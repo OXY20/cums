@@ -416,15 +416,16 @@
         <a onclick="showAboutPage()">关于</a> &bull; <span id="footerVersion">v1.0.0</span>
     </footer>
 
-    <div class="modal" id="loginModal">
+        <div class="modal" id="loginModal">
         <div class="modal-content">
             <span class="modal-close" onclick="hideLoginModal()">&times;</span>
             <h3>用户登录</h3>
             <form onsubmit="handleLogin(event)">
                 <div class="form-group">
                     <label>班级</label>
-                    <input type="text" id="loginClass" placeholder="请输入班级（如：一班）" required list="classList">
-                    <datalist id="classList"></datalist>
+                    <select id="loginClass" required>
+                        <option value="">请选择班级</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>号数</label>
@@ -458,7 +459,7 @@
                 const result = await response.json();
                 if (result.success) {
                     configData = result.data;
-                    initClassDatalist();
+                    initClassSelect();
                 }
             } catch (error) {
                 console.error('加载配置失败:', error);
@@ -525,13 +526,11 @@
             return html;
         }
 
-        function initClassDatalist() {
-            const datalist = document.getElementById('classList');
-            datalist.innerHTML = '';
+        function initClassSelect() {
+            const select = document.getElementById('loginClass');
+            select.innerHTML = '<option value="">请选择班级</option>';
             configData.classes.forEach(cls => {
-                const option = document.createElement('option');
-                option.value = cls;
-                datalist.appendChild(option);
+                select.add(new Option(cls, cls));
             });
         }
 
