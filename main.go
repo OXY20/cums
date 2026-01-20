@@ -509,7 +509,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		Filepath: filepath,
 	})
 
-	logMessage := fmt.Sprintf("[%s] %s班 %s号%s提交%s作业",
+	logMessage := fmt.Sprintf("[%s] %s %s号%s提交%s作业",
 		time.Now().Format("2006-01-02 15:04:05"), class, studentID, studentName, homework)
 
 	fmt.Println(logMessage)
