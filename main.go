@@ -14,19 +14,15 @@ import (
 )
 
 type Config struct {
-	Version    string                 `json:"version"`
-	ServerAddr string                 `json:"server_addr"`
-	UploadDir  string                 `json:"upload_dir"`
-	Classes    map[string]ClassConfig `json:"classes"`
+	Version    string                   `json:"version"`
+	ServerAddr string                   `json:"server_addr"`
+	UploadDir  string                   `json:"upload_dir"`
+	Subjects   map[string]SubjectConfig `json:"subjects"`
 }
 
-type ClassConfig struct {
-	Subjects map[string][]HomeworkConfig `json:"subjects"`
-}
-
-type HomeworkConfig struct {
-	Name       string `json:"name"`
-	UploadPath string `json:"upload_path"`
+type SubjectConfig struct {
+	Classes   []string `json:"classes"`
+	Homeworks []string `json:"homeworks"`
 }
 
 type LoginRequest struct {
@@ -47,8 +43,7 @@ type ConfigResponse struct {
 }
 
 type ConfigDataResponse struct {
-	Classes   []string                       `json:"classes"`
-	Homeworks map[string]map[string][]string `json:"homeworks"`
+	Subjects map[string]SubjectConfig `json:"subjects"`
 }
 
 type UploadResponse struct {
@@ -70,42 +65,29 @@ type ChangelogResponse struct {
 
 var config Config
 
-const defaultConfig = `{
-    "version": "1.0.0",
+var buildVersion = ""
+
+var defaultConfigTpl = `{
+    "version": "{{VERSION}}",
     "server_addr": ":3000",
     "upload_dir": "uploads",
-    "classes": {
-        "一班": {
-            "subjects": {
-                "数学": [
-                    { "name": "第一章作业" },
-                    { "name": "第二章作业" }
-                ],
-                "语文": [
-                    { "name": "作文" },
-                    { "name": "阅读理解" }
-                ],
-                "英语": [
-                    { "name": "听力练习" }
-                ]
-            }
+    "subjects": {
+        "数学": {
+            "classes": ["一班", "二班"],
+            "homeworks": ["第一章作业", "第二章作业"]
         },
-        "二班": {
-            "subjects": {
-                "物理": [
-                    { "name": "实验报告" },
-                    { "name": "课后习题" }
-                ],
-                "化学": [
-                    { "name": "实验报告" },
-                    { "name": "方程式练习" }
-                ]
-            }
+        "语文": {
+            "classes": ["一班"],
+            "homeworks": ["作文", "阅读理解"]
+        },
+        "英语": {
+            "classes": ["一班"],
+            "homeworks": ["听力练习"]
         }
     }
 }`
 
-const defaultIndexHTML = `<!DOCTYPE html>
+var defaultIndexHTMLTpl = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -190,6 +172,10 @@ const defaultIndexHTML = `<!DOCTYPE html>
                         <select id="subjectSelect" onchange="onSubjectChange()" required><option value="">请选择科目</option></select>
                     </div>
                     <div class="form-group">
+                        <label>班级</label>
+                        <select id="classSelect" onchange="onClassChange()" required><option value="">请选择班级</option></select>
+                    </div>
+                    <div class="form-group">
                         <label>作业</label>
                         <select id="homeworkSelect" required><option value="">请选择作业</option></select>
                     </div>
@@ -205,14 +191,14 @@ const defaultIndexHTML = `<!DOCTYPE html>
         <div class="about-card hidden" id="aboutCard">
             <h2>关于</h2>
             <div class="version-info">
-                <div class="version" id="aboutVersion">v1.0.0</div>
+                <div class="version" id="aboutVersion">v{{VERSION}}</div>
                 <div class="date">文件上传系统</div>
             </div>
             <div class="changelog" id="changelogContent"><p>加载中...</p></div>
         </div>
     </main>
     <footer class="footer">
-        <a onclick="showAboutPage()">关于</a> &bull; <span id="footerVersion">v1.0.0</span>
+        <a onclick="showAboutPage()">关于</a> &bull; <span id="footerVersion">v{{VERSION}}</span>
     </footer>
     <div class="modal" id="loginModal">
         <div class="modal-content">
@@ -221,8 +207,7 @@ const defaultIndexHTML = `<!DOCTYPE html>
             <form onsubmit="handleLogin(event)">
                 <div class="form-group">
                     <label>班级</label>
-                    <input type="text" id="loginClass" placeholder="请输入班级（如：一班）" required list="classList">
-                    <datalist id="classList"></datalist>
+                    <select id="loginClass" required><option value="">请选择班级</option></select>
                 </div>
                 <div class="form-group">
                     <label>号数</label>
@@ -237,27 +222,42 @@ const defaultIndexHTML = `<!DOCTYPE html>
         </div>
     </div>
     <script>
-        let currentUser = null, configData = null, currentVersion = '1.0.0';
+        let currentUser = null, configData = null, currentVersion = '{{VERSION}}';
         document.getElementById('fileInput').addEventListener('change', e => { document.getElementById('fileName').textContent = e.target.files[0]?.name || ''; });
-        async function loadConfig() { try { const r = await fetch('/api/v1/config', { method: 'POST', headers: {'Content-Type': 'application/json'} }); const rs = await r.json(); if (rs.success) { configData = rs.data; initClassDatalist(); } } catch (e) { console.error('加载配置失败:', e); } }
+        async function loadConfig() { try { const r = await fetch('/api/v1/config', { method: 'POST', headers: {'Content-Type': 'application/json'} }); const rs = await r.json(); if (rs.success) { configData = rs.data; initSubjectSelect(); } } catch (e) { console.error('加载配置失败:', e); } }
         async function loadVersion() { try { const r = await fetch('/api/v1/version'); const rs = await r.json(); if (rs.success) { currentVersion = rs.version; document.getElementById('aboutVersion').textContent = 'v' + currentVersion; document.getElementById('footerVersion').textContent = 'v' + currentVersion; } } catch (e) { console.error('加载版本失败:', e); } }
         async function loadChangelog() { try { const r = await fetch('/api/v1/changelog'); const rs = await r.json(); if (rs.success) { document.getElementById('changelogContent').innerHTML = formatChangelog(rs.changelog); } } catch (e) { document.getElementById('changelogContent').innerHTML = '<p>加载失败</p>'; } }
         function formatChangelog(text) { const lines = text.split('\n'); let h = ''; let inList = false; for (let l of lines) { l = l.trim(); if (!l) continue; if (l.startsWith('# ')) { if (inList) { h += '</ul>'; inList = false; } h += '<h2>' + l.substring(2) + '</h2>'; } else if (l.startsWith('## ')) { if (inList) { h += '</ul>'; inList = false; } h += '<div class="version-header">' + l.substring(3) + '</div>'; } else if (l.startsWith('### ')) { if (inList) { h += '</ul>'; inList = false; } h += '<h3>' + l.substring(4) + '</h3>'; } else if (l.startsWith('- ') || l.startsWith('* ')) { if (!inList) { h += '<ul>'; inList = true; } h += '<li>' + l.substring(2) + '</li>'; } else { if (inList) { h += '</ul>'; inList = false; } h += '<p>' + l + '</p>'; } } if (inList) h += '</ul>'; return h; }
-        function initClassDatalist() { const d = document.getElementById('classList'); configData.classes.forEach(c => { const o = document.createElement('option'); o.value = c; d.appendChild(o); }); }
-        function onSubjectChange() { const s = document.getElementById('subjectSelect').value, hs = document.getElementById('homeworkSelect'); hs.innerHTML = '<option value="">请选择作业</option>'; if (currentUser && s && configData.homeworks[currentUser.class][s]) { configData.homeworks[currentUser.class][s].forEach(h => hs.add(new Option(h, h))); } }
+        function initSubjectSelect() { const s = document.getElementById('subjectSelect'); Object.keys(configData.subjects).forEach(sub => { s.add(new Option(sub, sub)); }); }
+        function initLoginClassSelect() { const s = document.getElementById('loginClass'); const classes = new Set(); Object.values(configData.subjects).forEach(sub => { sub.classes.forEach(c => classes.add(c)); }); classes.forEach(c => { s.add(new Option(c, c)); }); }
+        function onSubjectChange() { const subject = document.getElementById('subjectSelect').value; const classSelect = document.getElementById('classSelect'); classSelect.innerHTML = '<option value="">请选择班级</option>'; if (subject && configData.subjects[subject]) { configData.subjects[subject].classes.forEach(c => { classSelect.add(new Option(c, c)); }); } onClassChange(); }
+        function onClassChange() { const subject = document.getElementById('subjectSelect').value; const className = document.getElementById('classSelect').value; const hwSelect = document.getElementById('homeworkSelect'); hwSelect.innerHTML = '<option value="">请选择作业</option>'; if (subject && configData.subjects[subject]) { configData.subjects[subject].homeworks.forEach(h => { hwSelect.add(new Option(h, h)); }); } }
         function showAboutPage() { document.getElementById('uploadCard').classList.add('hidden'); document.getElementById('welcomeText').classList.add('hidden'); document.getElementById('uploadForm').classList.add('hidden'); document.getElementById('aboutCard').classList.remove('hidden'); loadChangelog(); }
         function showUploadPage() { document.getElementById('aboutCard').classList.add('hidden'); if (currentUser) { document.getElementById('uploadCard').classList.remove('hidden'); document.getElementById('uploadForm').classList.remove('hidden'); } else { document.getElementById('uploadCard').classList.remove('hidden'); document.getElementById('welcomeText').classList.remove('hidden'); } }
         function showLoginModal() { document.getElementById('loginModal').classList.add('active'); }
         function hideLoginModal() { document.getElementById('loginModal').classList.remove('active'); }
-        async function handleLogin(e) { e.preventDefault(); const c = document.getElementById('loginClass').value, id = document.getElementById('loginStudentId').value, n = document.getElementById('loginStudentName').value; try { const r = await fetch('/api/v1/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({class: c, student_id: id, student_name: n}) }); const rs = await r.json(); if (rs.success) { currentUser = rs.data; updateUserInfo(); initSubjectSelect(); hideLoginModal(); showUploadPage(); document.getElementById('loginClass').value = ''; document.getElementById('loginStudentId').value = ''; document.getElementById('loginStudentName').value = ''; } else { alert(rs.message); } } catch (e) { alert('登录失败，请重试'); } }
+        async function handleLogin(e) { e.preventDefault(); const c = document.getElementById('loginClass').value, id = document.getElementById('loginStudentId').value, n = document.getElementById('loginStudentName').value; try { const r = await fetch('/api/v1/login', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({class: c, student_id: id, student_name: n}) }); const rs = await r.json(); if (rs.success) { currentUser = rs.data; updateUserInfo(); hideLoginModal(); showUploadPage(); document.getElementById('loginClass').value = ''; document.getElementById('loginStudentId').value = ''; document.getElementById('loginStudentName').value = ''; } else { alert(rs.message); } } catch (e) { alert('登录失败，请重试'); } }
         function updateUserInfo() { const u = document.getElementById('userInfo'), t = document.getElementById('classTag'); if (currentUser) { u.innerHTML = '<a class="nav-link" onclick="showAboutPage()">关于</a><span>' + currentUser.class + ' - ' + currentUser.student_id + '号 ' + currentUser.student_name + '</span>'; t.textContent = currentUser.class; } }
-        function initSubjectSelect() { const s = document.getElementById('subjectSelect'); s.innerHTML = '<option value="">请选择科目</option>'; if (currentUser && configData.homeworks[currentUser.class]) { Object.keys(configData.homeworks[currentUser.class]).forEach(su => s.add(new Option(su, su))); } }
         async function handleUpload(e) { e.preventDefault(); const f = document.getElementById('fileInput'), b = document.getElementById('uploadBtn'), m = document.getElementById('message'); if (!f.files[0]) { m.textContent = '请选择要上传的文件'; m.className = 'message error'; return; } const fd = new FormData(); fd.append('class', currentUser.class); fd.append('student_id', currentUser.student_id); fd.append('student_name', currentUser.student_name); fd.append('subject', document.getElementById('subjectSelect').value); fd.append('homework', document.getElementById('homeworkSelect').value); fd.append('file', f.files[0]); b.disabled = true; b.innerHTML = '<span class="loading"></span>上传中...'; m.className = 'message'; try { const r = await fetch('/api/v1/upload', { method: 'POST', body: fd }); const rs = await r.json(); if (rs.success) { m.textContent = '上传成功：' + rs.filename; m.className = 'message success'; document.getElementById('fileUploadForm').reset(); document.getElementById('fileName').textContent = ''; } else { m.textContent = rs.message; m.className = 'message error'; } } catch (e) { m.textContent = '上传失败，请重试'; m.className = 'message error'; } finally { b.disabled = false; b.textContent = '上传文件'; } }
         document.getElementById('loginModal').addEventListener('click', e => { if (e.target === this) hideLoginModal(); });
         loadConfig(); loadVersion();
     </script>
 </body>
 </html>`
+
+func init() {
+	if buildVersion == "" {
+		buildVersion = "1.0.3"
+	}
+}
+
+func getDefaultConfig() string {
+	return strings.Replace(defaultConfigTpl, "{{VERSION}}", buildVersion, 1)
+}
+
+func getDefaultHTML() string {
+	return strings.ReplaceAll(defaultIndexHTMLTpl, "{{VERSION}}", buildVersion)
+}
 
 func getCumsDir() string {
 	exePath, _ := os.Executable()
@@ -301,6 +301,7 @@ func loadConfig() error {
 		if err := os.MkdirAll(cumsDir, 0755); err != nil {
 			return fmt.Errorf("创建 cums 目录失败: %w", err)
 		}
+		defaultConfig := getDefaultConfig()
 		if err := os.WriteFile(configPath, []byte(defaultConfig), 0644); err != nil {
 			return fmt.Errorf("创建默认配置文件失败: %w", err)
 		}
@@ -315,18 +316,13 @@ func initUploadDirs() error {
 	uploadDir := filepath.Join(baseDir, "uploads")
 	config.UploadDir = uploadDir
 
-	if config.Classes == nil {
-		config.Classes = make(map[string]ClassConfig)
+	if config.Subjects == nil {
+		config.Subjects = make(map[string]SubjectConfig)
 	}
-	for className, classConfig := range config.Classes {
-		for subject, homeworks := range classConfig.Subjects {
-			for _, hw := range homeworks {
-				var dir string
-				if hw.UploadPath != "" {
-					dir = hw.UploadPath
-				} else {
-					dir = filepath.Join(uploadDir, className, subject, hw.Name)
-				}
+	for subject, subConfig := range config.Subjects {
+		for _, class := range subConfig.Classes {
+			for _, hw := range subConfig.Homeworks {
+				dir := filepath.Join(uploadDir, subject, class, hw)
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return fmt.Errorf("创建目录失败 %s: %w", dir, err)
 				}
@@ -349,7 +345,8 @@ func autoInit() error {
 		if err := os.MkdirAll(staticPath, 0755); err != nil {
 			return fmt.Errorf("创建静态目录失败: %w", err)
 		}
-		if err := os.WriteFile(staticFile, []byte(defaultIndexHTML), 0644); err != nil {
+		defaultHTML := getDefaultHTML()
+		if err := os.WriteFile(staticFile, []byte(defaultHTML), 0644); err != nil {
 			return fmt.Errorf("创建默认静态文件失败: %w", err)
 		}
 		fmt.Printf("已创建静态文件: %s\n", staticFile)
@@ -368,21 +365,29 @@ var classMapping = map[string]string{
 	"4班": "四班", "5班": "五班", "6班": "六班",
 }
 
-func findClass(className string) (string, bool) {
-	if _, exists := config.Classes[className]; exists {
-		return className, true
-	}
+func findClassInConfig(className string) (string, bool) {
 	if mapped, ok := classMapping[className]; ok {
-		if _, exists := config.Classes[mapped]; exists {
-			return mapped, true
-		}
+		className = mapped
 	}
-	for cls := range config.Classes {
-		if cls == className {
-			return cls, true
+	for _, subConfig := range config.Subjects {
+		for _, class := range subConfig.Classes {
+			if class == className {
+				return className, true
+			}
 		}
 	}
 	return "", false
+}
+
+func isClassInSubject(subject, className string) bool {
+	if subConfig, ok := config.Subjects[subject]; ok {
+		for _, class := range subConfig.Classes {
+			if class == className {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -391,11 +396,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "无效的请求", http.StatusBadRequest)
 		return
 	}
-	className, found := findClass(req.Class)
+
+	className, found := findClassInConfig(req.Class)
 	if !found {
-		classes := make([]string, 0, len(config.Classes))
-		for c := range config.Classes {
-			classes = append(classes, c)
+		classes := make([]string, 0)
+		for _, subConfig := range config.Subjects {
+			for _, class := range subConfig.Classes {
+				classes = append(classes, class)
+			}
 		}
 		jsonResponse(w, LoginResponse{
 			Success: false,
@@ -424,22 +432,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func configHandler(w http.ResponseWriter, r *http.Request) {
-	classes := make([]string, 0, len(config.Classes))
-	homeworks := make(map[string]map[string][]string)
-	for className, classConfig := range config.Classes {
-		classes = append(classes, className)
-		homeworks[className] = make(map[string][]string)
-		for subject, hwConfigs := range classConfig.Subjects {
-			for _, hw := range hwConfigs {
-				homeworks[className][subject] = append(homeworks[className][subject], hw.Name)
-			}
-		}
-	}
 	jsonResponse(w, ConfigResponse{
 		Success: true,
 		Data: ConfigDataResponse{
-			Classes:   classes,
-			Homeworks: homeworks,
+			Subjects: config.Subjects,
 		},
 	})
 }
@@ -450,72 +446,104 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	studentName := r.FormValue("student_name")
 	subject := r.FormValue("subject")
 	homework := r.FormValue("homework")
+
+	fmt.Printf("[调试] 上传请求: 班级=%s, 科目=%s, 作业=%s\n", class, subject, homework)
+	fmt.Printf("[调试] UploadDir: %s\n", config.UploadDir)
+
 	if class == "" || studentID == "" || studentName == "" || subject == "" || homework == "" {
 		jsonResponse(w, UploadResponse{Success: false, Message: "缺少必要参数", Filename: ""})
 		return
 	}
-	classConfig, exists := config.Classes[class]
-	if !exists {
+
+	className, found := findClassInConfig(class)
+	if !found {
+		fmt.Printf("[错误] 班级不存在: %s\n", class)
 		jsonResponse(w, UploadResponse{Success: false, Message: "班级不存在", Filename: ""})
 		return
 	}
-	hwConfigs, exists := classConfig.Subjects[subject]
+
+	subConfig, exists := config.Subjects[subject]
 	if !exists {
+		fmt.Printf("[错误] 科目不存在: %s\n", subject)
 		jsonResponse(w, UploadResponse{Success: false, Message: "科目不存在", Filename: ""})
 		return
 	}
-	var uploadPath string
-	var found bool
-	for _, hw := range hwConfigs {
-		if hw.Name == homework {
-			if hw.UploadPath != "" {
-				uploadPath = hw.UploadPath
-			} else {
-				uploadPath = filepath.Join(config.UploadDir, class, subject, homework)
-			}
-			found = true
+
+	if !isClassInSubject(subject, className) {
+		fmt.Printf("[错误] 班级 %s 不在科目 %s 中\n", className, subject)
+		jsonResponse(w, UploadResponse{Success: false, Message: "该班级没有此科目", Filename: ""})
+		return
+	}
+
+	homeworkExists := false
+	for _, hw := range subConfig.Homeworks {
+		if hw == homework {
+			homeworkExists = true
 			break
 		}
 	}
-	if !found {
+	if !homeworkExists {
+		fmt.Printf("[错误] 作业不存在: %s\n", homework)
 		jsonResponse(w, UploadResponse{Success: false, Message: "作业不存在", Filename: ""})
 		return
 	}
+
+	uploadPath := filepath.Join(config.UploadDir, subject, className, homework)
+	fmt.Printf("[调试] 上传路径: %s\n", uploadPath)
+
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		jsonResponse(w, UploadResponse{Success: false, Message: "请选择要上传的文件", Filename: ""})
 		return
 	}
 	defer file.Close()
+
+	fmt.Printf("[调试] 接收文件: %s\n", header.Filename)
+
 	ext := filepath.Ext(header.Filename)
 	filename := fmt.Sprintf("%s_%s_%s_%s%s", homework, studentID, studentName, time.Now().Format("20060102150405"), ext)
+
+	fmt.Printf("[调试] 创建目录: %s\n", uploadPath)
 	if err := os.MkdirAll(uploadPath, 0755); err != nil {
-		jsonResponse(w, UploadResponse{Success: false, Message: "创建目录失败", Filename: ""})
+		fmt.Printf("[错误] 创建目录失败: %v\n", err)
+		jsonResponse(w, UploadResponse{Success: false, Message: "创建目录失败: " + err.Error(), Filename: ""})
 		return
 	}
+
 	filepath := filepath.Join(uploadPath, filename)
 	dst, err := os.Create(filepath)
 	if err != nil {
-		jsonResponse(w, UploadResponse{Success: false, Message: "创建文件失败", Filename: ""})
+		fmt.Printf("[错误] 创建文件失败: %v\n", err)
+		jsonResponse(w, UploadResponse{Success: false, Message: "创建文件失败: " + err.Error(), Filename: ""})
 		return
 	}
 	defer dst.Close()
+
 	if _, err := io.Copy(dst, file); err != nil {
+		fmt.Printf("[错误] 写入文件失败: %v\n", err)
 		jsonResponse(w, UploadResponse{Success: false, Message: "写入文件失败", Filename: ""})
 		return
 	}
+
+	fmt.Printf("[调试] 文件上传成功\n")
+	fmt.Printf("  班级: %s\n", className)
+	fmt.Printf("  科目: %s\n", subject)
+	fmt.Printf("  作业: %s\n", homework)
+	fmt.Printf("  文件: %s\n", filename)
+	fmt.Printf("  路径: %s\n", filepath)
+
+	logMessage := fmt.Sprintf("[%s] %s %s号%s提交%s作业",
+		time.Now().Format("2006-01-02 15:04:05"), className, studentID, studentName, homework)
+
+	fmt.Println(logMessage)
+	writeLog(logMessage)
+
 	jsonResponse(w, UploadResponse{
 		Success:  true,
 		Message:  "上传成功",
 		Filename: filename,
 		Filepath: filepath,
 	})
-
-	logMessage := fmt.Sprintf("[%s] %s %s号%s提交%s作业",
-		time.Now().Format("2006-01-02 15:04:05"), class, studentID, studentName, homework)
-
-	fmt.Println(logMessage)
-	writeLog(logMessage)
 }
 
 func writeLog(message string) {
@@ -536,28 +564,15 @@ func writeLog(message string) {
 }
 
 func versionHandler(w http.ResponseWriter, r *http.Request) {
-	jsonResponse(w, VersionResponse{Success: true, Version: config.Version})
+	version := config.Version
+	if version == "" {
+		version = buildVersion
+	}
+	jsonResponse(w, VersionResponse{Success: true, Version: version})
 }
 
 func changelogHandler(w http.ResponseWriter, r *http.Request) {
-	changelog := `# 更新日志
-
-## v1.0.0 (2026-01-20)
-
-### 新增功能
-- 文件上传系统
-- 班级/科目/作业配置管理
-- 支持自定义存储路径
-
-### 特性
-- 简洁的登录界面
-- 文件自动重命名
-- 跨平台支持（Windows/Linux/Mac）
-
-### 配置
-- 配置文件格式：JSON
-- 端口：3000
-- 默认上传目录：cums/uploads/`
+	changelog := "# 更新日志\n\n## v" + buildVersion + " (" + time.Now().Format("2006-01-20") + ")\n\n### 新增功能\n- 文件上传系统\n- 班级/科目/作业配置管理\n- 支持自定义存储路径\n\n### 特性\n- 简洁的登录界面\n- 文件自动重命名\n- 跨平台支持（Windows/Linux/Mac）\n\n### 配置\n- 配置文件格式：JSON\n- 端口：3000\n- 默认上传目录：cums/uploads/"
 	jsonResponse(w, ChangelogResponse{Success: true, Changelog: changelog})
 }
 
@@ -588,6 +603,11 @@ func main() {
 	staticPath := findStaticPath()
 	cumsDir := getCumsDir()
 
+	displayVersion := config.Version
+	if displayVersion == "" {
+		displayVersion = buildVersion
+	}
+
 	fmt.Println("目录结构:")
 	fmt.Printf("  配置: %s\n", filepath.Join(cumsDir, "config.json"))
 	fmt.Printf("  静态: %s\n", staticPath)
@@ -605,7 +625,7 @@ func main() {
 
 	addr := "0.0.0.0" + config.ServerAddr
 	fmt.Printf("服务器启动: http://%s\n", addr)
-	fmt.Printf("版本: %s\n", config.Version)
+	fmt.Printf("版本: %s\n", displayVersion)
 	fmt.Println()
 	fmt.Println("按 Ctrl+C 停止服务")
 	fmt.Println()
