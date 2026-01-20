@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -601,13 +603,48 @@ func main() {
 	http.HandleFunc("/api/v1/version", versionHandler)
 	http.HandleFunc("/api/v1/changelog", changelogHandler)
 
-	fmt.Printf("服务器启动: http://localhost%s\n", config.ServerAddr)
+	addr := "0.0.0.0" + config.ServerAddr
+	fmt.Printf("服务器启动: http://%s\n", addr)
 	fmt.Printf("版本: %s\n", config.Version)
 	fmt.Println()
 	fmt.Println("按 Ctrl+C 停止服务")
 	fmt.Println()
 
-	if err := http.ListenAndServe(config.ServerAddr, nil); err != nil {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		if strings.Contains(err.Error(), "address already in use") {
+			port := getNextPort(config.ServerAddr)
+			addr = "0.0.0.0" + port
+			fmt.Printf("端口被占用，尝试新端口: %s\n", addr)
+			ln, err = net.Listen("tcp", addr)
+		}
+		if err != nil {
+			fmt.Printf("启动服务器失败: %v\n", err)
+			os.Exit(1)
+		}
+	}
+	fmt.Printf("服务器启动: http://%s\n", addr)
+	if err := http.Serve(ln, nil); err != nil {
 		fmt.Printf("服务器错误: %v\n", err)
+	}
+}
+
+func getNextPort(addr string) string {
+	portStr := strings.TrimPrefix(addr, ":")
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		return ":3000"
+	}
+	for {
+		port++
+		testAddr := fmt.Sprintf(":%d", port)
+		ln, err := net.Listen("tcp", testAddr)
+		if err == nil {
+			ln.Close()
+			return testAddr
+		}
+		if port > 65535 {
+			return ":3000"
+		}
 	}
 }
