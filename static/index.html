@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f5;
+            min-height: 100vh;
+        }
+
+        .header {
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-info span {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .nav-link {
+            color: #666;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            color: #1890ff;
+            background-color: #e6f7ff;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background-color: #1890ff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background-color: #40a9ff;
+        }
+
+        .main {
+            max-width: 600px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .upload-card, .about-card {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 32px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .about-card h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .about-card h2 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .version-info {
+            text-align: center;
+            padding: 20px 0;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 24px;
+        }
+
+        .version-info .version {
+            font-size: 24px;
+            color: #1890ff;
+            font-weight: 500;
+        }
+
+        .version-info .date {
+            font-size: 12px;
+            color: #999;
+            margin-top: 8px;
+        }
+
+        .changelog {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .changelog h3 {
+            font-size: 16px;
+            color: #333;
+            margin: 16px 0 8px;
+        }
+
+        .changelog ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .changelog li {
+            position: relative;
+            padding-left: 16px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .changelog li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #1890ff;
+        }
+
+        .changelog .version-header {
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+            margin-top: 24px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e8e8e8;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .form-group select,
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus,
+        .form-group input[type="text"]:focus {
+            outline: none;
+            border-color: #1890ff;
+        }
+
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .upload-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #1890ff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .upload-btn:hover {
+            background-color: #40a9ff;
+        }
+
+        .upload-btn:disabled {
+            background-color: #d9d9d9;
+            cursor: not-allowed;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 24px;
+            width: 360px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .modal-content h3 {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .modal-close {
+            float: right;
+            cursor: pointer;
+            color: #999;
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .modal .btn-primary {
+            width: 100%;
+            padding: 10px;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .message.success {
+            background-color: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+            display: block;
+        }
+
+        .message.error {
+            background-color: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #f5222d;
+            display: block;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .welcome-text {
+            color: #666;
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .welcome-text p {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .welcome-text .btn {
+            margin-top: 16px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .file-name {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .class-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background-color: #e6f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            color: #1890ff;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        .footer a {
+            color: #1890ff;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <h1>文件上传系统</h1>
+        <div class="user-info" id="userInfo">
+            <a class="nav-link" onclick="showAboutPage()">关于</a>
+            <button class="btn btn-primary" onclick="showLoginModal()">登录</button>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="upload-card" id="uploadCard">
+            <div class="welcome-text" id="welcomeText">
+                <p>请先登录</p>
+                <button class="btn btn-primary" onclick="showLoginModal()">登录</button>
+            </div>
+            <div id="uploadForm" class="hidden">
+                <div class="class-tag" id="classTag"></div>
+                <h2>作业上传</h2>
+                <div class="message" id="message"></div>
+                <form id="fileUploadForm" onsubmit="handleUpload(event)">
+                    <div class="form-group">
+                        <label>科目</label>
+                        <select id="subjectSelect" onchange="onSubjectChange()" required>
+                            <option value="">请选择科目</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>作业</label>
+                        <select id="homeworkSelect" required>
+                            <option value="">请选择作业</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>文件</label>
+                        <input type="file" id="fileInput" required>
+                        <div class="file-name" id="fileName"></div>
+                    </div>
+                    <button type="submit" class="upload-btn" id="uploadBtn">上传文件</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="about-card hidden" id="aboutCard">
+            <h2>关于</h2>
+            <div class="version-info">
+                <div class="version" id="aboutVersion">v1.0.0</div>
+                <div class="date">文件上传系统</div>
+            </div>
+            <div class="changelog" id="changelogContent">
+                <p>加载中...</p>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <a onclick="showAboutPage()">关于</a> &bull; <span id="footerVersion">v1.0.0</span>
+    </footer>
+
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="hideLoginModal()">&times;</span>
+            <h3>用户登录</h3>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>班级</label>
+                    <input type="text" id="loginClass" placeholder="请输入班级（如：一班）" required list="classList">
+                    <datalist id="classList"></datalist>
+                </div>
+                <div class="form-group">
+                    <label>号数</label>
+                    <input type="text" id="loginStudentId" placeholder="请输入号数" required>
+                </div>
+                <div class="form-group">
+                    <label>姓名</label>
+                    <input type="text" id="loginStudentName" placeholder="请输入姓名" required>
+                </div>
+                <button type="submit" class="btn btn-primary">登录</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+        let configData = null;
+        let currentVersion = '1.0.0';
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name;
+            document.getElementById('fileName').textContent = fileName || '';
+        });
+
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/v1/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    configData = result.data;
+                    initClassDatalist();
+                }
+            } catch (error) {
+                console.error('加载配置失败:', error);
+            }
+        }
+
+        async function loadVersion() {
+            try {
+                const response = await fetch('/api/v1/version');
+                const result = await response.json();
+                if (result.success) {
+                    currentVersion = result.version;
+                    document.getElementById('aboutVersion').textContent = 'v' + currentVersion;
+                    document.getElementById('footerVersion').textContent = 'v' + currentVersion;
+                }
+            } catch (error) {
+                console.error('加载版本失败:', error);
+            }
+        }
+
+        async function loadChangelog() {
+            try {
+                const response = await fetch('/api/v1/changelog');
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('changelogContent').innerHTML = formatChangelog(result.changelog);
+                }
+            } catch (error) {
+                document.getElementById('changelogContent').innerHTML = '<p>加载失败</p>';
+            }
+        }
+
+        function formatChangelog(text) {
+            const lines = text.split('\n');
+            let html = '';
+            let inList = false;
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+
+                if (line.startsWith('# ')) {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    html += `<h2>${line.substring(2)}</h2>`;
+                } else if (line.startsWith('## ')) {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    html += `<div class="version-header">${line.substring(3)}</div>`;
+                } else if (line.startsWith('### ')) {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    html += `<h3>${line.substring(4)}</h3>`;
+                } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                    if (!inList) { html += '<ul>'; inList = true; }
+                    html += `<li>${line.substring(2)}</li>`;
+                } else if (line.startsWith('-')) {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    html += `<li>${line.substring(1).trim()}</li>`;
+                } else {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    html += `<p>${line}</p>`;
+                }
+            }
+
+            if (inList) html += '</ul>';
+            return html;
+        }
+
+        function initClassDatalist() {
+            const datalist = document.getElementById('classList');
+            datalist.innerHTML = '';
+            configData.classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls;
+                datalist.appendChild(option);
+            });
+        }
+
+        function onSubjectChange() {
+            const subjectName = document.getElementById('subjectSelect').value;
+            const homeworkSelect = document.getElementById('homeworkSelect');
+
+            homeworkSelect.innerHTML = '<option value="">请选择作业</option>';
+
+            if (currentUser && subjectName && configData.homeworks[currentUser.class][subjectName]) {
+                configData.homeworks[currentUser.class][subjectName].forEach(homework => {
+                    homeworkSelect.add(new Option(homework, homework));
+                });
+            }
+        }
+
+        function showAboutPage() {
+            document.getElementById('uploadCard').classList.add('hidden');
+            document.getElementById('welcomeText').classList.add('hidden');
+            document.getElementById('uploadForm').classList.add('hidden');
+            document.getElementById('aboutCard').classList.remove('hidden');
+            loadChangelog();
+        }
+
+        function showUploadPage() {
+            document.getElementById('aboutCard').classList.add('hidden');
+            if (currentUser) {
+                document.getElementById('uploadCard').classList.remove('hidden');
+                document.getElementById('uploadForm').classList.remove('hidden');
+            } else {
+                document.getElementById('uploadCard').classList.remove('hidden');
+                document.getElementById('welcomeText').classList.remove('hidden');
+            }
+        }
+
+        function showLoginModal() {
+            document.getElementById('loginModal').classList.add('active');
+        }
+
+        function hideLoginModal() {
+            document.getElementById('loginModal').classList.remove('active');
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+
+            const className = document.getElementById('loginClass').value;
+            const studentId = document.getElementById('loginStudentId').value;
+            const studentName = document.getElementById('loginStudentName').value;
+
+            try {
+                const response = await fetch('/api/v1/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        class: className,
+                        student_id: studentId,
+                        student_name: studentName
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentUser = result.data;
+                    updateUserInfo();
+                    initSubjectSelect();
+                    hideLoginModal();
+                    showUploadPage();
+                    document.getElementById('loginClass').value = '';
+                    document.getElementById('loginStudentId').value = '';
+                    document.getElementById('loginStudentName').value = '';
+                } else {
+                    alert(result.message);
+                }
+            } catch (error) {
+                alert('登录失败，请重试');
+            }
+        }
+
+        function updateUserInfo() {
+            const userInfo = document.getElementById('userInfo');
+            const classTag = document.getElementById('classTag');
+
+            if (currentUser) {
+                userInfo.innerHTML = `<a class="nav-link" onclick="showAboutPage()">关于</a><span>${currentUser.class} - ${currentUser.student_id}号 ${currentUser.student_name}</span>`;
+                classTag.textContent = currentUser.class;
+            }
+        }
+
+        function initSubjectSelect() {
+            const subjectSelect = document.getElementById('subjectSelect');
+            subjectSelect.innerHTML = '<option value="">请选择科目</option>';
+
+            if (currentUser && configData.homeworks[currentUser.class]) {
+                Object.keys(configData.homeworks[currentUser.class]).forEach(subject => {
+                    subjectSelect.add(new Option(subject, subject));
+                });
+            }
+        }
+
+        async function handleUpload(e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const message = document.getElementById('message');
+
+            if (!fileInput.files[0]) {
+                message.textContent = '请选择要上传的文件';
+                message.className = 'message error';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('class', currentUser.class);
+            formData.append('student_id', currentUser.student_id);
+            formData.append('student_name', currentUser.student_name);
+            formData.append('subject', document.getElementById('subjectSelect').value);
+            formData.append('homework', document.getElementById('homeworkSelect').value);
+            formData.append('file', fileInput.files[0]);
+
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="loading"></span>上传中...';
+            message.className = 'message';
+
+            try {
+                const response = await fetch('/api/v1/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    message.textContent = `上传成功：${result.filename}`;
+                    message.className = 'message success';
+                    document.getElementById('fileUploadForm').reset();
+                    document.getElementById('fileName').textContent = '';
+                } else {
+                    message.textContent = result.message;
+                    message.className = 'message error';
+                }
+            } catch (error) {
+                message.textContent = '上传失败，请重试';
+                message.className = 'message error';
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '上传文件';
+            }
+        }
+
+        document.getElementById('loginModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideLoginModal();
+            }
+        });
+
+        loadConfig();
+        loadVersion();
+    </script>
+</body>
+</html>
