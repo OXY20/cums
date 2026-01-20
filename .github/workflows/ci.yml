@@ -1,0 +1,75 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [master, develop]
+  pull_request:
+    branches: [master, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Build
+        run: |
+          go build -o cums .
+
+      - name: Verify Build
+        run: |
+          file cums
+          ./cums --help 2>/dev/null || true
+
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get Version
+        id: version
+        run: |
+          VERSION=$(grep '"version"' config.json | cut -d'"' -f4)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Date: $(date +%Y%m%d%H%M)"
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      - name: Build Windows
+        run: |
+          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o cums.exe .
+
+      - name: Build Linux
+        run: |
+          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o cums-linux .
+
+      - name: Build macOS
+        run: |
+          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o cums-macos .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            cums.exe
+            cums-linux
+            cums-macos
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
