@@ -46,7 +46,7 @@ cums/
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/yourusername/cums.git
+git clone https://github.com/OXY20/cums.git
 cd cums
 ```
 

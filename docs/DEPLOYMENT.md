@@ -360,7 +360,7 @@ cp -r uploads uploads.backup
 ### 2. 下载新版本
 
 ```bash
-wget https://github.com/yourusername/cums/releases/download/v1.0.1/cums_1.0.1_linux_amd64
+wget https://github.com/OXY20/cums/releases/download/v1.0.1/cums_1.0.1_linux_amd64
 mv cums_1.0.1_linux_amd64 cums
 chmod +x cums
 ```

@@ -6,7 +6,7 @@
 
 ### 报告问题
 
-1. 检查 [Issues](https://github.com/yourusername/cums/issues) 是否已有相同问题
+1. 检查 [Issues](https://github.com/OXY20/cums/issues) 是否已有相同问题
 2. 如果没有，创建新 Issue，包含：
    - 清晰的标题
    - 详细的问题描述
@@ -17,7 +17,7 @@
 
 ### 提出建议
 
-1. 检查 [Issues](https://github.com/yourusername/cums/issues) 是否已有相同建议
+1. 检查 [Issues](https://github.com/OXY20/cums/issues) 是否已有相同建议
 2. 如果没有，创建新 Issue，包含：
    - 清晰的标题
    - 功能的详细描述
@@ -33,14 +33,14 @@
 #### 2. 克隆你的 Fork
 
 ```bash
-git clone https://github.com/yourusername/cums.git
+git clone https://github.com/OXY20/cums.git
 cd cums
 ```
 
 #### 3. 添加上游仓库
 
 ```bash
-git remote add upstream https://github.com/original-author/cums.git
+git remote add upstream https://github.com/OXY20/cums.git
 ```
 
 #### 4. 创建功能分支
@@ -299,7 +299,7 @@ git push origin develop
 
 如有疑问，可以通过以下方式联系：
 
-- 提交 [Issue](https://github.com/yourusername/cums/issues)
+- 提交 [Issue](https://github.com/OXY20/cums/issues)
 - 发送邮件：your-email@example.com
 
 ## 许可证
