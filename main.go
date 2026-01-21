@@ -16,9 +16,11 @@ import (
 
 // Config 系统配置
 type Config struct {
-	Version    string                   `json:"version"`
-	ServerAddr string                   `json:"server_addr"`
-	Subjects   map[string]SubjectConfig `json:"subjects"`
+	Version       string                   `json:"version"`
+	ServerAddr    string                   `json:"server_addr"`
+	AdminEnabled  bool                     `json:"admin_enabled"`
+	AdminPassword string                   `json:"admin_password"`
+	Subjects      map[string]SubjectConfig `json:"subjects"`
 }
 
 // SubjectConfig 科目配置
@@ -54,13 +56,31 @@ type VersionResponse struct {
 	Version string `json:"version"`
 }
 
+// AdminLoginRequest 管理员登录请求
+type AdminLoginRequest struct {
+	Password string `json:"password"`
+}
+
+// AdminLoginResponse 管理员登录响应
+type AdminLoginResponse struct {
+	Success bool   `json:"success"`
+	Message string `json:"message"`
+	Token   string `json:"token,omitempty"`
+}
+
+// AdminConfigRequest 管理员配置更新请求
+type AdminConfigRequest struct {
+	Subjects map[string]SubjectConfig `json:"subjects"`
+}
+
 // ==================== 全局变量 ====================
 
 var (
-	config    Config
-	version   = "2.0.0"
-	baseDir   string // 程序所在目录
-	uploadDir string // 上传目录
+	config      Config
+	version     = "2.0.0"
+	baseDir     string            // 程序所在目录
+	uploadDir   string            // 上传目录
+	adminTokens = make(map[string]time.Time) // 管理员会话令牌
 )
 
 // ==================== 初始化函数 ====================
@@ -321,6 +341,146 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, staticFile)
 }
 
+// adminPageHandler 返回管理员页面
+func adminPageHandler(w http.ResponseWriter, r *http.Request) {
+	if !config.AdminEnabled {
+		http.Error(w, "管理员功能未启用", http.StatusForbidden)
+		return
+	}
+	
+	adminFile := filepath.Join(baseDir, "static", "admin.html")
+	
+	if _, err := os.Stat(adminFile); os.IsNotExist(err) {
+		http.Error(w, "管理员页面不存在", http.StatusNotFound)
+		return
+	}
+	
+	http.ServeFile(w, r, adminFile)
+}
+
+// adminLoginHandler 处理管理员登录
+func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		jsonResponse(w, AdminLoginResponse{Success: false, Message: "请求方法错误"})
+		return
+	}
+	
+	if !config.AdminEnabled {
+		jsonResponse(w, AdminLoginResponse{Success: false, Message: "管理员功能未启用"})
+		return
+	}
+	
+	var req AdminLoginRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		jsonResponse(w, AdminLoginResponse{Success: false, Message: "请求格式错误"})
+		return
+	}
+	
+	if req.Password != config.AdminPassword {
+		jsonResponse(w, AdminLoginResponse{Success: false, Message: "密码错误"})
+		return
+	}
+	
+	// 生成令牌
+	token := generateAdminToken()
+	adminTokens[token] = time.Now().Add(24 * time.Hour) // 24小时有效
+	
+	jsonResponse(w, AdminLoginResponse{
+		Success: true,
+		Message: "登录成功",
+		Token:   token,
+	})
+}
+
+// adminConfigHandler 获取/更新管理员配置
+func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
+	if !config.AdminEnabled {
+		jsonResponse(w, APIResponse{Success: false, Message: "管理员功能未启用"})
+		return
+	}
+	
+	// 验证令牌
+	token := r.Header.Get("X-Admin-Token")
+	if !validateAdminToken(token) {
+		jsonResponse(w, APIResponse{Success: false, Message: "未授权访问"})
+		return
+	}
+	
+	switch r.Method {
+	case http.MethodGet:
+		// 返回当前配置
+		jsonResponse(w, APIResponse{
+			Success: true,
+			Data: map[string]interface{}{
+				"subjects": config.Subjects,
+			},
+		})
+	case http.MethodPost:
+		// 更新配置
+		var req AdminConfigRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			jsonResponse(w, APIResponse{Success: false, Message: "请求格式错误"})
+			return
+		}
+		
+		// 更新内存中的配置
+		config.Subjects = req.Subjects
+		
+		// 保存到文件
+		if err := saveConfig(); err != nil {
+			jsonResponse(w, APIResponse{Success: false, Message: "保存配置失败: " + err.Error()})
+			return
+		}
+		
+		// 重新初始化上传目录
+		if err := initUploadDirs(); err != nil {
+			jsonResponse(w, APIResponse{Success: false, Message: "初始化目录失败: " + err.Error()})
+			return
+		}
+		
+		jsonResponse(w, APIResponse{Success: true, Message: "配置已更新"})
+	default:
+		jsonResponse(w, APIResponse{Success: false, Message: "请求方法错误"})
+	}
+}
+
+// generateAdminToken 生成管理员令牌
+func generateAdminToken() string {
+	return fmt.Sprintf("admin_%d_%d", time.Now().UnixNano(), time.Now().Unix())
+}
+
+// validateAdminToken 验证管理员令牌
+func validateAdminToken(token string) bool {
+	if token == "" {
+		return false
+	}
+	expiry, exists := adminTokens[token]
+	if !exists {
+		return false
+	}
+	if time.Now().After(expiry) {
+		delete(adminTokens, token)
+		return false
+	}
+	return true
+}
+
+// saveConfig 保存配置到文件
+func saveConfig() error {
+	configPath := filepath.Join(baseDir, "config.json")
+	
+	data, err := json.MarshalIndent(config, "", "    ")
+	if err != nil {
+		return fmt.Errorf("序列化配置失败: %w", err)
+	}
+	
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("写入配置文件失败: %w", err)
+	}
+	
+	return nil
+}
+
 // ==================== 工具函数 ====================
 
 // jsonResponse 发送JSON响应
@@ -416,10 +576,13 @@ func main() {
 	
 	// 注册路由
 	http.HandleFunc("/", staticHandler)
+	http.HandleFunc("/admin", adminPageHandler)
 	http.HandleFunc("/api/v1/login", loginHandler)
 	http.HandleFunc("/api/v1/config", configHandler)
 	http.HandleFunc("/api/v1/upload", uploadHandler)
 	http.HandleFunc("/api/v1/version", versionHandler)
+	http.HandleFunc("/api/v1/admin/login", adminLoginHandler)
+	http.HandleFunc("/api/v1/admin/config", adminConfigHandler)
 	
 	// 启动服务器
 	addr := config.ServerAddr

@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CUMS - 管理员控制台</title>
+    <style>
+        /* ========== 基础样式 ========== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: #e8e8e8;
+        }
+
+        /* ========== 头部 ========== */
+        .header {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            padding: 16px 24px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 .badge {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        /* ========== 按钮 ========== */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-danger {
+            background: transparent;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00d9a5, #00b894);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0, 217, 165, 0.3);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 217, 165, 0.4);
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-icon {
+            width: 32px;
+            height: 32px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        /* ========== 主内容 ========== */
+        .main {
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 32px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* ========== 登录页 ========== */
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+        }
+
+        .login-card {
+            text-align: center;
+        }
+
+        .login-logo {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #e94560, #ff6b6b);
+            border-radius: 20px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 24px rgba(233, 69, 96, 0.4);
+        }
+
+        .login-title {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .login-subtitle {
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 32px;
+            font-size: 14px;
+        }
+
+        /* ========== 表单 ========== */
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #fff;
+            transition: all 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #e94560;
+            box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+        }
+
+        .form-group input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            margin-top: 8px;
+        }
+
+        /* ========== 消息提示 ========== */
+        .message {
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.success {
+            display: block;
+            background: rgba(0, 217, 165, 0.15);
+            border: 1px solid rgba(0, 217, 165, 0.3);
+            color: #00d9a5;
+        }
+
+        .message.error {
+            display: block;
+            background: rgba(255, 107, 107, 0.15);
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            color: #ff6b6b;
+        }
+
+        /* ========== 科目列表 ========== */
+        .subject-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .subject-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .subject-item:hover {
+            border-color: rgba(233, 69, 96, 0.3);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .subject-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .subject-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .subject-name .icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .subject-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .subject-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .content-section {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .content-section h4 {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 12px;
+        }
+
+        .tag-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tag .remove-btn {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: rgba(255, 107, 107, 0.3);
+            border: none;
+            color: #ff6b6b;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .tag .remove-btn:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        .add-tag-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            background: transparent;
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 20px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-tag-btn:hover {
+            border-color: #e94560;
+            color: #e94560;
+        }
+
+        /* ========== 添加科目区域 ========== */
+        .add-subject-area {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .add-form {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .add-form .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        /* ========== 操作栏 ========== */
+        .action-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .action-bar-right {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* ========== 输入弹窗 ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 28px;
+            width: 400px;
+            max-width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .modal-close:hover {
+            color: #fff;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .modal-actions .btn {
+            flex: 1;
+        }
+
+        /* ========== 空状态 ========== */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            margin-bottom: 20px;
+        }
+
+        /* ========== 加载动画 ========== */
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ========== 隐藏 ========== */
+        .hidden { display: none !important; }
+
+        /* ========== 返回链接 ========== */
+        .back-link {
+            color: rgba(255, 255, 255, 0.5);
+            text-decoration: none;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.2s;
+        }
+
+        .back-link:hover {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="loginPage">
+        <div class="login-container">
+            <div class="card login-card">
+                <div class="login-logo">🔐</div>
+                <h2 class="login-title">管理员登录</h2>
+                <p class="login-subtitle">请输入管理员密码以继续</p>
+                
+                <div class="message" id="loginMessage"></div>
+                
+                <form onsubmit="handleAdminLogin(event)">
+                    <div class="form-group">
+                        <label>管理员密码</label>
+                        <input type="password" id="adminPassword" placeholder="请输入密码" required autocomplete="off">
+                    </div>
+                    <button type="submit" class="btn btn-primary submit-btn" id="loginBtn">
+                        登录
+                    </button>
+                </form>
+                
+                <div style="margin-top: 24px;">
+                    <a href="/" class="back-link">← 返回首页</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理页面 -->
+    <div id="adminPage" class="hidden">
+        <!-- 头部 -->
+        <header class="header">
+            <h1>
+                CUMS 管理控制台
+                <span class="badge">Admin</span>
+            </h1>
+            <div class="user-info">
+                <a href="/" class="back-link">← 返回首页</a>
+                <button class="btn btn-secondary btn-small" onclick="logout()">退出登录</button>
+            </div>
+        </header>
+
+        <!-- 主内容 -->
+        <main class="main">
+            <div class="card">
+                <div class="action-bar">
+                    <div class="action-bar-left">
+                        <h2 class="card-title" style="margin-bottom: 0;">📚 科目管理</h2>
+                    </div>
+                    <div class="action-bar-right">
+                        <button class="btn btn-secondary" onclick="refreshConfig()">🔄 刷新</button>
+                        <button class="btn btn-success" onclick="saveConfig()">💾 保存配置</button>
+                    </div>
+                </div>
+
+                <div class="message" id="adminMessage"></div>
+
+                <!-- 科目列表 -->
+                <div class="subject-list" id="subjectList">
+                    <!-- 动态生成 -->
+                </div>
+
+                <!-- 添加科目 -->
+                <div class="add-subject-area">
+                    <div class="add-form">
+                        <div class="form-group">
+                            <label>添加新科目</label>
+                            <input type="text" id="newSubjectName" placeholder="输入科目名称">
+                        </div>
+                        <button class="btn btn-primary" onclick="addSubject()">+ 添加科目</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 输入弹窗 -->
+    <div class="modal" id="inputModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">添加</h3>
+                <button class="modal-close" onclick="hideModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label id="modalLabel">名称</label>
+                <input type="text" id="modalInput" placeholder="请输入">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideModal()">取消</button>
+                <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局状态 ====================
+        let adminToken = null;
+        let configData = null;
+        let pendingChanges = false;
+        let modalCallback = null;
+
+        // ==================== 初始化 ====================
+        
+        async function init() {
+            // 检查是否有保存的令牌
+            const savedToken = sessionStorage.getItem('admin_token');
+            if (savedToken) {
+                adminToken = savedToken;
+                const valid = await verifyToken();
+                if (valid) {
+                    showAdminPage();
+                    await loadConfig();
+                } else {
+                    sessionStorage.removeItem('admin_token');
+                    showLoginPage();
+                }
+            }
+        }
+
+        // 验证令牌
+        async function verifyToken() {
+            try {
+                const res = await fetch('/api/v1/admin/config', {
+                    method: 'GET',
+                    headers: { 'X-Admin-Token': adminToken }
+                });
+                const data = await res.json();
+                return data.success;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        // ==================== 登录处理 ====================
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            
+            const password = document.getElementById('adminPassword').value;
+            const loginBtn = document.getElementById('loginBtn');
+            const message = document.getElementById('loginMessage');
+            
+            loginBtn.disabled = true;
+            loginBtn.innerHTML = '<span class="loading"></span>登录中...';
+            
+            try {
+                const res = await fetch('/api/v1/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    adminToken = data.token;
+                    sessionStorage.setItem('admin_token', adminToken);
+                    showAdminPage();
+                    await loadConfig();
+                } else {
+                    message.textContent = data.message || '登录失败';
+                    message.className = 'message error';
+                }
+            } catch (e) {
+                message.textContent = '登录失败，请重试';
+                message.className = 'message error';
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        }
+
+        function logout() {
+            if (pendingChanges && !confirm('有未保存的更改，确定要退出吗？')) {
+                return;
+            }
+            adminToken = null;
+            sessionStorage.removeItem('admin_token');
+            showLoginPage();
+        }
+
+        // ==================== 页面切换 ====================
+
+        function showLoginPage() {
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('adminPage').classList.add('hidden');
+        }
+
+        function showAdminPage() {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('adminPage').classList.remove('hidden');
+        }
+
+        // ==================== 配置加载 ====================
+
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/v1/admin/config', {
+                    method: 'GET',
+                    headers: { 'X-Admin-Token': adminToken }
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    configData = data.data;
+                    renderSubjects();
+                } else {
+                    showMessage('adminMessage', data.message || '加载配置失败', 'error');
+                }
+            } catch (e) {
+                showMessage('adminMessage', '加载配置失败', 'error');
+            }
+        }
+
+        async function refreshConfig() {
+            if (pendingChanges && !confirm('有未保存的更改，刷新将丢失这些更改，确定要继续吗？')) {
+                return;
+            }
+            pendingChanges = false;
+            await loadConfig();
+            showMessage('adminMessage', '配置已刷新', 'success');
+        }
+
+        // ==================== 配置保存 ====================
+
+        async function saveConfig() {
+            try {
+                const res = await fetch('/api/v1/admin/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Token': adminToken
+                    },
+                    body: JSON.stringify({ subjects: configData.subjects })
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    pendingChanges = false;
+                    showMessage('adminMessage', '配置已保存', 'success');
+                } else {
+                    showMessage('adminMessage', data.message || '保存失败', 'error');
+                }
+            } catch (e) {
+                showMessage('adminMessage', '保存失败', 'error');
+            }
+        }
+
+        // ==================== 渲染科目列表 ====================
+
+        function renderSubjects() {
+            const container = document.getElementById('subjectList');
+            
+            if (!configData || !configData.subjects || Object.keys(configData.subjects).length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📭</div>
+                        <p>暂无科目配置</p>
+                        <p style="font-size: 14px;">在下方添加新科目开始配置</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const subjectColors = ['#667eea', '#e94560', '#00d9a5', '#ffd93d', '#6c5ce7', '#00cec9'];
+            let colorIndex = 0;
+
+            container.innerHTML = Object.entries(configData.subjects).map(([name, data]) => {
+                const color = subjectColors[colorIndex++ % subjectColors.length];
+                return `
+                    <div class="subject-item" data-subject="${name}">
+                        <div class="subject-header">
+                            <div class="subject-name">
+                                <span class="icon" style="background: linear-gradient(135deg, ${color}, ${color}dd);">📖</span>
+                                ${name}
+                            </div>
+                            <div class="subject-actions">
+                                <button class="btn btn-secondary btn-icon" onclick="editSubjectName('${name}')" title="编辑名称">✏️</button>
+                                <button class="btn btn-danger btn-icon" onclick="deleteSubject('${name}')" title="删除科目">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="subject-content">
+                            <div class="content-section">
+                                <h4>班级</h4>
+                                <div class="tag-list">
+                                    ${data.classes.map(c => `
+                                        <span class="tag">
+                                            ${c}
+                                            <button class="remove-btn" onclick="removeClass('${name}', '${c}')">&times;</button>
+                                        </span>
+                                    `).join('')}
+                                    <button class="add-tag-btn" onclick="addClass('${name}')">+ 添加班级</button>
+                                </div>
+                            </div>
+                            <div class="content-section">
+                                <h4>作业</h4>
+                                <div class="tag-list">
+                                    ${data.homeworks.map(h => `
+                                        <span class="tag">
+                                            ${h}
+                                            <button class="remove-btn" onclick="removeHomework('${name}', '${h}')">&times;</button>
+                                        </span>
+                                    `).join('')}
+                                    <button class="add-tag-btn" onclick="addHomework('${name}')">+ 添加作业</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==================== 科目操作 ====================
+
+        function addSubject() {
+            const input = document.getElementById('newSubjectName');
+            const name = input.value.trim();
+            
+            if (!name) {
+                showMessage('adminMessage', '请输入科目名称', 'error');
+                return;
+            }
+            
+            if (configData.subjects[name]) {
+                showMessage('adminMessage', '科目已存在', 'error');
+                return;
+            }
+            
+            configData.subjects[name] = {
+                classes: [],
+                homeworks: []
+            };
+            
+            input.value = '';
+            pendingChanges = true;
+            renderSubjects();
+            showMessage('adminMessage', `科目 "${name}" 已添加`, 'success');
+        }
+
+        function editSubjectName(oldName) {
+            showModal('编辑科目名称', '新名称', oldName, (newName) => {
+                if (!newName || newName === oldName) return;
+                
+                if (configData.subjects[newName]) {
+                    showMessage('adminMessage', '科目已存在', 'error');
+                    return;
+                }
+                
+                configData.subjects[newName] = configData.subjects[oldName];
+                delete configData.subjects[oldName];
+                pendingChanges = true;
+                renderSubjects();
+            });
+        }
+
+        function deleteSubject(name) {
+            if (!confirm(`确定要删除科目 "${name}" 吗？\n该科目下的所有班级和作业配置都将被删除。`)) {
+                return;
+            }
+            
+            delete configData.subjects[name];
+            pendingChanges = true;
+            renderSubjects();
+            showMessage('adminMessage', `科目 "${name}" 已删除`, 'success');
+        }
+
+        // ==================== 班级操作 ====================
+
+        function addClass(subjectName) {
+            showModal('添加班级', '班级名称', '', (className) => {
+                if (!className) return;
+                
+                const subject = configData.subjects[subjectName];
+                if (subject.classes.includes(className)) {
+                    showMessage('adminMessage', '班级已存在', 'error');
+                    return;
+                }
+                
+                subject.classes.push(className);
+                pendingChanges = true;
+                renderSubjects();
+            });
+        }
+
+        function removeClass(subjectName, className) {
+            if (!confirm(`确定要从 "${subjectName}" 中移除班级 "${className}" 吗？`)) {
+                return;
+            }
+            
+            const subject = configData.subjects[subjectName];
+            subject.classes = subject.classes.filter(c => c !== className);
+            pendingChanges = true;
+            renderSubjects();
+        }
+
+        // ==================== 作业操作 ====================
+
+        function addHomework(subjectName) {
+            showModal('添加作业', '作业名称', '', (homeworkName) => {
+                if (!homeworkName) return;
+                
+                const subject = configData.subjects[subjectName];
+                if (subject.homeworks.includes(homeworkName)) {
+                    showMessage('adminMessage', '作业已存在', 'error');
+                    return;
+                }
+                
+                subject.homeworks.push(homeworkName);
+                pendingChanges = true;
+                renderSubjects();
+            });
+        }
+
+        function removeHomework(subjectName, homeworkName) {
+            if (!confirm(`确定要从 "${subjectName}" 中移除作业 "${homeworkName}" 吗？`)) {
+                return;
+            }
+            
+            const subject = configData.subjects[subjectName];
+            subject.homeworks = subject.homeworks.filter(h => h !== homeworkName);
+            pendingChanges = true;
+            renderSubjects();
+        }
+
+        // ==================== 弹窗 ====================
+
+        function showModal(title, label, defaultValue, callback) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalLabel').textContent = label;
+            document.getElementById('modalInput').value = defaultValue || '';
+            modalCallback = callback;
+            document.getElementById('inputModal').classList.add('active');
+            document.getElementById('modalInput').focus();
+        }
+
+        function hideModal() {
+            document.getElementById('inputModal').classList.remove('active');
+            modalCallback = null;
+        }
+
+        function confirmModal() {
+            const value = document.getElementById('modalInput').value.trim();
+            if (modalCallback) {
+                modalCallback(value);
+            }
+            hideModal();
+        }
+
+        // ==================== 工具函数 ====================
+
+        function showMessage(elementId, text, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = text;
+            element.className = `message ${type}`;
+            
+            setTimeout(() => {
+                element.className = 'message';
+            }, 3000);
+        }
+
+        // ==================== 事件绑定 ====================
+
+        // 点击弹窗背景关闭
+        document.getElementById('inputModal').addEventListener('click', function(e) {
+            if (e.target === this) hideModal();
+        });
+
+        // Enter 键确认弹窗
+        document.getElementById('modalInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                confirmModal();
+            }
+        });
+
+        // 离开页面提示
+        window.addEventListener('beforeunload', function(e) {
+            if (pendingChanges) {
+                e.preventDefault();
+                e.returnValue = '';
+            }
+        });
+
+        // 初始化
+        init();
+    </script>
+</body>
+</html>

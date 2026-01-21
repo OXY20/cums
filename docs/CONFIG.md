@@ -27,9 +27,11 @@ cums/
 
 ```json
 {
-    "version": "1.0.3",
+    "version": "2.0.0",
     "server_addr": ":3000",
     "upload_dir": "uploads",
+    "admin_enabled": false,
+    "admin_password": "admin123",
     "subjects": {
         "数学": {
             "classes": ["一班", "二班", "三班"],
@@ -63,10 +65,29 @@ cums/
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| `version` | string | 是 | "1.0.3" | 版本号（语义化版本） |
+| `version` | string | 是 | "2.0.0" | 版本号（语义化版本） |
 | `server_addr` | string | 是 | ":3000" | 服务器监听地址和端口 |
 | `upload_dir` | string | 是 | "uploads" | 上传文件存储目录 |
+| `admin_enabled` | bool | 否 | false | 是否启用管理员功能（默认关闭以保证安全） |
+| `admin_password` | string | 否 | "" | 管理员密码（明文存储） |
 | `subjects` | object | 是 | - | 科目配置（核心，见下文） |
+
+### 管理员配置
+
+管理员功能允许通过 Web 界面管理科目、班级和作业配置。
+
+**安全说明**：
+- `admin_enabled` 默认为 `false`，需要手动开启
+- 密码以明文存储在配置文件中，请确保配置文件的访问权限
+- 建议仅在内网环境使用
+
+**配置示例**：
+```json
+{
+    "admin_enabled": true,
+    "admin_password": "your_admin_password"
+}
+```
 
 ### subjects 配置（核心）
 
@@ -244,9 +265,11 @@ uploads/
 
 ```json
 {
-    "version": "1.0.3",
+    "version": "2.0.0",
     "server_addr": ":3000",
     "upload_dir": "uploads",
+    "admin_enabled": false,
+    "admin_password": "",
     "subjects": {
         "数学": {
             "classes": ["一班", "二班"],
@@ -284,9 +307,31 @@ uploads/
 
 ```json
 {
-    "version": "1.0.3"  // 建议跟随程序版本
+    "version": "2.0.0"  // 建议跟随程序版本
 }
 ```
+
+### 4. 启用管理员功能
+
+如需使用 Web 管理界面，请按以下步骤操作：
+
+1. 设置管理员密码：
+```json
+{
+    "admin_password": "your_secure_password"
+}
+```
+
+2. 启用管理员功能：
+```json
+{
+    "admin_enabled": true
+}
+```
+
+3. 重启程序后访问 `/admin` 路由
+
+> ⚠️ **安全提示**: 密码以明文存储，请确保配置文件的访问权限，并仅在可信网络环境使用。
 
 ---
 
@@ -337,6 +382,6 @@ uploads/
 
 ---
 
-**文档版本**: v1.0.3
-**更新日期**: 2026-01-21
-**状态**: ✅ 已更新为以科目为中心的架构
+**文档版本**: v2.0.0
+**更新日期**: 2026-01-22
+**状态**: ✅ 已更新为以科目为中心的架构，新增管理员功能配置
