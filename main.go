@@ -136,7 +136,7 @@ func loadConfig() error {
 	if config.Version == "" {
 		return fmt.Errorf("配置文件缺少版本号 (version)")
 	}
-	
+
 	return nil
 }
 
@@ -542,42 +542,29 @@ func writeLog(message string) {
 // ==================== 主函数 ====================
 
 func main() {
-	fmt.Println("========================================")
-	fmt.Println("  CUMS - 文件上传系统")
-	fmt.Println("========================================")
+	fmt.Println()
+	fmt.Println("╔════════════════════════════════════════════════════════════╗")
+	fmt.Println("║           CUMS - 课堂文件上传管理系统                      ║")
+	fmt.Println("╚════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
 	// 初始化目录
 	if err := initDirs(); err != nil {
-		fmt.Printf("初始化目录失败: %v\n", err)
+		fmt.Printf("❌ 初始化目录失败: %v\n", err)
 		os.Exit(1)
 	}
 
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		fmt.Printf("错误: %v\n", err)
+		fmt.Printf("❌ 错误: %v\n", err)
 		os.Exit(1)
 	}
 
 	// 初始化上传目录
 	if err := initUploadDirs(); err != nil {
-		fmt.Printf("初始化上传目录失败: %v\n", err)
+		fmt.Printf("❌ 初始化上传目录失败: %v\n", err)
 		os.Exit(1)
 	}
-
-	// 显示配置信息
-	fmt.Printf("版本: %s\n", config.Version)
-	fmt.Printf("配置文件: %s\n", filepath.Join(baseDir, "config.json"))
-	fmt.Printf("静态文件: %s\n", filepath.Join(baseDir, "static", "index.html"))
-	fmt.Printf("上传目录: %s\n", uploadDir)
-	fmt.Printf("日志文件: %s\n", filepath.Join(baseDir, "logs", "cums.log"))
-	fmt.Println()
-
-	fmt.Println("已配置科目:")
-	for name, sub := range config.Subjects {
-		fmt.Printf("  - %s (班级: %s)\n", name, strings.Join(sub.Classes, ", "))
-	}
-	fmt.Println()
 
 	// 注册路由
 	http.HandleFunc("/", staticHandler)
@@ -594,19 +581,71 @@ func main() {
 	if addr == "" {
 		addr = ":3000"
 	}
-
 	localIP := getLocalIP()
-	fmt.Println("========================================")
-	fmt.Printf("服务器已启动\n")
-	fmt.Printf("本机访问: http://localhost%s\n", addr)
-	fmt.Printf("局域网访问: http://%s%s\n", localIP, addr)
-	fmt.Println("========================================")
+
+	// 显示系统信息
+	fmt.Println("📋 系统信息")
+	fmt.Println("────────────────────────────────────────")
+	fmt.Printf("   版本: %s\n", config.Version)
+	fmt.Printf("   配置: %s\n", filepath.Join(baseDir, "config.json"))
+	fmt.Printf("   上传: %s\n", uploadDir)
+	fmt.Printf("   日志: %s\n", filepath.Join(baseDir, "logs", "cums.log"))
 	fmt.Println()
-	fmt.Println("按 Ctrl+C 停止服务")
+
+	// 显示科目信息
+	fmt.Println("📚 已配置科目")
+	fmt.Println("────────────────────────────────────────")
+	for name, sub := range config.Subjects {
+		fmt.Printf("   • %s (%d个班级, %d个作业)\n", name, len(sub.Classes), len(sub.Homeworks))
+	}
+	fmt.Println()
+
+	// 显示访问地址
+	fmt.Println("🌐 访问地址")
+	fmt.Println("────────────────────────────────────────")
+	fmt.Printf("   学生端:   http://localhost%s\n", addr)
+	fmt.Printf("   局域网:   http://%s%s\n", localIP, addr)
+	fmt.Println()
+
+	// 显示管理后台信息
+	fmt.Println("🔧 管理后台")
+	fmt.Println("────────────────────────────────────────")
+	if config.AdminEnabled {
+		fmt.Printf("   状态:     ✅ 已启用\n")
+		fmt.Printf("   地址:     http://localhost%s/admin\n", addr)
+		fmt.Printf("   密码:     %s\n", maskPassword(config.AdminPassword))
+	} else {
+		fmt.Printf("   状态:     ❌ 未启用\n")
+		fmt.Println("   开启方法: 编辑 config.json，设置以下参数：")
+		fmt.Println("            \"admin_enabled\": true")
+		fmt.Println("            \"admin_password\": \"你的密码\"")
+	}
+	fmt.Println()
+
+	// 使用说明
+	fmt.Println("📖 使用说明")
+	fmt.Println("────────────────────────────────────────")
+	fmt.Println("   1. 学生访问上方地址，登录后上传作业")
+	fmt.Println("   2. 文件保存在 uploads/科目/班级/作业/ 目录")
+	fmt.Println("   3. 通过管理后台可添加科目、班级、作业")
+	fmt.Println("   4. 修改 config.json 后需重启程序生效")
+	fmt.Println()
+
+	fmt.Println("════════════════════════════════════════════════════════════")
+	fmt.Println("🚀 服务器已启动，按 Ctrl+C 停止")
+	fmt.Println("════════════════════════════════════════════════════════════")
 	fmt.Println()
 
 	if err := http.ListenAndServe("0.0.0.0"+addr, nil); err != nil {
-		fmt.Printf("启动服务器失败: %v\n", err)
+		fmt.Printf("❌ 启动服务器失败: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// maskPassword 隐藏密码中间部分
+func maskPassword(password string) string {
+	if len(password) <= 4 {
+		return "****"
+	}
+	return password[:2] + strings.Repeat("*", len(password)-4) + password[len(password)-2:]
 }
