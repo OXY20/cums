@@ -510,6 +510,88 @@
             to { transform: rotate(360deg); }
         }
 
+        /* ========== 快速选择样式 ========== */
+        .quick-select-section {
+            margin-bottom: 16px;
+        }
+
+        .section-label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .quick-select-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-height: 40px;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+
+        .quick-select-btn {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-select-btn:hover {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: transparent;
+            transform: translateY(-1px);
+        }
+
+        .quick-select-btn.selected {
+            background: linear-gradient(135deg, #00d9a5, #00b894);
+            border-color: transparent;
+        }
+
+        .quick-select-btn.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            text-decoration: line-through;
+        }
+
+        .quick-select-btn.disabled:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: none;
+        }
+
+        .empty-hint {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 13px;
+            font-style: italic;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 16px 0;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .divider span {
+            padding: 0 12px;
+        }
+
         /* ========== 隐藏 ========== */
         .hidden { display: none !important; }
 
@@ -619,6 +701,40 @@
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="hideModal()">取消</button>
                 <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 班级选择弹窗 -->
+    <div class="modal" id="classModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>添加班级</h3>
+                <button class="modal-close" onclick="hideClassModal()">&times;</button>
+            </div>
+            
+            <!-- 快速选择区域 -->
+            <div class="quick-select-section" id="quickSelectSection">
+                <label class="section-label">快速选择已有班级</label>
+                <div class="quick-select-list" id="existingClassList">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 分隔线 -->
+            <div class="divider" id="classDivider">
+                <span>或者</span>
+            </div>
+            
+            <!-- 手动输入区域 -->
+            <div class="form-group">
+                <label>输入新班级名称</label>
+                <input type="text" id="newClassInput" placeholder="如：三班">
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideClassModal()">取消</button>
+                <button class="btn btn-primary" onclick="confirmAddClass()">确定</button>
             </div>
         </div>
     </div>
@@ -896,20 +1012,110 @@
 
         // ==================== 班级操作 ====================
 
+        let currentAddClassSubject = null; // 当前正在添加班级的科目
+
+        // 获取所有已存在的班级列表（去重）
+        function getAllExistingClasses() {
+            const classSet = new Set();
+            if (configData && configData.subjects) {
+                Object.values(configData.subjects).forEach(subject => {
+                    subject.classes.forEach(c => classSet.add(c));
+                });
+            }
+            return Array.from(classSet).sort();
+        }
+
+        // 显示班级选择弹窗
+        function showClassModal(subjectName) {
+            currentAddClassSubject = subjectName;
+            const subject = configData.subjects[subjectName];
+            const existingClasses = getAllExistingClasses();
+            const currentSubjectClasses = subject.classes;
+            
+            // 生成快速选择列表
+            const listContainer = document.getElementById('existingClassList');
+            const quickSelectSection = document.getElementById('quickSelectSection');
+            const divider = document.getElementById('classDivider');
+            
+            if (existingClasses.length === 0) {
+                // 没有已有班级，隐藏快速选择区域
+                quickSelectSection.style.display = 'none';
+                divider.style.display = 'none';
+            } else {
+                quickSelectSection.style.display = 'block';
+                divider.style.display = 'flex';
+                
+                listContainer.innerHTML = existingClasses.map(className => {
+                    const isInCurrentSubject = currentSubjectClasses.includes(className);
+                    return `
+                        <button class="quick-select-btn ${isInCurrentSubject ? 'disabled' : ''}" 
+                                onclick="${isInCurrentSubject ? '' : `selectExistingClass('${className}', '${subjectName}')`}"
+                                title="${isInCurrentSubject ? '该班级已添加到此科目' : '点击快速添加'}">
+                            ${className}${isInCurrentSubject ? ' ✓' : ''}
+                        </button>
+                    `;
+                }).join('');
+            }
+            
+            // 清空输入框
+            document.getElementById('newClassInput').value = '';
+            
+            // 显示弹窗
+            document.getElementById('classModal').classList.add('active');
+            document.getElementById('newClassInput').focus();
+        }
+
+        // 隐藏班级选择弹窗
+        function hideClassModal() {
+            document.getElementById('classModal').classList.remove('active');
+            currentAddClassSubject = null;
+        }
+
+        // 快速选择已有班级
+        function selectExistingClass(className, subjectName) {
+            const targetSubject = subjectName || currentAddClassSubject;
+            if (!targetSubject) return;
+            
+            const subject = configData.subjects[targetSubject];
+            if (subject.classes.includes(className)) {
+                showMessage('adminMessage', '班级已存在', 'error');
+                return;
+            }
+            
+            subject.classes.push(className);
+            pendingChanges = true;
+            hideClassModal();
+            renderSubjects();
+            showMessage('adminMessage', `班级 "${className}" 已添加到 "${targetSubject}"`, 'success');
+        }
+
+        // 确认添加班级（手动输入）
+        function confirmAddClass() {
+            const className = document.getElementById('newClassInput').value.trim();
+            
+            if (!className) {
+                showMessage('adminMessage', '请输入班级名称', 'error');
+                return;
+            }
+            
+            if (!currentAddClassSubject) return;
+            
+            const subject = configData.subjects[currentAddClassSubject];
+            if (subject.classes.includes(className)) {
+                showMessage('adminMessage', '班级已存在', 'error');
+                return;
+            }
+            
+            subject.classes.push(className);
+            pendingChanges = true;
+            hideClassModal();
+            renderSubjects();
+            showMessage('adminMessage', `班级 "${className}" 已添加到 "${currentAddClassSubject}"`, 'success');
+        }
+
+        // 原来的 addClass 函数改为调用新弹窗
         function addClass(subjectName) {
-            showModal('添加班级', '班级名称', '', (className) => {
-                if (!className) return;
-                
-                const subject = configData.subjects[subjectName];
-                if (subject.classes.includes(className)) {
-                    showMessage('adminMessage', '班级已存在', 'error');
-                    return;
-                }
-                
-                subject.classes.push(className);
-                pendingChanges = true;
-                renderSubjects();
-            });
+            showClassModal(subjectName);
         }
 
         function removeClass(subjectName, className) {
@@ -995,10 +1201,22 @@
             if (e.target === this) hideModal();
         });
 
+        // 点击班级弹窗背景关闭
+        document.getElementById('classModal').addEventListener('click', function(e) {
+            if (e.target === this) hideClassModal();
+        });
+
         // Enter 键确认弹窗
         document.getElementById('modalInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 confirmModal();
+            }
+        });
+
+        // Enter 键确认班级弹窗
+        document.getElementById('newClassInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                confirmAddClass();
             }
         });
 

@@ -338,10 +338,74 @@ uploads/
 ## ⚠️ 注意事项
 
 1. **JSON 格式**: 必须符合 JSON 规范（引号、逗号等）
-2. **重启生效**: 修改配置后需要重启程序
+2. **重启生效**: 修改配置后需要重启程序（通过管理后台修改的配置会即时生效）
 3. **目录自动创建**: 配置中的目录不存在时会自动创建
 4. **端口占用**: 如果端口被占用，程序会自动尝试下一个端口
 5. **班级格式**: 支持"一班"和"1班"等格式（自动转换）
+
+---
+
+## 📋 后期规划（TODO）
+
+以下配置扩展已列入开发计划：
+
+### 作业模板下载
+
+```json
+{
+    "homeworks": [
+        {
+            "name": "第一章作业",
+            "template": "templates/ch1_template.docx"
+        }
+    ]
+}
+```
+
+### 作业说明文字和图片
+
+```json
+{
+    "homeworks": [
+        {
+            "name": "第一章作业",
+            "description": "请完成课本第1-10题，要求写出解题过程",
+            "images": ["images/example1.png", "images/hint.jpg"]
+        }
+    ]
+}
+```
+
+### 完整扩展结构示例（规划中）
+
+```json
+{
+    "version": "3.0.0",
+    "server_addr": ":3000",
+    "admin_enabled": true,
+    "admin_password": "admin123",
+    "subjects": {
+        "数学": {
+            "classes": ["一班", "二班"],
+            "homeworks": [
+                {
+                    "name": "第一章作业",
+                    "description": "完成课本第一章习题1-10",
+                    "template": "templates/math_ch1.docx",
+                    "images": ["images/math_ch1_hint.png"],
+                    "deadline": "2026-02-01"
+                },
+                {
+                    "name": "第二章作业",
+                    "description": "完成课本第二章习题1-15"
+                }
+            ]
+        }
+    }
+}
+```
+
+> 💡 这些扩展将在后续版本中逐步实装。当前版本作业仍使用字符串数组格式。
 
 ---
 

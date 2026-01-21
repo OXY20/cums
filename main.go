@@ -78,8 +78,8 @@ type AdminConfigRequest struct {
 var (
 	config      Config
 	version     = "2.0.0"
-	baseDir     string            // 程序所在目录
-	uploadDir   string            // 上传目录
+	baseDir     string                       // 程序所在目录
+	uploadDir   string                       // 上传目录
 	adminTokens = make(map[string]time.Time) // 管理员会话令牌
 )
 
@@ -91,7 +91,7 @@ func getBaseDir() string {
 	if _, err := os.Stat("go.mod"); err == nil {
 		return "."
 	}
-	
+
 	// 生产环境：使用可执行文件所在目录
 	exePath, err := os.Executable()
 	if err != nil {
@@ -104,40 +104,40 @@ func getBaseDir() string {
 func initDirs() error {
 	baseDir = getBaseDir()
 	uploadDir = filepath.Join(baseDir, "uploads")
-	
+
 	// 创建必要的目录
 	dirs := []string{
 		filepath.Join(baseDir, "logs"),
 		uploadDir,
 	}
-	
+
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return fmt.Errorf("创建目录失败 %s: %w", dir, err)
 		}
 	}
-	
+
 	return nil
 }
 
 // loadConfig 加载配置文件
 func loadConfig() error {
 	configPath := filepath.Join(baseDir, "config.json")
-	
+
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return fmt.Errorf("配置文件不存在: %s\n请确保 config.json 与程序在同一目录", configPath)
 	}
-	
+
 	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("解析配置文件失败: %w", err)
 	}
-	
+
 	// 使用配置中的版本号
 	if config.Version != "" {
 		version = config.Version
 	}
-	
+
 	return nil
 }
 
@@ -164,13 +164,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, APIResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
-	
+
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonResponse(w, APIResponse{Success: false, Message: "请求格式错误"})
 		return
 	}
-	
+
 	// 验证班级是否存在
 	classExists := false
 	for _, subConfig := range config.Subjects {
@@ -184,17 +184,17 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	
+
 	if !classExists {
 		jsonResponse(w, APIResponse{Success: false, Message: "班级不存在"})
 		return
 	}
-	
+
 	if req.StudentID == "" || req.StudentName == "" {
 		jsonResponse(w, APIResponse{Success: false, Message: "学号和姓名不能为空"})
 		return
 	}
-	
+
 	jsonResponse(w, APIResponse{
 		Success: true,
 		Message: "登录成功",
@@ -222,33 +222,33 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, UploadResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
-	
+
 	// 解析表单
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB
 		jsonResponse(w, UploadResponse{Success: false, Message: "解析请求失败"})
 		return
 	}
-	
+
 	// 获取参数
 	class := r.FormValue("class")
 	studentID := r.FormValue("student_id")
 	studentName := r.FormValue("student_name")
 	subject := r.FormValue("subject")
 	homework := r.FormValue("homework")
-	
+
 	// 验证参数
 	if class == "" || studentID == "" || studentName == "" || subject == "" || homework == "" {
 		jsonResponse(w, UploadResponse{Success: false, Message: "缺少必要参数"})
 		return
 	}
-	
+
 	// 验证科目
 	subConfig, exists := config.Subjects[subject]
 	if !exists {
 		jsonResponse(w, UploadResponse{Success: false, Message: "科目不存在"})
 		return
 	}
-	
+
 	// 验证班级是否属于该科目
 	classInSubject := false
 	for _, c := range subConfig.Classes {
@@ -261,7 +261,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, UploadResponse{Success: false, Message: "该班级没有此科目"})
 		return
 	}
-	
+
 	// 验证作业
 	homeworkExists := false
 	for _, hw := range subConfig.Homeworks {
@@ -274,7 +274,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, UploadResponse{Success: false, Message: "作业不存在"})
 		return
 	}
-	
+
 	// 获取文件
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -282,19 +282,19 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer file.Close()
-	
+
 	// 生成文件名
 	ext := filepath.Ext(header.Filename)
 	timestamp := time.Now().Format("20060102150405")
 	filename := fmt.Sprintf("%s_%s_%s_%s%s", homework, studentID, studentName, timestamp, ext)
-	
+
 	// 确定存储路径
 	savePath := filepath.Join(uploadDir, subject, class, homework)
 	if err := os.MkdirAll(savePath, 0755); err != nil {
 		jsonResponse(w, UploadResponse{Success: false, Message: "创建目录失败"})
 		return
 	}
-	
+
 	// 保存文件
 	fullPath := filepath.Join(savePath, filename)
 	dst, err := os.Create(fullPath)
@@ -303,12 +303,12 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer dst.Close()
-	
+
 	if _, err := io.Copy(dst, file); err != nil {
 		jsonResponse(w, UploadResponse{Success: false, Message: "保存文件失败"})
 		return
 	}
-	
+
 	// 记录日志
 	clientIP := getClientIP(r)
 	logMsg := fmt.Sprintf("[%s] %s %s号%s 提交 %s-%s IP:%s",
@@ -316,7 +316,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		class, studentID, studentName, subject, homework, clientIP)
 	fmt.Println(logMsg)
 	writeLog(logMsg)
-	
+
 	jsonResponse(w, UploadResponse{
 		Success:  true,
 		Message:  "上传成功",
@@ -331,13 +331,19 @@ func versionHandler(w http.ResponseWriter, r *http.Request) {
 
 // staticHandler 返回静态文件
 func staticHandler(w http.ResponseWriter, r *http.Request) {
+	// 只处理根路径，其他路径由专门的处理器处理
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
 	staticFile := filepath.Join(baseDir, "static", "index.html")
-	
+
 	if _, err := os.Stat(staticFile); os.IsNotExist(err) {
 		http.Error(w, "静态文件不存在，请确保 static/index.html 与程序在同一目录", http.StatusNotFound)
 		return
 	}
-	
+
 	http.ServeFile(w, r, staticFile)
 }
 
@@ -347,14 +353,14 @@ func adminPageHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "管理员功能未启用", http.StatusForbidden)
 		return
 	}
-	
+
 	adminFile := filepath.Join(baseDir, "static", "admin.html")
-	
+
 	if _, err := os.Stat(adminFile); os.IsNotExist(err) {
 		http.Error(w, "管理员页面不存在", http.StatusNotFound)
 		return
 	}
-	
+
 	http.ServeFile(w, r, adminFile)
 }
 
@@ -364,27 +370,27 @@ func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, AdminLoginResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
-	
+
 	if !config.AdminEnabled {
 		jsonResponse(w, AdminLoginResponse{Success: false, Message: "管理员功能未启用"})
 		return
 	}
-	
+
 	var req AdminLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		jsonResponse(w, AdminLoginResponse{Success: false, Message: "请求格式错误"})
 		return
 	}
-	
+
 	if req.Password != config.AdminPassword {
 		jsonResponse(w, AdminLoginResponse{Success: false, Message: "密码错误"})
 		return
 	}
-	
+
 	// 生成令牌
 	token := generateAdminToken()
 	adminTokens[token] = time.Now().Add(24 * time.Hour) // 24小时有效
-	
+
 	jsonResponse(w, AdminLoginResponse{
 		Success: true,
 		Message: "登录成功",
@@ -398,14 +404,14 @@ func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, APIResponse{Success: false, Message: "管理员功能未启用"})
 		return
 	}
-	
+
 	// 验证令牌
 	token := r.Header.Get("X-Admin-Token")
 	if !validateAdminToken(token) {
 		jsonResponse(w, APIResponse{Success: false, Message: "未授权访问"})
 		return
 	}
-	
+
 	switch r.Method {
 	case http.MethodGet:
 		// 返回当前配置
@@ -422,22 +428,22 @@ func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 			jsonResponse(w, APIResponse{Success: false, Message: "请求格式错误"})
 			return
 		}
-		
+
 		// 更新内存中的配置
 		config.Subjects = req.Subjects
-		
+
 		// 保存到文件
 		if err := saveConfig(); err != nil {
 			jsonResponse(w, APIResponse{Success: false, Message: "保存配置失败: " + err.Error()})
 			return
 		}
-		
+
 		// 重新初始化上传目录
 		if err := initUploadDirs(); err != nil {
 			jsonResponse(w, APIResponse{Success: false, Message: "初始化目录失败: " + err.Error()})
 			return
 		}
-		
+
 		jsonResponse(w, APIResponse{Success: true, Message: "配置已更新"})
 	default:
 		jsonResponse(w, APIResponse{Success: false, Message: "请求方法错误"})
@@ -468,16 +474,16 @@ func validateAdminToken(token string) bool {
 // saveConfig 保存配置到文件
 func saveConfig() error {
 	configPath := filepath.Join(baseDir, "config.json")
-	
+
 	data, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		return fmt.Errorf("序列化配置失败: %w", err)
 	}
-	
+
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
 		return fmt.Errorf("写入配置文件失败: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -541,25 +547,25 @@ func main() {
 	fmt.Println("  CUMS - 文件上传系统")
 	fmt.Println("========================================")
 	fmt.Println()
-	
+
 	// 初始化目录
 	if err := initDirs(); err != nil {
 		fmt.Printf("初始化目录失败: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// 加载配置
 	if err := loadConfig(); err != nil {
 		fmt.Printf("错误: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// 初始化上传目录
 	if err := initUploadDirs(); err != nil {
 		fmt.Printf("初始化上传目录失败: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// 显示配置信息
 	fmt.Printf("版本: %s\n", version)
 	fmt.Printf("配置文件: %s\n", filepath.Join(baseDir, "config.json"))
@@ -567,13 +573,13 @@ func main() {
 	fmt.Printf("上传目录: %s\n", uploadDir)
 	fmt.Printf("日志文件: %s\n", filepath.Join(baseDir, "logs", "cums.log"))
 	fmt.Println()
-	
+
 	fmt.Println("已配置科目:")
 	for name, sub := range config.Subjects {
 		fmt.Printf("  - %s (班级: %s)\n", name, strings.Join(sub.Classes, ", "))
 	}
 	fmt.Println()
-	
+
 	// 注册路由
 	http.HandleFunc("/", staticHandler)
 	http.HandleFunc("/admin", adminPageHandler)
@@ -583,13 +589,13 @@ func main() {
 	http.HandleFunc("/api/v1/version", versionHandler)
 	http.HandleFunc("/api/v1/admin/login", adminLoginHandler)
 	http.HandleFunc("/api/v1/admin/config", adminConfigHandler)
-	
+
 	// 启动服务器
 	addr := config.ServerAddr
 	if addr == "" {
 		addr = ":3000"
 	}
-	
+
 	localIP := getLocalIP()
 	fmt.Println("========================================")
 	fmt.Printf("服务器已启动\n")
@@ -599,7 +605,7 @@ func main() {
 	fmt.Println()
 	fmt.Println("按 Ctrl+C 停止服务")
 	fmt.Println()
-	
+
 	if err := http.ListenAndServe("0.0.0.0"+addr, nil); err != nil {
 		fmt.Printf("启动服务器失败: %v\n", err)
 		os.Exit(1)
