@@ -310,9 +310,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 记录日志
 	clientIP := getClientIP(r)
-	logMsg := fmt.Sprintf("[%s] %s %s号%s 提交 %s-%s IP:%s",
+	clientHostname := getClientHostname(clientIP)
+	logMsg := fmt.Sprintf("[%s] %s %s号%s 提交 %s-%s IP:%s 主机名:%s",
 		time.Now().Format("2006-01-02 15:04:05"),
-		class, studentID, studentName, subject, homework, clientIP)
+		class, studentID, studentName, subject, homework, clientIP, clientHostname)
 	fmt.Println(logMsg)
 	writeLog(logMsg)
 
@@ -510,6 +511,17 @@ func getClientIP(r *http.Request) string {
 		return r.RemoteAddr
 	}
 	return ip
+}
+
+// getClientHostname 获取客户端主机名（通过反向DNS查询）
+func getClientHostname(ip string) string {
+	// 尝试反向DNS查询
+	names, err := net.LookupAddr(ip)
+	if err != nil || len(names) == 0 {
+		return "未知主机"
+	}
+	// 返回第一个主机名，去掉末尾的点
+	return strings.TrimSuffix(names[0], ".")
 }
 
 // getLocalIP 获取本机局域网IP
