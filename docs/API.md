@@ -347,7 +347,7 @@ GET /api/v1/version
 ```json
 {
   "success": true,
-  "version": "1.0.3"
+  "version": "2.0.0"
 }
 ```
 

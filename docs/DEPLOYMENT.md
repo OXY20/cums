@@ -35,9 +35,10 @@ cums/
 
 ```json
 {
-    "version": "1.0.0",
+    "version": "2.0.0",
     "server_addr": ":3000",
-    "upload_dir": "uploads",
+    "admin_enabled": false,
+    "admin_password": "",
     "classes": {
         "一班": {
             "subjects": {
