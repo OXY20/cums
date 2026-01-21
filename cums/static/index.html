@@ -429,15 +429,9 @@
 
         // ==================== 下拉框初始化 ====================
 
-        // 初始化所有下拉框
+        // 初始化登录班级下拉框
         function initSelects() {
             if (!configData || !configData.subjects) return;
-
-            // 初始化科目下拉框
-            const subjectSelect = document.getElementById('subjectSelect');
-            Object.keys(configData.subjects).forEach(name => {
-                subjectSelect.add(new Option(name, name));
-            });
 
             // 初始化登录班级下拉框（收集所有班级）
             const loginClass = document.getElementById('loginClass');
@@ -450,26 +444,37 @@
             });
         }
 
+        // 初始化科目下拉框（只显示当前班级有的科目）
+        function initSubjectSelect() {
+            if (!configData || !configData.subjects || !currentUser) return;
+
+            const subjectSelect = document.getElementById('subjectSelect');
+            // 清空现有选项
+            subjectSelect.innerHTML = '<option value="">请选择科目</option>';
+            
+            // 只添加当前班级有的科目
+            Object.keys(configData.subjects).forEach(name => {
+                const subConfig = configData.subjects[name];
+                if (subConfig.classes.includes(currentUser.class)) {
+                    subjectSelect.add(new Option(name, name));
+                }
+            });
+            
+            // 同时清空作业选择
+            document.getElementById('homeworkSelect').innerHTML = '<option value="">请选择作业</option>';
+        }
+
         // 科目变更时更新作业列表
         function onSubjectChange() {
             const subject = document.getElementById('subjectSelect').value;
             const homeworkSelect = document.getElementById('homeworkSelect');
-            const message = document.getElementById('message');
             
             // 清空作业列表
             homeworkSelect.innerHTML = '<option value="">请选择作业</option>';
-            message.className = 'message';
             
             if (!subject || !configData.subjects[subject]) return;
             
             const subConfig = configData.subjects[subject];
-            
-            // 检查当前班级是否有该科目
-            if (currentUser && !subConfig.classes.includes(currentUser.class)) {
-                message.textContent = '您的班级没有该科目';
-                message.className = 'message error';
-                return;
-            }
             
             // 填充作业选项
             subConfig.homeworks.forEach(hw => {
@@ -575,6 +580,9 @@
                 
                 // 更新班级标签
                 classTag.textContent = currentUser.class;
+                
+                // 初始化科目下拉框（只显示当前班级有的科目）
+                initSubjectSelect();
                 
                 // 显示上传表单
                 document.getElementById('welcomeCard').classList.add('hidden');
