@@ -77,7 +77,6 @@ type AdminConfigRequest struct {
 
 var (
 	config      Config
-	version     = "2.0.0"
 	baseDir     string                       // 程序所在目录
 	uploadDir   string                       // 上传目录
 	adminTokens = make(map[string]time.Time) // 管理员会话令牌
@@ -133,11 +132,11 @@ func loadConfig() error {
 		return fmt.Errorf("解析配置文件失败: %w", err)
 	}
 
-	// 使用配置中的版本号
-	if config.Version != "" {
-		version = config.Version
+	// 检查版本号是否存在
+	if config.Version == "" {
+		return fmt.Errorf("配置文件缺少版本号 (version)")
 	}
-
+	
 	return nil
 }
 
@@ -326,7 +325,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 // versionHandler 返回版本信息
 func versionHandler(w http.ResponseWriter, r *http.Request) {
-	jsonResponse(w, VersionResponse{Success: true, Version: version})
+	jsonResponse(w, VersionResponse{Success: true, Version: config.Version})
 }
 
 // staticHandler 返回静态文件
@@ -567,7 +566,7 @@ func main() {
 	}
 
 	// 显示配置信息
-	fmt.Printf("版本: %s\n", version)
+	fmt.Printf("版本: %s\n", config.Version)
 	fmt.Printf("配置文件: %s\n", filepath.Join(baseDir, "config.json"))
 	fmt.Printf("静态文件: %s\n", filepath.Join(baseDir, "static", "index.html"))
 	fmt.Printf("上传目录: %s\n", uploadDir)
