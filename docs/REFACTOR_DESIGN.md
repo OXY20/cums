@@ -86,15 +86,16 @@
 ```
 程序目录/
 ├── cums.exe              # 可执行文件
-└── cums/                 # 运行时数据目录
-    ├── config.json       # 配置文件
-    ├── static/
-    │   └── index.html    # 前端页面
-    ├── uploads/          # 上传文件
-    │   └── {科目}/{班级}/{作业}/
-    └── logs/
-        └── cums.log      # 上传日志
+├── config.json           # 配置文件
+├── static/
+│   └── index.html        # 前端页面
+├── uploads/              # 上传文件
+│   └── {科目}/{班级}/{作业}/
+└── logs/
+    └── cums.log          # 上传日志
 ```
+
+> 📦 **打包说明**: 分发时需要一起打包 `config.json` 和 `static/` 目录
 
 ## 四、配置设计
 

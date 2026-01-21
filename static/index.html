@@ -253,6 +253,158 @@
             padding: 20px;
             color: #999;
             font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer-about {
+            color: #1890ff;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .footer-about:hover {
+            color: #40a9ff;
+            text-decoration: underline;
+        }
+
+        .footer-divider {
+            color: #d9d9d9;
+        }
+
+        /* ========== 关于弹窗 ========== */
+        .about-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .about-popup.active {
+            display: flex;
+        }
+
+        .about-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px;
+            width: 340px;
+            max-width: 90%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+            animation: popIn 0.25s ease-out;
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .about-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .about-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .about-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .about-close:hover {
+            color: #333;
+        }
+
+        .about-logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .about-logo-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #1890ff, #36cfc9);
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+
+        .about-logo h4 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .about-version {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #f0f5ff;
+            color: #1890ff;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .about-desc {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .about-github {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            color: #24292f;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .about-github:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+        }
+
+        .about-github svg {
+            width: 20px;
+            height: 20px;
         }
 
         /* ========== 加载动画 ========== */
@@ -281,7 +433,6 @@
     <header class="header">
         <h1>CUMS - 文件上传系统</h1>
         <div class="user-info" id="userInfo">
-            <button class="btn btn-link" onclick="showAbout()">关于</button>
             <button class="btn btn-primary" onclick="showLogin()">登录</button>
         </div>
     </header>
@@ -322,23 +473,39 @@
             </form>
         </div>
 
-        <!-- 关于页面 -->
-        <div class="card hidden" id="aboutCard">
-            <h2 class="card-title">关于</h2>
-            <div style="text-align: center; padding: 20px 0;">
-                <div style="font-size: 24px; color: #1890ff; font-weight: 500;" id="versionText">v2.0.0</div>
-                <p style="color: #999; margin-top: 8px;">局域网文件上传系统</p>
-            </div>
-            <div style="margin-top: 20px; text-align: center;">
-                <button class="btn btn-primary" onclick="showUpload()">返回</button>
-            </div>
-        </div>
     </main>
 
     <!-- 页脚 -->
     <footer class="footer">
         <span id="footerVersion">v2.0.0</span>
+        <span class="footer-divider">·</span>
+        <span class="footer-about" onclick="showAboutPopup()">关于</span>
     </footer>
+
+    <!-- 关于弹窗 -->
+    <div class="about-popup" id="aboutPopup">
+        <div class="about-card">
+            <div class="about-header">
+                <h3>关于</h3>
+                <button class="about-close" onclick="hideAboutPopup()">&times;</button>
+            </div>
+            <div class="about-logo">
+                <div class="about-logo-icon">📁</div>
+                <h4>CUMS</h4>
+                <span class="about-version" id="aboutVersion">v2.0.0</span>
+            </div>
+            <div class="about-desc">
+                简洁的局域网文件上传系统<br>
+                专为机房作业收集场景设计
+            </div>
+            <a href="https://github.com/OXY20/cums" target="_blank" class="about-github">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                GitHub 仓库
+            </a>
+        </div>
+    </div>
 
     <!-- 登录模态框 -->
     <div class="modal" id="loginModal">
@@ -405,8 +572,8 @@
                 const res = await fetch('/api/v1/version');
                 const data = await res.json();
                 if (data.success) {
-                    document.getElementById('versionText').textContent = 'v' + data.version;
                     document.getElementById('footerVersion').textContent = 'v' + data.version;
+                    document.getElementById('aboutVersion').textContent = 'v' + data.version;
                 }
             } catch (e) {
                 console.error('加载版本失败:', e);
@@ -487,7 +654,6 @@
         // 显示上传页面
         function showUpload() {
             document.getElementById('welcomeCard').classList.add('hidden');
-            document.getElementById('aboutCard').classList.add('hidden');
             
             if (isLoggedIn) {
                 document.getElementById('uploadCard').classList.remove('hidden');
@@ -496,11 +662,14 @@
             }
         }
 
-        // 显示关于页面
-        function showAbout() {
-            document.getElementById('welcomeCard').classList.add('hidden');
-            document.getElementById('uploadCard').classList.add('hidden');
-            document.getElementById('aboutCard').classList.remove('hidden');
+        // 显示关于弹窗
+        function showAboutPopup() {
+            document.getElementById('aboutPopup').classList.add('active');
+        }
+
+        // 隐藏关于弹窗
+        function hideAboutPopup() {
+            document.getElementById('aboutPopup').classList.remove('active');
         }
 
         // 显示登录框
@@ -573,7 +742,6 @@
             if (isLoggedIn && currentUser) {
                 // 更新头部
                 userInfo.innerHTML = `
-                    <button class="btn btn-link" onclick="showAbout()">关于</button>
                     <span>${currentUser.class} - ${currentUser.student_id}号 ${currentUser.student_name}</span>
                     <button class="btn btn-link btn-logout" onclick="logout()">退出</button>
                 `;
@@ -590,7 +758,6 @@
             } else {
                 // 恢复头部
                 userInfo.innerHTML = `
-                    <button class="btn btn-link" onclick="showAbout()">关于</button>
                     <button class="btn btn-primary" onclick="showLogin()">登录</button>
                 `;
                 
@@ -659,6 +826,11 @@
         // 点击模态框背景关闭
         document.getElementById('loginModal').addEventListener('click', function(e) {
             if (e.target === this) hideLogin();
+        });
+
+        // 点击关于弹窗背景关闭
+        document.getElementById('aboutPopup').addEventListener('click', function(e) {
+            if (e.target === this) hideAboutPopup();
         });
 
         // 初始化

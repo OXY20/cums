@@ -57,58 +57,37 @@ type VersionResponse struct {
 // ==================== 全局变量 ====================
 
 var (
-	config   Config
-	version  = "2.0.0"
-	cumsDir  string
-	uploadDir string
+	config    Config
+	version   = "2.0.0"
+	baseDir   string // 程序所在目录
+	uploadDir string // 上传目录
 )
-
-// ==================== 默认配置 ====================
-
-var defaultConfig = `{
-    "version": "2.0.0",
-    "server_addr": ":3000",
-    "subjects": {
-        "数学": {
-            "classes": ["一班", "二班"],
-            "homeworks": ["第一章作业", "第二章作业"]
-        },
-        "语文": {
-            "classes": ["一班"],
-            "homeworks": ["作文", "阅读理解"]
-        },
-        "英语": {
-            "classes": ["一班"],
-            "homeworks": ["听力练习"]
-        }
-    }
-}`
 
 // ==================== 初始化函数 ====================
 
-// initDirs 初始化目录
-func initDirs() error {
-	// 获取可执行文件所在目录
+// getBaseDir 获取程序所在目录
+func getBaseDir() string {
+	// 如果当前目录有 go.mod，说明是开发环境，使用当前目录
+	if _, err := os.Stat("go.mod"); err == nil {
+		return "."
+	}
+	
+	// 生产环境：使用可执行文件所在目录
 	exePath, err := os.Executable()
 	if err != nil {
-		exePath = "."
+		return "."
 	}
-	exeDir := filepath.Dir(exePath)
-	
-	// 如果当前目录有 go.mod，说明是开发环境
-	if _, err := os.Stat("go.mod"); err == nil {
-		cumsDir = filepath.Join(".", "cums")
-	} else {
-		cumsDir = filepath.Join(exeDir, "cums")
-	}
-	
-	uploadDir = filepath.Join(cumsDir, "uploads")
+	return filepath.Dir(exePath)
+}
+
+// initDirs 初始化目录
+func initDirs() error {
+	baseDir = getBaseDir()
+	uploadDir = filepath.Join(baseDir, "uploads")
 	
 	// 创建必要的目录
 	dirs := []string{
-		cumsDir,
-		filepath.Join(cumsDir, "static"),
-		filepath.Join(cumsDir, "logs"),
+		filepath.Join(baseDir, "logs"),
 		uploadDir,
 	}
 	
@@ -123,16 +102,11 @@ func initDirs() error {
 
 // loadConfig 加载配置文件
 func loadConfig() error {
-	configPath := filepath.Join(cumsDir, "config.json")
+	configPath := filepath.Join(baseDir, "config.json")
 	
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		// 配置文件不存在，创建默认配置
-		if err := os.WriteFile(configPath, []byte(defaultConfig), 0644); err != nil {
-			return fmt.Errorf("创建配置文件失败: %w", err)
-		}
-		fmt.Printf("已创建默认配置文件: %s\n", configPath)
-		data = []byte(defaultConfig)
+		return fmt.Errorf("配置文件不存在: %s\n请确保 config.json 与程序在同一目录", configPath)
 	}
 	
 	if err := json.Unmarshal(data, &config); err != nil {
@@ -337,15 +311,11 @@ func versionHandler(w http.ResponseWriter, r *http.Request) {
 
 // staticHandler 返回静态文件
 func staticHandler(w http.ResponseWriter, r *http.Request) {
-	staticFile := filepath.Join(cumsDir, "static", "index.html")
+	staticFile := filepath.Join(baseDir, "static", "index.html")
 	
-	// 如果静态文件不存在，使用内嵌的静态文件
 	if _, err := os.Stat(staticFile); os.IsNotExist(err) {
-		// 从 static 目录复制
-		srcFile := filepath.Join("static", "index.html")
-		if data, err := os.ReadFile(srcFile); err == nil {
-			os.WriteFile(staticFile, data, 0644)
-		}
+		http.Error(w, "静态文件不存在，请确保 static/index.html 与程序在同一目录", http.StatusNotFound)
+		return
 	}
 	
 	http.ServeFile(w, r, staticFile)
@@ -395,7 +365,7 @@ func getLocalIP() string {
 
 // writeLog 写入日志文件
 func writeLog(message string) {
-	logFile := filepath.Join(cumsDir, "logs", "cums.log")
+	logFile := filepath.Join(baseDir, "logs", "cums.log")
 	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return
@@ -420,7 +390,7 @@ func main() {
 	
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		fmt.Printf("加载配置失败: %v\n", err)
+		fmt.Printf("错误: %v\n", err)
 		os.Exit(1)
 	}
 	
@@ -432,8 +402,10 @@ func main() {
 	
 	// 显示配置信息
 	fmt.Printf("版本: %s\n", version)
-	fmt.Printf("配置文件: %s\n", filepath.Join(cumsDir, "config.json"))
+	fmt.Printf("配置文件: %s\n", filepath.Join(baseDir, "config.json"))
+	fmt.Printf("静态文件: %s\n", filepath.Join(baseDir, "static", "index.html"))
 	fmt.Printf("上传目录: %s\n", uploadDir)
+	fmt.Printf("日志文件: %s\n", filepath.Join(baseDir, "logs", "cums.log"))
 	fmt.Println()
 	
 	fmt.Println("已配置科目:")
