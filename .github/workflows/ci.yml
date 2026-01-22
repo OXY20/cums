@@ -3,6 +3,10 @@ on:
     tags:
       - 'v*'  # 推送 v2.0.0 这种 tag 时触发
 
+# 设置必要的权限
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
