@@ -23,6 +23,5 @@ build/
 Thumbs.db
 
 # 本地配置
-config.json
 uploads/
 logs/cums.log

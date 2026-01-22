@@ -1,0 +1,31 @@
+{
+    "version": "2.0.0",
+    "server_addr": ":3000",
+    "admin_enabled": true,
+    "admin_password": "admin123",
+    "subjects": {
+        "人工智能": {
+            "classes": [
+                "25体育",
+                "25食品",
+                "25幼托",
+                "25计应"
+            ],
+            "homeworks": []
+        },
+        "文字处理": {
+            "classes": [
+                "25计应",
+                "25幼托",
+                "25体育",
+                "25食品"
+            ],
+            "homeworks": [
+                "WT16",
+                "WT19",
+                "WT21",
+                "WPS21"
+            ]
+        }
+    }
+}
