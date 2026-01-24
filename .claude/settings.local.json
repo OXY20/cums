@@ -3,7 +3,9 @@
     "allow": [
       "Bash(find:*)",
       "mcp__acp__Bash",
-      "Edit"
+      "Edit",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)"
     ]
   },
   "outputStyle": "Coding Vibes"
