@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 )
 
 // ==================== 数据结构 ====================
@@ -81,6 +84,25 @@ var (
 	uploadDir   string                       // 上传目录
 	adminTokens = make(map[string]time.Time) // 管理员会话令牌
 )
+
+// init 包初始化函数，启动令牌清理协程
+func init() {
+	// 启动定期清理过期令牌的协程
+	go cleanExpiredTokens()
+}
+
+// cleanExpiredTokens 定期清理过期的管理员令牌，防止内存泄漏
+func cleanExpiredTokens() {
+	ticker := time.NewTicker(1 * time.Hour)
+	for range ticker.C {
+		now := time.Now()
+		for token, expiry := range adminTokens {
+			if now.After(expiry) {
+				delete(adminTokens, token)
+			}
+		}
+	}
+}
 
 // ==================== 初始化函数 ====================
 
@@ -160,13 +182,13 @@ func initUploadDirs() error {
 // loginHandler 处理登录请求
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonResponse(w, APIResponse{Success: false, Message: "请求方法错误"})
+		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
 
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonResponse(w, APIResponse{Success: false, Message: "请求格式错误"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "请求格式错误"})
 		return
 	}
 
@@ -185,12 +207,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !classExists {
-		jsonResponse(w, APIResponse{Success: false, Message: "班级不存在"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "班级不存在"})
 		return
 	}
 
 	if req.StudentID == "" || req.StudentName == "" {
-		jsonResponse(w, APIResponse{Success: false, Message: "学号和姓名不能为空"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "学号和姓名不能为空"})
 		return
 	}
 
@@ -207,6 +229,11 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 // configHandler 返回配置信息
 func configHandler(w http.ResponseWriter, r *http.Request) {
+	// 只允许 GET 方法
+	if r.Method != http.MethodGet {
+		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
+		return
+	}
 	jsonResponse(w, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
@@ -218,13 +245,13 @@ func configHandler(w http.ResponseWriter, r *http.Request) {
 // uploadHandler 处理文件上传
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonResponse(w, UploadResponse{Success: false, Message: "请求方法错误"})
+		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, UploadResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
 
 	// 解析表单
 	if err := r.ParseMultipartForm(32 << 20); err != nil { // 32MB
-		jsonResponse(w, UploadResponse{Success: false, Message: "解析请求失败"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "解析请求失败"})
 		return
 	}
 
@@ -237,14 +264,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 验证参数
 	if class == "" || studentID == "" || studentName == "" || subject == "" || homework == "" {
-		jsonResponse(w, UploadResponse{Success: false, Message: "缺少必要参数"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "缺少必要参数"})
 		return
 	}
 
 	// 验证科目
 	subConfig, exists := config.Subjects[subject]
 	if !exists {
-		jsonResponse(w, UploadResponse{Success: false, Message: "科目不存在"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "科目不存在"})
 		return
 	}
 
@@ -257,7 +284,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !classInSubject {
-		jsonResponse(w, UploadResponse{Success: false, Message: "该班级没有此科目"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "该班级没有此科目"})
 		return
 	}
 
@@ -270,27 +297,40 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !homeworkExists {
-		jsonResponse(w, UploadResponse{Success: false, Message: "作业不存在"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "作业不存在"})
 		return
 	}
 
 	// 获取文件
 	file, header, err := r.FormFile("file")
 	if err != nil {
-		jsonResponse(w, UploadResponse{Success: false, Message: "请选择要上传的文件"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "请选择要上传的文件"})
 		return
 	}
 	defer file.Close()
 
-	// 生成文件名
-	ext := filepath.Ext(header.Filename)
-	timestamp := time.Now().Format("20060102150405")
-	filename := fmt.Sprintf("%s_%s_%s_%s%s", homework, studentID, studentName, timestamp, ext)
+	// 验证文件类型（白名单）
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if !isAllowedFileType(ext) {
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "不支持的文件类型"})
+		return
+	}
 
-	// 确定存储路径
-	savePath := filepath.Join(uploadDir, subject, class, homework)
+	// 生成文件名（使用过滤后的安全文件名）
+	timestamp := time.Now().Format("20060102150405")
+	filename := fmt.Sprintf("%s_%s_%s_%s%s",
+		sanitizeFilename(homework),
+		sanitizeFilename(studentID),
+		sanitizeFilename(studentName),
+		timestamp, ext)
+
+	// 确定存储路径（使用过滤后的安全路径）
+	savePath := filepath.Join(uploadDir,
+		sanitizeFilename(subject),
+		sanitizeFilename(class),
+		sanitizeFilename(homework))
 	if err := os.MkdirAll(savePath, 0755); err != nil {
-		jsonResponse(w, UploadResponse{Success: false, Message: "创建目录失败"})
+		jsonResponseWithStatus(w, http.StatusInternalServerError, UploadResponse{Success: false, Message: "创建目录失败"})
 		return
 	}
 
@@ -298,13 +338,13 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	fullPath := filepath.Join(savePath, filename)
 	dst, err := os.Create(fullPath)
 	if err != nil {
-		jsonResponse(w, UploadResponse{Success: false, Message: "创建文件失败"})
+		jsonResponseWithStatus(w, http.StatusInternalServerError, UploadResponse{Success: false, Message: "创建文件失败"})
 		return
 	}
 	defer dst.Close()
 
 	if _, err := io.Copy(dst, file); err != nil {
-		jsonResponse(w, UploadResponse{Success: false, Message: "保存文件失败"})
+		jsonResponseWithStatus(w, http.StatusInternalServerError, UploadResponse{Success: false, Message: "保存文件失败"})
 		return
 	}
 
@@ -327,6 +367,22 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 // versionHandler 返回版本信息
 func versionHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, VersionResponse{Success: true, Version: config.Version})
+}
+
+// changelogHandler 返回更新日志
+func changelogHandler(w http.ResponseWriter, r *http.Request) {
+	// 从嵌入的文件系统读取 CHANGELOG.md
+	content, err := changelog.ReadFile("CHANGELOG.md")
+	if err != nil {
+		jsonResponse(w, APIResponse{Success: false, Message: "无法读取更新日志"})
+		return
+	}
+	jsonResponse(w, APIResponse{
+		Success: true,
+		Data: map[string]string{
+			"content": string(content),
+		},
+	})
 }
 
 // staticHandler 返回静态文件
@@ -367,23 +423,23 @@ func adminPageHandler(w http.ResponseWriter, r *http.Request) {
 // adminLoginHandler 处理管理员登录
 func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		jsonResponse(w, AdminLoginResponse{Success: false, Message: "请求方法错误"})
+		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, AdminLoginResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
 
 	if !config.AdminEnabled {
-		jsonResponse(w, AdminLoginResponse{Success: false, Message: "管理员功能未启用"})
+		jsonResponseWithStatus(w, http.StatusForbidden, AdminLoginResponse{Success: false, Message: "管理员功能未启用"})
 		return
 	}
 
 	var req AdminLoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonResponse(w, AdminLoginResponse{Success: false, Message: "请求格式错误"})
+		jsonResponseWithStatus(w, http.StatusBadRequest, AdminLoginResponse{Success: false, Message: "请求格式错误"})
 		return
 	}
 
 	if req.Password != config.AdminPassword {
-		jsonResponse(w, AdminLoginResponse{Success: false, Message: "密码错误"})
+		jsonResponseWithStatus(w, http.StatusUnauthorized, AdminLoginResponse{Success: false, Message: "密码错误"})
 		return
 	}
 
@@ -401,14 +457,14 @@ func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
 // adminConfigHandler 获取/更新管理员配置
 func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 	if !config.AdminEnabled {
-		jsonResponse(w, APIResponse{Success: false, Message: "管理员功能未启用"})
+		jsonResponseWithStatus(w, http.StatusForbidden, APIResponse{Success: false, Message: "管理员功能未启用"})
 		return
 	}
 
 	// 验证令牌
 	token := r.Header.Get("X-Admin-Token")
 	if !validateAdminToken(token) {
-		jsonResponse(w, APIResponse{Success: false, Message: "未授权访问"})
+		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访问"})
 		return
 	}
 
@@ -425,7 +481,7 @@ func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 		// 更新配置
 		var req AdminConfigRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			jsonResponse(w, APIResponse{Success: false, Message: "请求格式错误"})
+			jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "请求格式错误"})
 			return
 		}
 
@@ -434,25 +490,30 @@ func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 		// 保存到文件
 		if err := saveConfig(); err != nil {
-			jsonResponse(w, APIResponse{Success: false, Message: "保存配置失败: " + err.Error()})
+			jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "保存配置失败: " + err.Error()})
 			return
 		}
 
 		// 重新初始化上传目录
 		if err := initUploadDirs(); err != nil {
-			jsonResponse(w, APIResponse{Success: false, Message: "初始化目录失败: " + err.Error()})
+			jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "初始化目录失败: " + err.Error()})
 			return
 		}
 
 		jsonResponse(w, APIResponse{Success: true, Message: "配置已更新"})
 	default:
-		jsonResponse(w, APIResponse{Success: false, Message: "请求方法错误"})
+		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
 	}
 }
 
-// generateAdminToken 生成管理员令牌
+// generateAdminToken 生成安全的管理员令牌
 func generateAdminToken() string {
-	return fmt.Sprintf("admin_%d_%d", time.Now().UnixNano(), time.Now().Unix())
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		// 降级使用时间戳（不推荐，仅作为备用）
+		return fmt.Sprintf("admin_%d", time.Now().UnixNano())
+	}
+	return "admin_" + hex.EncodeToString(b)
 }
 
 // validateAdminToken 验证管理员令牌
@@ -489,10 +550,61 @@ func saveConfig() error {
 
 // ==================== 工具函数 ====================
 
+// sanitizeFilename 过滤文件名中的危险字符，防止路径遍历攻击
+// 严格模式：只允许字母、数字、下划线、连字符和中文字符
+func sanitizeFilename(name string) string {
+	var result strings.Builder
+	for _, r := range name {
+		// 允许：字母、数字、下划线、连字符、中文字符
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+	// 如果过滤后为空，返回默认值
+	if result.Len() == 0 {
+		return "unnamed"
+	}
+	return result.String()
+}
+
+// allowedExtensions 允许上传的文件扩展名白名单
+var allowedExtensions = map[string]bool{
+	// 文档类
+	".doc": true, ".docx": true, ".pdf": true, ".txt": true,
+	".xls": true, ".xlsx": true, ".ppt": true, ".pptx": true,
+	".odt": true, ".ods": true, ".odp": true, ".rtf": true,
+	// 图片类
+	".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
+	".bmp": true, ".webp": true, ".svg": true,
+	// 压缩包
+	".zip": true, ".rar": true, ".7z": true, ".tar": true, ".gz": true,
+	// 代码/文本
+	".c": true, ".cpp": true, ".h": true, ".java": true, ".py": true,
+	".js": true, ".html": true, ".css": true, ".json": true, ".xml": true,
+	".md": true, ".go": true, ".rs": true, ".ts": true,
+}
+
+// isAllowedFileType 检查文件扩展名是否在白名单中
+func isAllowedFileType(ext string) bool {
+	return allowedExtensions[ext]
+}
+
 // jsonResponse 发送JSON响应
 func jsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		// 记录编码错误到日志
+		writeLog(fmt.Sprintf("[ERROR] JSON编码失败: %v", err))
+	}
+}
+
+// jsonResponseWithStatus 发送带状态码的JSON响应
+func jsonResponseWithStatus(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		writeLog(fmt.Sprintf("[ERROR] JSON编码失败: %v", err))
+	}
 }
 
 // getClientIP 获取客户端IP
@@ -585,6 +697,7 @@ func main() {
 	http.HandleFunc("/api/v1/config", configHandler)
 	http.HandleFunc("/api/v1/upload", uploadHandler)
 	http.HandleFunc("/api/v1/version", versionHandler)
+	http.HandleFunc("/api/v1/changelog", changelogHandler)
 	http.HandleFunc("/api/v1/admin/login", adminLoginHandler)
 	http.HandleFunc("/api/v1/admin/config", adminConfigHandler)
 
