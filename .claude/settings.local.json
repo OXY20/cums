@@ -5,7 +5,10 @@
       "mcp__acp__Bash",
       "Edit",
       "Bash(git checkout:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(git tag:*)",
+      "Bash(git push:*)",
+      "Bash(go build:*)"
     ]
   },
   "outputStyle": "Coding Vibes"
