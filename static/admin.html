@@ -746,8 +746,17 @@
         let pendingChanges = false;
         let modalCallback = null;
 
+        // ==================== 工具函数 ====================
+
+        // HTML 转义函数，防止 XSS 攻击
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         // ==================== 初始化 ====================
-        
+
         async function init() {
             // 检查是否有保存的令牌
             const savedToken = sessionStorage.getItem('admin_token');
@@ -913,16 +922,17 @@
 
             container.innerHTML = Object.entries(configData.subjects).map(([name, data]) => {
                 const color = subjectColors[colorIndex++ % subjectColors.length];
+                const escapedName = escapeHtml(name);
                 return `
-                    <div class="subject-item" data-subject="${name}">
+                    <div class="subject-item" data-subject="${escapedName}">
                         <div class="subject-header">
                             <div class="subject-name">
                                 <span class="icon" style="background: linear-gradient(135deg, ${color}, ${color}dd);">📖</span>
-                                ${name}
+                                ${escapedName}
                             </div>
                             <div class="subject-actions">
-                                <button class="btn btn-secondary btn-icon" onclick="editSubjectName('${name}')" title="编辑名称">✏️</button>
-                                <button class="btn btn-danger btn-icon" onclick="deleteSubject('${name}')" title="删除科目">🗑️</button>
+                                <button class="btn btn-secondary btn-icon" onclick="editSubjectName('${escapedName}')" title="编辑名称">✏️</button>
+                                <button class="btn btn-danger btn-icon" onclick="deleteSubject('${escapedName}')" title="删除科目">🗑️</button>
                             </div>
                         </div>
                         <div class="subject-content">
@@ -931,11 +941,11 @@
                                 <div class="tag-list">
                                     ${data.classes.map(c => `
                                         <span class="tag">
-                                            ${c}
-                                            <button class="remove-btn" onclick="removeClass('${name}', '${c}')">&times;</button>
+                                            ${escapeHtml(c)}
+                                            <button class="remove-btn" onclick="removeClass('${escapedName}', '${escapeHtml(c)}')">&times;</button>
                                         </span>
                                     `).join('')}
-                                    <button class="add-tag-btn" onclick="addClass('${name}')">+ 添加班级</button>
+                                    <button class="add-tag-btn" onclick="addClass('${escapedName}')">+ 添加班级</button>
                                 </div>
                             </div>
                             <div class="content-section">
@@ -943,11 +953,11 @@
                                 <div class="tag-list">
                                     ${data.homeworks.map(h => `
                                         <span class="tag">
-                                            ${h}
-                                            <button class="remove-btn" onclick="removeHomework('${name}', '${h}')">&times;</button>
+                                            ${escapeHtml(h)}
+                                            <button class="remove-btn" onclick="removeHomework('${escapedName}', '${escapeHtml(h)}')">&times;</button>
                                         </span>
                                     `).join('')}
-                                    <button class="add-tag-btn" onclick="addHomework('${name}')">+ 添加作业</button>
+                                    <button class="add-tag-btn" onclick="addHomework('${escapedName}')">+ 添加作业</button>
                                 </div>
                             </div>
                         </div>

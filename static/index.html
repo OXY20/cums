@@ -540,8 +540,17 @@
         let configData = null;   // 配置数据
         let isLoggedIn = false;  // 登录状态
 
+        // ==================== 工具函数 ====================
+
+        // HTML 转义函数，防止 XSS 攻击
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
         // ==================== 初始化 ====================
-        
+
         // 页面加载时初始化
         async function init() {
             await loadConfig();
@@ -552,10 +561,7 @@
         // 加载配置
         async function loadConfig() {
             try {
-                const res = await fetch('/api/v1/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+                const res = await fetch('/api/v1/config');
                 const data = await res.json();
                 if (data.success) {
                     configData = data.data;
@@ -738,14 +744,14 @@
         function updateUI() {
             const userInfo = document.getElementById('userInfo');
             const classTag = document.getElementById('classTag');
-            
+
             if (isLoggedIn && currentUser) {
-                // 更新头部
+                // 更新头部（使用 escapeHtml 防止 XSS）
                 userInfo.innerHTML = `
-                    <span>${currentUser.class} - ${currentUser.student_id}号 ${currentUser.student_name}</span>
+                    <span>${escapeHtml(currentUser.class)} - ${escapeHtml(currentUser.student_id)}号 ${escapeHtml(currentUser.student_name)}</span>
                     <button class="btn btn-link btn-logout" onclick="logout()">退出</button>
                 `;
-                
+
                 // 更新班级标签
                 classTag.textContent = currentUser.class;
                 
