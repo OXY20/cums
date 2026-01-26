@@ -81,7 +81,7 @@ type SubjectConfig struct {
 **配置文件格式**:
 ```json
 {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "server_addr": ":3000",
     "upload_dir": "uploads",
     "admin_enabled": false,

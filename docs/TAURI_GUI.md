@@ -183,7 +183,7 @@ cargo tauri init
 {
   "$schema": "https://schema.tauri.app/config/1",
   "productName": "CUMS 课堂管理系统",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "identifier": "com.cums.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -232,7 +232,7 @@ cargo tauri init
 ```toml
 [package]
 name = "cums-gui"
-version = "2.0.0"
+version = "2.1.0"
 edition = "2021"
 
 [dependencies]
@@ -1420,7 +1420,7 @@ npm run tauri build
 
 构建完成后，可执行文件位于：
 - `cums-gui/src-tauri/target/release/cums-gui.exe`
-- 或 `cums-gui/src-tauri/target/release/bundle/nsis/CUMS-课堂管理系统_2.0.0_x64-setup.exe`（安装程序）
+- 或 `cums-gui/src-tauri/target/release/bundle/nsis/CUMS-课堂管理系统_2.1.0_x64-setup.exe`（安装程序）
 
 #### 2. 分发方案
 

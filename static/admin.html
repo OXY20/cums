@@ -595,6 +595,112 @@
         /* ========== 隐藏 ========== */
         .hidden { display: none !important; }
 
+        /* ========== 大模态框 ========== */
+        .modal-large .modal-content {
+            max-width: 560px;
+            width: 560px;
+        }
+
+        /* ========== 有附加信息的作业标签 ========== */
+        .tag-with-info {
+            background: rgba(0, 217, 165, 0.2);
+            border: 1px solid rgba(0, 217, 165, 0.4);
+        }
+
+        .info-badge {
+            margin-left: 4px;
+            color: #00d9a5;
+            font-size: 11px;
+        }
+
+        .tag-clickable {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tag-clickable:hover {
+            background: rgba(233, 69, 96, 0.3);
+            border-color: #e94560;
+        }
+
+        /* ========== 模板列表 ========== */
+        .template-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .template-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .template-item-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.8);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .template-item-name .icon {
+            font-size: 16px;
+        }
+
+        .template-item .remove-btn {
+            background: rgba(255, 107, 107, 0.2);
+            border: none;
+            color: #ff6b6b;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .template-item .remove-btn:hover {
+            background: #ff6b6b;
+            color: #fff;
+        }
+
+        .template-upload {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .template-upload input[type="file"] {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px dashed rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+        }
+
+        .template-empty {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 13px;
+            font-style: italic;
+            padding: 12px;
+            text-align: center;
+        }
+
         /* ========== 返回链接 ========== */
         .back-link {
             color: rgba(255, 255, 255, 0.5);
@@ -712,7 +818,7 @@
                 <h3>添加班级</h3>
                 <button class="modal-close" onclick="hideClassModal()">&times;</button>
             </div>
-            
+
             <!-- 快速选择区域 -->
             <div class="quick-select-section" id="quickSelectSection">
                 <label class="section-label">快速选择已有班级</label>
@@ -720,21 +826,53 @@
                     <!-- 动态生成 -->
                 </div>
             </div>
-            
+
             <!-- 分隔线 -->
             <div class="divider" id="classDivider">
                 <span>或者</span>
             </div>
-            
+
             <!-- 手动输入区域 -->
             <div class="form-group">
                 <label>输入新班级名称</label>
                 <input type="text" id="newClassInput" placeholder="如：三班">
             </div>
-            
+
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="hideClassModal()">取消</button>
                 <button class="btn btn-primary" onclick="confirmAddClass()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 作业编辑弹窗 -->
+    <div class="modal modal-large" id="homeworkEditModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>编辑作业</h3>
+                <button class="modal-close" onclick="hideHomeworkEditModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label>作业名称</label>
+                <input type="text" id="hwEditName" readonly style="background: rgba(255,255,255,0.02); cursor: not-allowed;">
+            </div>
+            <div class="form-group">
+                <label>作业说明</label>
+                <textarea id="hwEditDescription" rows="3" placeholder="输入作业要求、注意事项等" style="width:100%; padding:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); border-radius:10px; color:#fff; font-size:14px; resize:vertical;"></textarea>
+            </div>
+            <div class="form-group">
+                <label>模板文件</label>
+                <div class="template-list" id="hwTemplateList">
+                    <!-- 动态生成 -->
+                </div>
+                <div class="template-upload">
+                    <input type="file" id="hwTemplateInput" multiple>
+                    <button class="btn btn-secondary btn-small" onclick="uploadTemplates()">📤 上传</button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="hideHomeworkEditModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveHomeworkEdit()">保存</button>
             </div>
         </div>
     </div>
@@ -951,12 +1089,18 @@
                             <div class="content-section">
                                 <h4>作业</h4>
                                 <div class="tag-list">
-                                    ${data.homeworks.map(h => `
-                                        <span class="tag">
-                                            ${escapeHtml(h)}
-                                            <button class="remove-btn" onclick="removeHomework('${escapedName}', '${escapeHtml(h)}')">&times;</button>
+                                    ${data.homeworks.map(h => {
+                                        const hwName = typeof h === 'string' ? h : h.name;
+                                        const hwData = typeof h === 'string' ? { name: h } : h;
+                                        const hasInfo = hwData.description || (hwData.templates && hwData.templates.length > 0);
+                                        return `
+                                        <span class="tag tag-clickable ${hasInfo ? 'tag-with-info' : ''}"
+                                              onclick="openHomeworkEdit('${escapedName}', '${escapeHtml(hwName)}')">
+                                            ${escapeHtml(hwName)}
+                                            ${hasInfo ? '<span class="info-badge">✓</span>' : ''}
+                                            <button class="remove-btn" onclick="event.stopPropagation(); removeHomework('${escapedName}', '${escapeHtml(hwName)}')">&times;</button>
                                         </span>
-                                    `).join('')}
+                                    `;}).join('')}
                                     <button class="add-tag-btn" onclick="addHomework('${escapedName}')">+ 添加作业</button>
                                 </div>
                             </div>
@@ -1141,17 +1285,27 @@
 
         // ==================== 作业操作 ====================
 
+        // 当前编辑的作业信息
+        let currentEditSubject = null;
+        let currentEditHomework = null;
+        let currentEditTemplates = [];
+
         function addHomework(subjectName) {
             showModal('添加作业', '作业名称', '', (homeworkName) => {
                 if (!homeworkName) return;
-                
+
                 const subject = configData.subjects[subjectName];
-                if (subject.homeworks.includes(homeworkName)) {
+                // 检查是否已存在
+                const exists = subject.homeworks.some(h =>
+                    (typeof h === 'string' ? h : h.name) === homeworkName
+                );
+                if (exists) {
                     showMessage('adminMessage', '作业已存在', 'error');
                     return;
                 }
-                
-                subject.homeworks.push(homeworkName);
+
+                // 添加新作业（使用对象格式）
+                subject.homeworks.push({ name: homeworkName });
                 pendingChanges = true;
                 renderSubjects();
             });
@@ -1161,11 +1315,169 @@
             if (!confirm(`确定要从 "${subjectName}" 中移除作业 "${homeworkName}" 吗？`)) {
                 return;
             }
-            
+
             const subject = configData.subjects[subjectName];
-            subject.homeworks = subject.homeworks.filter(h => h !== homeworkName);
+            subject.homeworks = subject.homeworks.filter(h =>
+                (typeof h === 'string' ? h : h.name) !== homeworkName
+            );
             pendingChanges = true;
             renderSubjects();
+        }
+
+        // 打开作业编辑模态框
+        function openHomeworkEdit(subjectName, homeworkName) {
+            currentEditSubject = subjectName;
+            currentEditHomework = homeworkName;
+
+            const subject = configData.subjects[subjectName];
+            let hwData = null;
+
+            for (let i = 0; i < subject.homeworks.length; i++) {
+                const h = subject.homeworks[i];
+                if (typeof h === 'string') {
+                    if (h === homeworkName) {
+                        hwData = { name: h, description: '', templates: [] };
+                        break;
+                    }
+                } else {
+                    if (h.name === homeworkName) {
+                        hwData = h;
+                        break;
+                    }
+                }
+            }
+
+            if (!hwData) return;
+
+            // 填充表单
+            document.getElementById('hwEditName').value = hwData.name;
+            document.getElementById('hwEditDescription').value = hwData.description || '';
+            currentEditTemplates = hwData.templates ? [...hwData.templates] : [];
+            renderTemplateList();
+
+            // 显示模态框
+            document.getElementById('homeworkEditModal').classList.add('active');
+        }
+
+        // 关闭作业编辑模态框
+        function hideHomeworkEditModal() {
+            document.getElementById('homeworkEditModal').classList.remove('active');
+            currentEditSubject = null;
+            currentEditHomework = null;
+            currentEditTemplates = [];
+        }
+
+        // 渲染模板列表
+        function renderTemplateList() {
+            const container = document.getElementById('hwTemplateList');
+            if (currentEditTemplates.length === 0) {
+                container.innerHTML = '<div class="template-empty">暂无模板文件</div>';
+                return;
+            }
+
+            container.innerHTML = currentEditTemplates.map((tpl, index) => {
+                const fileName = tpl.split('/').pop();
+                return `
+                    <div class="template-item">
+                        <span class="template-item-name">
+                            <span class="icon">📄</span>
+                            ${escapeHtml(fileName)}
+                        </span>
+                        <button class="remove-btn" onclick="removeTemplate(${index})" title="删除">×</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 删除模板
+        function removeTemplate(index) {
+            currentEditTemplates.splice(index, 1);
+            renderTemplateList();
+        }
+
+        // 上传模板文件
+        async function uploadTemplates() {
+            const input = document.getElementById('hwTemplateInput');
+            if (!input.files || input.files.length === 0) {
+                alert('请先选择要上传的文件');
+                return;
+            }
+
+            // 获取上传按钮并显示上传状态
+            const uploadBtn = event.target;
+            const originalText = uploadBtn.textContent;
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = '上传中...';
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const file of input.files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const res = await fetch('/api/v1/admin/template/upload', {
+                        method: 'POST',
+                        headers: { 'X-Admin-Token': adminToken },
+                        body: formData
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        currentEditTemplates.push(data.data.path);
+                        successCount++;
+                    } else {
+                        alert('上传失败: ' + (data.message || '未知错误'));
+                        failCount++;
+                    }
+                } catch (e) {
+                    alert('上传出错: ' + e.message);
+                    failCount++;
+                }
+            }
+
+            // 恢复按钮状态
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = originalText;
+
+            // 显示上传结果
+            if (successCount > 0) {
+                renderTemplateList();
+                alert(`✅ 成功上传 ${successCount} 个文件！\n\n💡 提示：请点击"保存"按钮，然后点击页面底部的【💾 保存配置】按钮，否则刷新后将丢失更改。`);
+            }
+
+            // 清空文件输入
+            input.value = '';
+        }
+
+        // 保存作业编辑
+        function saveHomeworkEdit() {
+            if (!currentEditSubject || !currentEditHomework) return;
+
+            const subject = configData.subjects[currentEditSubject];
+            const description = document.getElementById('hwEditDescription').value.trim();
+
+            // 查找并更新作业
+            for (let i = 0; i < subject.homeworks.length; i++) {
+                const h = subject.homeworks[i];
+                const hwName = typeof h === 'string' ? h : h.name;
+
+                if (hwName === currentEditHomework) {
+                    // 更新为对象格式
+                    subject.homeworks[i] = {
+                        name: currentEditHomework,
+                        description: description,
+                        templates: currentEditTemplates
+                    };
+                    break;
+                }
+            }
+
+            pendingChanges = true;
+            hideHomeworkEditModal();
+            renderSubjects();
+            showMessage('adminMessage', '作业信息已更新（请保存配置）', 'success');
         }
 
         // ==================== 弹窗 ====================
@@ -1214,6 +1526,11 @@
         // 点击班级弹窗背景关闭
         document.getElementById('classModal').addEventListener('click', function(e) {
             if (e.target === this) hideClassModal();
+        });
+
+        // 点击作业编辑弹窗背景关闭
+        document.getElementById('homeworkEditModal').addEventListener('click', function(e) {
+            if (e.target === this) hideHomeworkEditModal();
         });
 
         // Enter 键确认弹窗

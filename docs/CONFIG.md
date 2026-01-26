@@ -27,7 +27,7 @@ cums/
 
 ```json
 {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "server_addr": ":3000",
     "upload_dir": "uploads",
     "admin_enabled": false,
@@ -65,7 +65,7 @@ cums/
 
 | 字段 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| `version` | string | 是 | "2.0.0" | 版本号（语义化版本） |
+| `version` | string | 是 | "2.1.0" | 版本号（语义化版本） |
 | `server_addr` | string | 是 | ":3000" | 服务器监听地址和端口 |
 | `upload_dir` | string | 是 | "uploads" | 上传文件存储目录 |
 | `admin_enabled` | bool | 否 | false | 是否启用管理员功能（默认关闭以保证安全） |
@@ -96,15 +96,39 @@ cums/
 | 字段 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | `classes` | array | 是 | 开设该科目的班级列表 |
-| `homeworks` | array | 是 | 该科目的作业名称列表 |
+| `homeworks` | array | 是 | 该科目的作业列表（支持字符串或对象格式） |
+
+**作业格式说明**：
+
+作业支持两种格式，可混合使用：
+
+1. **简单格式**（字符串）：仅作业名称
+2. **扩展格式**（对象）：包含作业说明和模板文件
+
+| 字段 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `name` | string | 是 | 作业名称 |
+| `description` | string | 否 | 作业说明文字 |
+| `templates` | array | 否 | 模板文件路径列表 |
 
 **示例**：
 ```json
 "数学": {
-    "classes": ["一班", "二班"],           // 一班和二班开设数学课
-    "homeworks": ["第一章作业", "第二章作业"]  // 数学有两项作业
+    "classes": ["一班", "二班"],
+    "homeworks": [
+        "第一章作业",
+        {
+            "name": "第二章作业",
+            "description": "完成课本P45-50习题，要求写出详细解题过程",
+            "templates": ["templates/math_ch2_template.docx"]
+        },
+        {
+            "name": "期中考试",
+            "description": "闭卷考试，时长90分钟",
+            "templates": ["templates/midterm_paper.docx", "templates/answer_sheet.docx"]
+        }
+    ]
 }
-```
 
 ---
 
@@ -265,7 +289,7 @@ uploads/
 
 ```json
 {
-    "version": "2.0.0",
+    "version": "2.1.0",
     "server_addr": ":3000",
     "upload_dir": "uploads",
     "admin_enabled": false,
@@ -345,59 +369,59 @@ uploads/
 
 ---
 
-## 📋 后期规划（TODO）
+## 📋 已实现功能
 
-以下配置扩展已列入开发计划：
+### 作业模板下载（v2.1.0+）
 
-### 作业模板下载
-
-```json
-{
-    "homeworks": [
-        {
-            "name": "第一章作业",
-            "template": "templates/ch1_template.docx"
-        }
-    ]
-}
-```
-
-### 作业说明文字和图片
+支持为作业配置多个模板文件，学生选择作业后可下载：
 
 ```json
 {
     "homeworks": [
         {
             "name": "第一章作业",
-            "description": "请完成课本第1-10题，要求写出解题过程",
-            "images": ["images/example1.png", "images/hint.jpg"]
+            "templates": ["templates/ch1_template.docx", "templates/ch1_data.xlsx"]
         }
     ]
 }
 ```
 
-### 完整扩展结构示例（规划中）
+### 作业说明文字（v2.1.0+）
+
+支持为作业添加说明文字，选择作业时会显示：
 
 ```json
 {
-    "version": "3.0.0",
+    "homeworks": [
+        {
+            "name": "第一章作业",
+            "description": "请完成课本第1-10题，要求写出解题过程"
+        }
+    ]
+}
+```
+
+### 完整配置示例
+
+```json
+{
+    "version": "2.1.0",
     "server_addr": ":3000",
     "admin_enabled": true,
     "admin_password": "admin123",
     "subjects": {
-        "数学": {
-            "classes": ["一班", "二班"],
+        "文字处理": {
+            "classes": ["25计应", "25幼托"],
             "homeworks": [
                 {
-                    "name": "第一章作业",
-                    "description": "完成课本第一章习题1-10",
-                    "template": "templates/math_ch1.docx",
-                    "images": ["images/math_ch1_hint.png"],
-                    "deadline": "2026-02-01"
+                    "name": "WT16",
+                    "description": "完成Word表格制作，要求使用边框和底纹",
+                    "templates": ["templates/wt16_template.docx", "templates/wt16_data.xlsx"]
                 },
+                "WT21",
                 {
-                    "name": "第二章作业",
-                    "description": "完成课本第二章习题1-15"
+                    "name": "WT19",
+                    "description": "完成邮件合并功能练习"
                 }
             ]
         }
@@ -405,7 +429,39 @@ uploads/
 }
 ```
 
-> 💡 这些扩展将在后续版本中逐步实装。当前版本作业仍使用字符串数组格式。
+> 💡 新旧格式可混合使用，系统会自动兼容处理。
+
+---
+
+## 📋 后期规划（TODO）
+
+以下配置扩展已列入开发计划：
+
+### 作业图片展示
+
+```json
+{
+    "homeworks": [
+        {
+            "name": "第一章作业",
+            "images": ["images/example1.png", "images/hint.jpg"]
+        }
+    ]
+}
+```
+
+### 作业截止时间
+
+```json
+{
+    "homeworks": [
+        {
+            "name": "第一章作业",
+            "deadline": "2026-02-01"
+        }
+    ]
+}
+```
 
 ---
 
@@ -446,6 +502,6 @@ uploads/
 
 ---
 
-**文档版本**: v2.0.0
-**更新日期**: 2026-01-22
+**文档版本**: v2.1.0
+**更新日期**: 2026-01-26
 **状态**: ✅ 已更新为以科目为中心的架构，新增管理员功能配置
