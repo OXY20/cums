@@ -1,5 +1,5 @@
 {
-    "version": "2.0.0",
+    "version": "2.3.1",
     "server_addr": ":3000",
     "admin_enabled": true,
     "admin_password": "admin123",
