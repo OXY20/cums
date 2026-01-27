@@ -39,11 +39,11 @@ type HomeworkConfig struct {
 
 // SubjectConfig 科目配置
 type SubjectConfig struct {
-	Classes   []string          `json:"classes"`
-	Homeworks json.RawMessage   `json:"homeworks"` // 支持字符串数组或对象数组
+	Classes   []string        `json:"classes"`
+	Homeworks json.RawMessage `json:"homeworks"` // 支持字符串数组或对象数组
 }
 
-// SubjectConfigParsed 解析后的科目配置（用于返回给前端�?
+// SubjectConfigParsed 解析后的科目配置（用于返回给前端）
 type SubjectConfigParsed struct {
 	Classes   []string         `json:"classes"`
 	Homeworks []HomeworkConfig `json:"homeworks"`
@@ -76,19 +76,19 @@ type VersionResponse struct {
 	Version string `json:"version"`
 }
 
-// AdminLoginRequest 管理员登录请�?
+// AdminLoginRequest 管理员登录请求
 type AdminLoginRequest struct {
 	Password string `json:"password"`
 }
 
-// AdminLoginResponse 管理员登录响�?
+// AdminLoginResponse 管理员登录响应
 type AdminLoginResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 	Token   string `json:"token,omitempty"`
 }
 
-// AdminConfigRequest 管理员配置更新请�?
+// AdminConfigRequest 管理员配置更新请求
 type AdminConfigRequest struct {
 	Subjects map[string]SubjectConfig `json:"subjects"`
 }
@@ -97,18 +97,18 @@ type AdminConfigRequest struct {
 
 var (
 	config      Config
-	baseDir     string                       // 程序所在目�?
+	baseDir     string                       // 程序所在目录
 	uploadDir   string                       // 上传目录
-	adminTokens = make(map[string]time.Time) // 管理员会话令�?
+	adminTokens = make(map[string]time.Time) // 管理员会话令牌
 )
 
-// init 包初始化函数，启动令牌清理协�?
+// init 包初始化函数，启动令牌清理协程
 func init() {
-	// 启动定期清理过期令牌的协�?
+	// 启动定期清理过期令牌的协程
 	go cleanExpiredTokens()
 }
 
-// cleanExpiredTokens 定期清理过期的管理员令牌，防止内存泄�?
+// cleanExpiredTokens 定期清理过期的管理员令牌，防止内存泄漏
 func cleanExpiredTokens() {
 	ticker := time.NewTicker(1 * time.Hour)
 	for range ticker.C {
@@ -121,16 +121,16 @@ func cleanExpiredTokens() {
 	}
 }
 
-// ==================== 初始化函�?====================
+// ==================== 初始化函数 ====================
 
-// getBaseDir 获取程序所在目�?
+// getBaseDir 获取程序所在目录
 func getBaseDir() string {
-	// 如果当前目录�?go.mod，说明是开发环境，使用当前目录
+	// 如果当前目录有go.mod，说明是开发环境，使用当前目录
 	if _, err := os.Stat("go.mod"); err == nil {
 		return "."
 	}
 
-	// 生产环境：使用可执行文件所在目�?
+	// 生产环境：使用可执行文件所在目录
 	exePath, err := os.Executable()
 	if err != nil {
 		return "."
@@ -138,12 +138,12 @@ func getBaseDir() string {
 	return filepath.Dir(exePath)
 }
 
-// initDirs 初始化目�?
+// initDirs 初始化目录
 func initDirs() error {
 	baseDir = getBaseDir()
 	uploadDir = filepath.Join(baseDir, "uploads")
 
-	// 创建必要的目�?
+	// 创建必要的目录
 	dirs := []string{
 		filepath.Join(baseDir, "logs"),
 		filepath.Join(baseDir, "templates"), // 模板文件目录
@@ -165,7 +165,7 @@ func loadConfig() error {
 
 	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return fmt.Errorf("配置文件不存�? %s\n请确�?config.json 与程序在同一目录", configPath)
+		return fmt.Errorf("配置文件不存在 %s\n请确认config.json 与程序在同一目录", configPath)
 	}
 
 	if err := json.Unmarshal(data, &config); err != nil {
@@ -174,13 +174,13 @@ func loadConfig() error {
 
 	// 检查版本号是否存在
 	if config.Version == "" {
-		return fmt.Errorf("配置文件缺少版本�?(version)")
+		return fmt.Errorf("配置文件缺少版本号(version)")
 	}
 
 	return nil
 }
 
-// initUploadDirs 初始化上传目录结�?
+// initUploadDirs 初始化上传目录结构
 func initUploadDirs() error {
 	for subject, subConfig := range config.Subjects {
 		homeworks := parseHomeworks(subConfig.Homeworks)
@@ -196,13 +196,13 @@ func initUploadDirs() error {
 	return nil
 }
 
-// parseHomeworks 解析作业配置，支持字符串数组和对象数组混合格�?
+// parseHomeworks 解析作业配置，支持字符串数组和对象数组混合格式
 func parseHomeworks(raw json.RawMessage) []HomeworkConfig {
 	if raw == nil || len(raw) == 0 {
 		return []HomeworkConfig{}
 	}
 
-	// 首先尝试解析为字符串数组（旧格式�?
+	// 首先尝试解析为字符串数组（旧格式）
 	var strArray []string
 	if err := json.Unmarshal(raw, &strArray); err == nil {
 		result := make([]HomeworkConfig, len(strArray))
@@ -212,12 +212,12 @@ func parseHomeworks(raw json.RawMessage) []HomeworkConfig {
 		return result
 	}
 
-	// 尝试解析为混合数组（字符串和对象混合�?
+	// 尝试解析为混合数组（字符串和对象混合）
 	var mixedArray []json.RawMessage
 	if err := json.Unmarshal(raw, &mixedArray); err == nil {
 		result := make([]HomeworkConfig, 0, len(mixedArray))
 		for _, item := range mixedArray {
-			// 尝试作为字符串解�?
+			// 尝试作为字符串解析
 			var strVal string
 			if err := json.Unmarshal(item, &strVal); err == nil {
 				result = append(result, HomeworkConfig{Name: strVal})
@@ -262,7 +262,7 @@ func getParsedSubjects() map[string]SubjectConfigParsed {
 	return result
 }
 
-// ==================== HTTP 处理�?====================
+// ==================== HTTP 处理器====================
 
 // loginHandler 处理登录请求
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -292,12 +292,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !classExists {
-		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "班级不存�?})
+		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "班级不存在"})
 		return
 	}
 
 	if req.StudentID == "" || req.StudentName == "" {
-		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "学号和姓名不能为�?})
+		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "学号和姓名不能为空"})
 		return
 	}
 
@@ -314,12 +314,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 // configHandler 返回配置信息
 func configHandler(w http.ResponseWriter, r *http.Request) {
-	// 只允�?GET 方法
+	// 只允许 GET 方法
 	if r.Method != http.MethodGet {
 		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
 		return
 	}
-	// 返回解析后的配置（统一格式�?
+	// 返回解析后的配置（统一格式）
 	jsonResponse(w, APIResponse{
 		Success: true,
 		Data: map[string]interface{}{
@@ -357,11 +357,11 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// 验证科目
 	subConfig, exists := config.Subjects[subject]
 	if !exists {
-		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "科目不存�?})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "科目不存在"})
 		return
 	}
 
-	// 验证班级是否属于该科�?
+	// 验证班级是否属于该科目
 	classInSubject := false
 	for _, c := range subConfig.Classes {
 		if c == class {
@@ -384,7 +384,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !homeworkExists {
-		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "作业不存�?})
+		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "作业不存在"})
 		return
 	}
 
@@ -396,7 +396,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// 验证文件类型（白名单�?
+	// 验证文件类型（白名单）
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if !isAllowedFileType(ext) {
 		jsonResponseWithStatus(w, http.StatusBadRequest, UploadResponse{Success: false, Message: "不支持的文件类型"})
@@ -438,7 +438,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	// 记录日志
 	clientIP := getClientIP(r)
 	clientHostname := getClientHostname(clientIP)
-	logMsg := fmt.Sprintf("[%s] %s %s�?s 提交 %s-%s IP:%s 主机�?%s",
+	logMsg := fmt.Sprintf("[%s] %s %s 提交 %s-%s IP:%s 主机名:%s",
 		time.Now().Format("2006-01-02 15:04:05"),
 		class, studentID, studentName, subject, homework, clientIP, clientHostname)
 	fmt.Println(logMsg)
@@ -472,7 +472,7 @@ func changelogHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// staticHandler 返回静态文�?
+// staticHandler 返回静态文件
 func staticHandler(w http.ResponseWriter, r *http.Request) {
 	// 只处理根路径，其他路径由专门的处理器处理
 	if r.URL.Path != "/" {
@@ -490,7 +490,7 @@ func staticHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, staticFile)
 }
 
-// adminPageHandler 返回管理员页�?
+// adminPageHandler 返回管理员页面
 func adminPageHandler(w http.ResponseWriter, r *http.Request) {
 	if !config.AdminEnabled {
 		http.Error(w, "管理员功能未启用", http.StatusForbidden)
@@ -507,7 +507,7 @@ func adminPageHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, adminFile)
 }
 
-// adminLoginHandler 处理管理员登�?
+// adminLoginHandler 处理管理员登录
 func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, AdminLoginResponse{Success: false, Message: "请求方法错误"})
@@ -541,7 +541,7 @@ func adminLoginHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// adminConfigHandler 获取/更新管理员配�?
+// adminConfigHandler 获取/更新管理员配置
 func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 	if !config.AdminEnabled {
 		jsonResponseWithStatus(w, http.StatusForbidden, APIResponse{Success: false, Message: "管理员功能未启用"})
@@ -551,7 +551,7 @@ func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 	// 验证令牌
 	token := r.Header.Get("X-Admin-Token")
 	if !validateAdminToken(token) {
-		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访�?})
+		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访问"})
 		return
 	}
 
@@ -575,19 +575,19 @@ func adminConfigHandler(w http.ResponseWriter, r *http.Request) {
 		// 更新内存中的配置
 		config.Subjects = req.Subjects
 
-		// 保存到文�?
+		// 保存到文件
 		if err := saveConfig(); err != nil {
 			jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "保存配置失败: " + err.Error()})
 			return
 		}
 
-		// 重新初始化上传目�?
+		// 重新初始化上传目录
 		if err := initUploadDirs(); err != nil {
-			jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "初始化目录失�? " + err.Error()})
+			jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "初始化目录失败 " + err.Error()})
 			return
 		}
 
-		jsonResponse(w, APIResponse{Success: true, Message: "配置已更�?})
+		jsonResponse(w, APIResponse{Success: true, Message: "配置已更新"})
 	default:
 		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
 	}
@@ -611,13 +611,13 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 	// 清理路径
 	cleanPath := filepath.Clean(filePath)
 
-	// 检查是否包含路径遍�?
+	// 检查是否包含路径遍历
 	if strings.Contains(cleanPath, "..") {
 		jsonResponseWithStatus(w, http.StatusForbidden, APIResponse{Success: false, Message: "非法路径"})
 		return
 	}
 
-	// 确保文件�?templates 目录�?
+	// 确保文件在 templates 目录下
 	if !strings.HasPrefix(cleanPath, "templates/") && !strings.HasPrefix(cleanPath, "templates\\") {
 		jsonResponseWithStatus(w, http.StatusForbidden, APIResponse{Success: false, Message: "非法路径"})
 		return
@@ -626,7 +626,7 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 	// 构建完整路径
 	fullPath := filepath.Join(baseDir, cleanPath)
 
-	// 再次验证路径在允许的目录�?
+	// 再次验证路径在允许的目录下
 	templatesDir := filepath.Join(baseDir, "templates")
 	absFullPath, err := filepath.Abs(fullPath)
 	if err != nil {
@@ -643,13 +643,13 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 检查文件是否存�?
+	// 检查文件是否存
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-		jsonResponseWithStatus(w, http.StatusNotFound, APIResponse{Success: false, Message: "文件不存�?})
+		jsonResponseWithStatus(w, http.StatusNotFound, APIResponse{Success: false, Message: "文件不存在"})
 		return
 	}
 
-	// 提取文件名并设置下载响应�?
+	// 提取文件名并设置下载响应头
 	filename := filepath.Base(fullPath)
 	w.Header().Set("Content-Disposition", "attachment; filename*=UTF-8''"+url.PathEscape(filename))
 	w.Header().Set("Content-Type", "application/octet-stream")
@@ -658,7 +658,7 @@ func templateHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, fullPath)
 }
 
-// templateUploadHandler 处理模板文件上传（管理端�?
+// templateUploadHandler 处理模板文件上传（管理端）
 func templateUploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
@@ -673,11 +673,11 @@ func templateUploadHandler(w http.ResponseWriter, r *http.Request) {
 	// 验证令牌
 	token := r.Header.Get("X-Admin-Token")
 	if !validateAdminToken(token) {
-		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访�?})
+		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访问"})
 		return
 	}
 
-	// 解析表单（最�?32MB�?
+	// 解析表单（最大 32MB）
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		jsonResponseWithStatus(w, http.StatusBadRequest, APIResponse{Success: false, Message: "解析请求失败"})
 		return
@@ -691,7 +691,7 @@ func templateUploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// 获取科目和作业名�?
+	// 获取科目和作业名称
 	subject := r.FormValue("subject")
 	homework := r.FormValue("homework")
 
@@ -710,14 +710,14 @@ func templateUploadHandler(w http.ResponseWriter, r *http.Request) {
 	// 生成安全的文件名
 	safeFilename := sanitizeFilename(strings.TrimSuffix(header.Filename, ext)) + ext
 
-	// 创建按科目组织的目录结构：templates/科目�?
+	// 创建按科目组织的目录结构：templates/科目名
 	subjectDir := filepath.Join(baseDir, "templates", subject)
 	if err := os.MkdirAll(subjectDir, 0755); err != nil {
 		jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "创建目录失败"})
 		return
 	}
 
-	// 保存文件到科目目�?
+	// 保存文件到科目目录
 	fullPath := filepath.Join(subjectDir, safeFilename)
 	dst, err := os.Create(fullPath)
 	if err != nil {
@@ -734,8 +734,8 @@ func templateUploadHandler(w http.ResponseWriter, r *http.Request) {
 	// 返回模板路径（包含科目目录）
 	templatePath := "templates/" + subject + "/" + safeFilename
 
-	// 添加日志输出（包含科目和作业信息�?
-	logMsg := fmt.Sprintf("[模板上传] %s 上传成功 �?%s", header.Filename, templatePath)
+	// 添加日志输出（包含科目和作业信息）
+	logMsg := fmt.Sprintf("[模板上传] %s 上传成功 路径:%s", header.Filename, templatePath)
 	if homework != "" {
 		logMsg += fmt.Sprintf(" (作业: %s)", homework)
 	}
@@ -751,7 +751,7 @@ func templateUploadHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// templateDeleteHandler 处理模板文件删除（管理端�?
+// templateDeleteHandler 处理模板文件删除（管理端）
 func templateDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		jsonResponseWithStatus(w, http.StatusMethodNotAllowed, APIResponse{Success: false, Message: "请求方法错误"})
@@ -766,7 +766,7 @@ func templateDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	// 验证令牌
 	token := r.Header.Get("X-Admin-Token")
 	if !validateAdminToken(token) {
-		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访�?})
+		jsonResponseWithStatus(w, http.StatusUnauthorized, APIResponse{Success: false, Message: "未授权访问"})
 		return
 	}
 
@@ -779,14 +779,14 @@ func templateDeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 安全检�?
+	// 安全检查
 	cleanPath := filepath.Clean(req.Path)
 	if strings.Contains(cleanPath, "..") || (!strings.HasPrefix(cleanPath, "templates/") && !strings.HasPrefix(cleanPath, "templates\\")) {
 		jsonResponseWithStatus(w, http.StatusForbidden, APIResponse{Success: false, Message: "非法路径"})
 		return
 	}
 
-	// 构建完整路径并验�?
+	// 构建完整路径并验证
 	fullPath := filepath.Join(baseDir, cleanPath)
 	templatesDir := filepath.Join(baseDir, "templates")
 	absFullPath, _ := filepath.Abs(fullPath)
@@ -799,14 +799,14 @@ func templateDeleteHandler(w http.ResponseWriter, r *http.Request) {
 	// 删除文件
 	if err := os.Remove(fullPath); err != nil {
 		if os.IsNotExist(err) {
-			jsonResponse(w, APIResponse{Success: true, Message: "文件已删�?})
+			jsonResponse(w, APIResponse{Success: true, Message: "文件已删除"})
 			return
 		}
 		jsonResponseWithStatus(w, http.StatusInternalServerError, APIResponse{Success: false, Message: "删除文件失败"})
 		return
 	}
 
-	jsonResponse(w, APIResponse{Success: true, Message: "文件已删�?})
+	jsonResponse(w, APIResponse{Success: true, Message: "文件已删除"})
 }
 
 // generateAdminToken 生成安全的管理员令牌
@@ -819,7 +819,7 @@ func generateAdminToken() string {
 	return "admin_" + hex.EncodeToString(b)
 }
 
-// validateAdminToken 验证管理员令�?
+// validateAdminToken 验证管理员令牌
 func validateAdminToken(token string) bool {
 	if token == "" {
 		return false
@@ -835,13 +835,13 @@ func validateAdminToken(token string) bool {
 	return true
 }
 
-// saveConfig 保存配置到文�?
+// saveConfig 保存配置到文
 func saveConfig() error {
 	configPath := filepath.Join(baseDir, "config.json")
 
 	data, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
-		return fmt.Errorf("序列化配置失�? %w", err)
+		return fmt.Errorf("序列化配置失败 %w", err)
 	}
 
 	if err := os.WriteFile(configPath, data, 0644); err != nil {
@@ -854,32 +854,32 @@ func saveConfig() error {
 // ==================== 工具函数 ====================
 
 // sanitizeFilename 过滤文件名中的危险字符，防止路径遍历攻击
-// 严格模式：只允许字母、数字、下划线、连字符和中文字�?
+// 严格模式：只允许字母、数字、下划线、连字符和中文字符
 func sanitizeFilename(name string) string {
 	var result strings.Builder
 	for _, r := range name {
-		// 允许：字母、数字、下划线、连字符、中文字�?
+		// 允许：字母、数字、下划线、连字符、中文字符
 		if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' || r == '-' {
 			result.WriteRune(r)
 		}
 	}
-	// 如果过滤后为空，返回默认�?
+	// 如果过滤后为空，返回默认值
 	if result.Len() == 0 {
 		return "unnamed"
 	}
 	return result.String()
 }
 
-// allowedExtensions 允许上传的文件扩展名白名�?
+// allowedExtensions 允许上传的文件扩展名白名单中
 var allowedExtensions = map[string]bool{
-	// 文档�?
+	// 文档类
 	".doc": true, ".docx": true, ".pdf": true, ".txt": true,
 	".xls": true, ".xlsx": true, ".ppt": true, ".pptx": true,
 	".odt": true, ".ods": true, ".odp": true, ".rtf": true,
-	// 图片�?
+	// 图片类
 	".jpg": true, ".jpeg": true, ".png": true, ".gif": true,
 	".bmp": true, ".webp": true, ".svg": true,
-	// 压缩�?
+	// 压缩类
 	".zip": true, ".rar": true, ".7z": true, ".tar": true, ".gz": true,
 	// 代码/文本
 	".c": true, ".cpp": true, ".h": true, ".java": true, ".py": true,
@@ -887,7 +887,7 @@ var allowedExtensions = map[string]bool{
 	".md": true, ".go": true, ".rs": true, ".ts": true,
 }
 
-// isAllowedFileType 检查文件扩展名是否在白名单�?
+// isAllowedFileType 检查文件扩展名是否在白名单）
 func isAllowedFileType(ext string) bool {
 	return allowedExtensions[ext]
 }
@@ -896,7 +896,7 @@ func isAllowedFileType(ext string) bool {
 func jsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	if err := json.NewEncoder(w).Encode(data); err != nil {
-		// 记录编码错误到日�?
+		// 记录编码错误到日志
 		writeLog(fmt.Sprintf("[ERROR] JSON编码失败: %v", err))
 	}
 }
@@ -928,14 +928,14 @@ func getClientIP(r *http.Request) string {
 	return ip
 }
 
-// getClientHostname 获取客户端主机名（通过反向DNS查询�?
+// getClientHostname 获取客户端主机名（通过反向DNS查询）
 func getClientHostname(ip string) string {
 	// 尝试反向DNS查询
 	names, err := net.LookupAddr(ip)
 	if err != nil || len(names) == 0 {
 		return "未知主机"
 	}
-	// 返回第一个主机名，去掉末尾的�?
+	// 返回第一个主机名，去掉末尾的点
 	return strings.TrimSuffix(names[0], ".")
 }
 
@@ -973,13 +973,13 @@ func isPortInUse(port string) bool {
 	addr := "0.0.0.0" + port
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
-		return true // 端口被占�?
+		return true // 端口被占用
 	}
 	listener.Close()
 	return false
 }
 
-// getPortProcess 获取占用端口的进程信�?(Windows)
+// getPortProcess 获取占用端口的进程信息(Windows)
 func getPortProcess(port string) (pid int, processName string, cmdLine string, err error) {
 	// 使用 netstat 命令获取端口占用信息
 	portNum := strings.TrimPrefix(port, ":")
@@ -1003,7 +1003,7 @@ func getPortProcess(port string) (pid int, processName string, cmdLine string, e
 	}
 
 	if pid == 0 {
-		return 0, "", "", fmt.Errorf("未找到占用进�?)
+		return 0, "", "", fmt.Errorf("未找到占用进程")
 	}
 
 	// 使用 tasklist 获取进程名称
@@ -1017,7 +1017,7 @@ func getPortProcess(port string) (pid int, processName string, cmdLine string, e
 		}
 	}
 
-	// 使用 wmic 获取命令�?
+	// 使用 wmic 获取命令行
 	cmd = exec.Command("wmic", "process", "where", fmt.Sprintf("ProcessId=%d", pid), "get", "CommandLine", "/format:list")
 	output, err = cmd.Output()
 	if err == nil {
@@ -1034,14 +1034,14 @@ func getPortProcess(port string) (pid int, processName string, cmdLine string, e
 	return pid, processName, cmdLine, nil
 }
 
-// killProcess 结束指定 PID 的进�?
+// killProcess 结束指定 PID 的进程
 func killProcess(pid int) error {
-	// 添加 /T 参数：终止进程树（包含所有子进程�?
+	// 添加 /T 参数：终止进程树（包含所有子进程）
 	cmd := exec.Command("taskkill", "/F", "/T", "/PID", strconv.Itoa(pid))
 	return cmd.Run()
 }
 
-// waitForUserInput 等待用户输入，支持倒计�?
+// waitForUserInput 等待用户输入，支持倒计时
 func waitForUserInput(timeout time.Duration) (choice string, timedOut bool) {
 	resultChan := make(chan string, 1)
 
@@ -1053,7 +1053,7 @@ func waitForUserInput(timeout time.Duration) (choice string, timedOut bool) {
 		resultChan <- input
 	}()
 
-	// 倒计�?
+	// 倒计时
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
@@ -1062,12 +1062,12 @@ func waitForUserInput(timeout time.Duration) (choice string, timedOut bool) {
 	for {
 		select {
 		case input := <-resultChan:
-			fmt.Print("\r                ") // 清除倒计时显�?
+			fmt.Print("\r                ") // 清除倒计时显示
 			fmt.Print("\r")
 			return input, false
 		case <-ticker.C:
 			remaining--
-			fmt.Printf("\r倒计�? %d �?(输入 Y/N 并按回车响应) ", remaining)
+			fmt.Printf("\r倒计时 %d 秒(输入 Y/N 并按回车响应) ", remaining)
 			if remaining <= 0 {
 				fmt.Println()
 				return "", true // 超时
@@ -1079,25 +1079,25 @@ func waitForUserInput(timeout time.Duration) (choice string, timedOut bool) {
 // startServerWithPortHandling 智能端口启动
 func startServerWithPortHandling(basePort string) error {
 	currentPort := basePort
-	maxRetries := 10 // 最多尝�?0个端�?
+	maxRetries := 10 // 最多尝试 10 个端口
 
 	for i := 0; i < maxRetries; i++ {
 		// 检测端口是否被占用
 		if !isPortInUse(currentPort) {
-			// 端口可用，直接启�?
+			// 端口可用，直接启动
 			return startServer(currentPort)
 		}
 
 		// 端口被占用，获取进程信息
-		fmt.Printf("\n�?端口 %s 已被占用\n", currentPort)
+		fmt.Printf("\n⚠️ 端口 %s 已被占用\n", currentPort)
 		pid, processName, cmdLine, err := getPortProcess(currentPort)
 
 		if err == nil && pid != 0 {
 			fmt.Println("📋 占用进程信息:")
 			fmt.Printf("   PID: %d\n", pid)
-			fmt.Printf("   进程�? %s\n", processName)
+			fmt.Printf("   进程名: %s\n", processName)
 			if cmdLine != "" {
-				fmt.Printf("   命令�? %s\n", cmdLine)
+				fmt.Printf("   命令行: %s\n", cmdLine)
 			}
 			fmt.Println()
 
@@ -1106,22 +1106,22 @@ func startServerWithPortHandling(basePort string) error {
 			nextPort := fmt.Sprintf(":%d", portNum+1)
 
 			fmt.Printf("⏱️  5秒后将自动结束占用进程并启动...\n")
-			fmt.Printf("   输入 Y 并按回车 �?立即结束进程\n")
-			fmt.Printf("   输入 N 并按回车 �?使用下一个端�?(%s)\n", nextPort)
+			fmt.Printf("   输入 Y 并按回车 →立即结束进程\n")
+			fmt.Printf("   输入 N 并按回车 →使用下一个端口(%s)\n", nextPort)
 			fmt.Printf("   不输入则等待倒计时\n\n")
 
-			// 等待用户输入�?秒倒计时）
+			// 等待用户输入（5秒倒计时）
 			choice, timedOut := waitForUserInput(5 * time.Second)
 
 			if choice == "Y" || timedOut {
 				// 结束进程
 				fmt.Printf("\n🔄 正在结束进程 %d...\n", pid)
 				if err := killProcess(pid); err != nil {
-					fmt.Printf("�?结束进程失败: %v\n", err)
+					fmt.Printf("❌ 结束进程失败: %v\n", err)
 					fmt.Printf("💡 提示：\n")
 					fmt.Printf("   1. 尝试【以管理员身份运行】此程序\n")
 					fmt.Printf("   2. 或手动在任务管理器中结束 PID %d\n", pid)
-					fmt.Printf("   正在尝试使用下一个端�?%s\n\n", nextPort)
+					fmt.Printf("   正在尝试使用下一个端口 %s\n\n", nextPort)
 					currentPort = nextPort
 					continue
 				}
@@ -1129,18 +1129,18 @@ func startServerWithPortHandling(basePort string) error {
 				// 等待端口释放
 				time.Sleep(500 * time.Millisecond)
 
-				// 重新检�?
+				// 重新检查
 				if !isPortInUse(currentPort) {
-					fmt.Println("�?进程已结束，端口已释�?)
+					fmt.Println("✅ 进程已结束，端口已释放")
 					return startServer(currentPort)
 				} else {
-					fmt.Println("⚠️  端口仍被占用，尝试下一个端�?)
+					fmt.Println("⚠️  端口仍被占用，尝试下一个端口")
 					currentPort = nextPort
 					continue
 				}
 			} else if choice == "N" {
-				// 换端�?
-				fmt.Printf("\n🔄 切换到端�?%s\n\n", nextPort)
+				// 换端口
+				fmt.Printf("\n🔄 切换到端口 %s\n\n", nextPort)
 				currentPort = nextPort
 				continue
 			} else {
@@ -1150,18 +1150,18 @@ func startServerWithPortHandling(basePort string) error {
 				continue
 			}
 		} else {
-			// 无法获取进程信息，直接尝试下一个端�?
+			// 无法获取进程信息，直接尝试下一个端口
 			portNum, _ := strconv.Atoi(strings.TrimPrefix(currentPort, ":"))
 			currentPort = fmt.Sprintf(":%d", portNum+1)
-			fmt.Printf("⚠️  无法获取占用进程信息，尝试端�?%s\n\n", currentPort)
+			fmt.Printf("⚠️  无法获取占用进程信息，尝试端口%s\n\n", currentPort)
 			continue
 		}
 	}
 
-	return fmt.Errorf("已尝�?%d 个端口，均被占用", maxRetries)
+	return fmt.Errorf("已尝试 %d 个端口，均被占用", maxRetries)
 }
 
-// startServer 实际启动服务�?
+// startServer 实际启动服务器
 func startServer(port string) error {
 	addr := "0.0.0.0" + port
 	localIP := getLocalIP()
@@ -1169,42 +1169,42 @@ func startServer(port string) error {
 	fmt.Println()
 	fmt.Println("🌐 访问地址")
 	fmt.Println("────────────────────────────────────────")
-	fmt.Printf("   学生�?   http://localhost%s\n", port)
+	fmt.Printf("   学生端:   http://localhost%s\n", port)
 	fmt.Printf("   局域网:   http://%s%s\n", localIP, port)
 	fmt.Println()
 
 	fmt.Println("════════════════════════════════════════════════════════════")
-	fmt.Printf("🚀 服务器已启动在端�?%s，按 Ctrl+C 停止\n", port)
+	fmt.Printf("🚀 服务器已启动在端口 %s，按 Ctrl+C 停止\n", port)
 	fmt.Println("════════════════════════════════════════════════════════════")
 	fmt.Println()
 
 	return http.ListenAndServe(addr, nil)
 }
 
-// ==================== 主函�?====================
+// ==================== 主函====================
 
 func main() {
 	fmt.Println()
 	fmt.Println("╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("�?          CUMS - 课堂文件上传管理系统                      �?)
+	fmt.Println("│          CUMS - 课堂文件上传管理系统                      │")
 	fmt.Println("╚════════════════════════════════════════════════════════════╝")
 	fmt.Println()
 
-	// 初始化目�?
+	// 初始化目录
 	if err := initDirs(); err != nil {
-		fmt.Printf("�?初始化目录失�? %v\n", err)
+		fmt.Printf("❌ 初始化目录失败 %v\n", err)
 		os.Exit(1)
 	}
 
 	// 加载配置
 	if err := loadConfig(); err != nil {
-		fmt.Printf("�?错误: %v\n", err)
+		fmt.Printf("❌ 错误: %v\n", err)
 		os.Exit(1)
 	}
 
-	// 初始化上传目�?
+	// 初始化上传目录
 	if err := initUploadDirs(); err != nil {
-		fmt.Printf("�?初始化上传目录失�? %v\n", err)
+		fmt.Printf("❌ 初始化上传目录失败 %v\n", err)
 		os.Exit(1)
 	}
 
@@ -1222,7 +1222,7 @@ func main() {
 	http.HandleFunc("/api/v1/admin/template/upload", templateUploadHandler)
 	http.HandleFunc("/api/v1/admin/template/delete", templateDeleteHandler)
 
-	// 启动服务�?
+	// 启动服务器
 	addr := config.ServerAddr
 	if addr == "" {
 		addr = ":3000"
@@ -1232,18 +1232,18 @@ func main() {
 	fmt.Println("📖 使用说明")
 	fmt.Println("────────────────────────────────────────")
 	fmt.Println("   1. 学生访问上方地址，登录后上传作业")
-	fmt.Println("   2. 文件保存�?uploads/科目/班级/作业/ 目录")
-	fmt.Println("   3. 通过管理后台可添加科目、班级、作�?)
+	fmt.Println("   2. 文件保存在 uploads/科目/班级/作业/ 目录")
+	fmt.Println("   3. 通过管理后台可添加科目、班级、作业")
 	fmt.Println("   4. 修改 config.json 后需重启程序生效")
 	fmt.Println()
 
 	fmt.Println("════════════════════════════════════════════════════════════")
-	fmt.Println("�?正在启动服务�?..")
+	fmt.Println("⏳ 正在启动服务器..")
 	fmt.Println("════════════════════════════════════════════════════════════")
 
 	// 使用智能端口启动
 	if err := startServerWithPortHandling(addr); err != nil {
-		fmt.Printf("�?启动服务器失�? %v\n", err)
+		fmt.Printf("❌ 启动服务器失败 %v\n", err)
 		os.Exit(1)
 	}
 }
