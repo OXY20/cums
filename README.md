@@ -1,7 +1,7 @@
 # CUMS - 课堂文件上传管理系统
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.2-blue.svg" alt="version">
+  <img src="https://img.shields.io/badge/version-2.3.3-blue.svg" alt="version">
   <img src="https://img.shields.io/badge/Go-1.21+-00ADD8.svg" alt="Go">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="license">
 </p>
@@ -90,7 +90,7 @@ uploads/
 
 ```json
 {
-    "version": "2.3.2",
+    "version": "2.3.3",
     "server_addr": ":3000",
     "admin_enabled": false,
     "admin_password": "admin123",
@@ -159,4 +159,4 @@ cums/
 
 ---
 
-**版本**: v2.3.2 | **更新**: 2026-01-26
+**版本**: v2.3.3 | **更新**: 2026-01-28

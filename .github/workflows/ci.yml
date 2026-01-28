@@ -1,4 +1,4 @@
-on:
+﻿on:
   push:
     tags:
       - 'v*'  # 推送 v2.0.0 这种 tag 时触发
