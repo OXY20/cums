@@ -72,7 +72,7 @@
             color: #ff4d4f;
         }
 
-        /* ========== 主内�?========== */
+        /* ========== 主内容 ========== */
         .main {
             max-width: 480px;
             margin: 40px auto;
@@ -93,7 +93,7 @@
             text-align: center;
         }
 
-        /* ========== 欢迎�?========== */
+        /* ========== 欢迎页 ========== */
         .welcome {
             text-align: center;
             padding: 40px 0;
@@ -491,17 +491,17 @@
         </div>
     </header>
 
-    <!-- 主内�?-->
+    <!-- 主内容 -->
     <main class="main">
         <!-- 欢迎页（未登录） -->
         <div class="card" id="welcomeCard">
             <div class="welcome">
-                <p>请先登录后上传作�?/p>
+                <p>请先登录后上传作业</p>
                 <button class="btn btn-primary" onclick="showLogin()">登录</button>
             </div>
         </div>
 
-        <!-- 上传表单（已登录�?-->
+        <!-- 上传表单（已登录） -->
         <div class="card hidden" id="uploadCard">
             <div class="class-tag" id="classTag"></div>
             <h2 class="card-title">作业上传</h2>
@@ -583,11 +583,11 @@
                 </div>
                 <div class="form-group">
                     <label>学号</label>
-                    <input type="text" id="loginStudentId" placeholder="请输入学�? required>
+                    <input type="text" id="loginStudentId" placeholder="请输入学号" required>
                 </div>
                 <div class="form-group">
                     <label>姓名</label>
-                    <input type="text" id="loginStudentName" placeholder="请输入姓�? required>
+                    <input type="text" id="loginStudentName" placeholder="请输入姓名" required>
                 </div>
                 <button type="submit" class="submit-btn">登录</button>
             </form>
@@ -595,21 +595,21 @@
     </div>
 
     <script>
-        // ==================== 全局状�?====================
+        // ==================== 全局状态 ====================
         let currentUser = null;  // 当前用户信息
         let configData = null;   // 配置数据
-        let isLoggedIn = false;  // 登录状�?
+        let isLoggedIn = false;  // 登录状态
 
         // ==================== 工具函数 ====================
 
-        // HTML 转义函数，防�?XSS 攻击
+        // HTML 转义函数，防止 XSS 攻击
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
 
-        // ==================== 初始�?====================
+        // ==================== 初始化 ====================
 
         // 页面加载时初始化
         async function init() {
@@ -646,7 +646,7 @@
             }
         }
 
-        // 加载保存的用�?
+        // 加载保存的用户
         function loadSavedUser() {
             try {
                 const saved = localStorage.getItem('cums_user');
@@ -677,7 +677,7 @@
             });
         }
 
-        // 初始化科目下拉框（只显示当前班级有的科目�?
+        // 初始化科目下拉框（只显示当前班级有的科目）
         function initSubjectSelect() {
             if (!configData || !configData.subjects || !currentUser) return;
 
@@ -685,7 +685,7 @@
             // 清空现有选项
             subjectSelect.innerHTML = '<option value="">请选择科目</option>';
             
-            // 只添加当前班级有的科�?
+            // 只添加当前班级有的科目
             Object.keys(configData.subjects).forEach(name => {
                 const subConfig = configData.subjects[name];
                 if (subConfig.classes.includes(currentUser.class)) {
@@ -697,7 +697,7 @@
             document.getElementById('homeworkSelect').innerHTML = '<option value="">请选择作业</option>';
         }
 
-        // 科目变更时更新作业列�?
+        // 科目变更时更新作业列表
         function onSubjectChange() {
             const subject = document.getElementById('subjectSelect').value;
             const homeworkSelect = document.getElementById('homeworkSelect');
@@ -712,14 +712,14 @@
 
             const subConfig = configData.subjects[subject];
 
-            // 填充作业选项（支持新格式�?
+            // 填充作业选项（支持新格式）
             subConfig.homeworks.forEach(hw => {
                 const hwName = typeof hw === 'string' ? hw : hw.name;
                 homeworkSelect.add(new Option(hwName, hwName));
             });
         }
 
-        // 作业变更时显示作业信�?
+        // 作业变更时显示作业信息
         function onHomeworkChange() {
             const subject = document.getElementById('subjectSelect').value;
             const homework = document.getElementById('homeworkSelect').value;
@@ -807,12 +807,12 @@
             document.getElementById('aboutPopup').classList.remove('active');
         }
 
-        // 显示登录�?
+        // 显示登录弹窗
         function showLogin() {
             document.getElementById('loginModal').classList.add('active');
         }
 
-        // 隐藏登录�?
+        // 隐藏登录弹窗
         function hideLogin() {
             document.getElementById('loginModal').classList.remove('active');
         }
@@ -859,9 +859,9 @@
             }
         }
 
-        // 退出登�?
+        // 退出登录
         function logout() {
-            if (!confirm('确定要退出登录吗�?)) return;
+            if (!confirm('确定要退出登录吗？')) return;
             
             currentUser = null;
             isLoggedIn = false;
@@ -875,16 +875,16 @@
             const classTag = document.getElementById('classTag');
 
             if (isLoggedIn && currentUser) {
-                // 更新头部（使�?escapeHtml 防止 XSS�?
+                // 更新头部（使用 escapeHtml 防止 XSS）
                 userInfo.innerHTML = `
-                    <span>${escapeHtml(currentUser.class)} - ${escapeHtml(currentUser.student_id)}�?${escapeHtml(currentUser.student_name)}</span>
-                    <button class="btn btn-link btn-logout" onclick="logout()">退�?/button>
+                    <span>${escapeHtml(currentUser.class)} - ${escapeHtml(currentUser.student_id)} · ${escapeHtml(currentUser.student_name)}</span>
+                    <button class="btn btn-link btn-logout" onclick="logout()">退出</button>
                 `;
 
                 // 更新班级标签
                 classTag.textContent = currentUser.class;
                 
-                // 初始化科目下拉框（只显示当前班级有的科目�?
+                // 初始化科目下拉框（只显示当前班级有的科目）
                 initSubjectSelect();
                 
                 // 显示上传表单
@@ -896,7 +896,7 @@
                     <button class="btn btn-primary" onclick="showLogin()">登录</button>
                 `;
                 
-                // 显示欢迎�?
+                // 显示欢迎页
                 document.getElementById('uploadCard').classList.add('hidden');
                 document.getElementById('welcomeCard').classList.remove('hidden');
             }
@@ -929,7 +929,7 @@
             
             // 禁用按钮
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="loading"></span>上传�?..';
+            submitBtn.innerHTML = '<span class="loading"></span>上传中...';
             message.className = 'message';
             
             try {
@@ -968,7 +968,7 @@
             if (e.target === this) hideAboutPopup();
         });
 
-        // 初始�?
+        // 初始化
         init();
     </script>
 </body>
