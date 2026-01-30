@@ -143,8 +143,8 @@ A: 查看 [DEVELOPMENT.md - 代码规范](./DEVELOPMENT.md#代码规范)
 | CONTRIBUTING.md | ✅ 完成 | 2026-01-20 | 100% |
 | ARCHITECTURE.md | ✅ 完成 | 2026-01-21 | 100% |
 | ISSUES.md | ✅ 完成 | 2026-01-21 | 100% |
-| INDEX.md | ✅ 完成 | 2026-01-21 | 100% |
-| README_CENTER.md | ✅ 完成 | 2026-01-20 | 100% |
+| INDEX.md | ✅ 完成 | 2026-01-30 | 100% |
+| ARCHIVE.md | ✅ 完成 | 2026-01-30 | 100% |
 
 **图例**:
 - ✅ 完成: 文档完整且最新
@@ -189,3 +189,7 @@ A: 查看 [DEVELOPMENT.md - 代码规范](./DEVELOPMENT.md#代码规范)
 ---
 
 **最后更新**: 2026-01-21
+
+## 📦 归档文档
+
+- [ARCHIVE.md](./ARCHIVE.md) - 文档归档说明

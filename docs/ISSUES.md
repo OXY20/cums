@@ -314,4 +314,3 @@ func validateConfig(cfg *Config) error {
 | 2026-01-21 | 修复配置结构不匹配问题 | Kiro |
 | 2026-01-21 | 修复班级选择逻辑冲突 | Kiro |
 | 2026-01-21 | 更新问题状态 | Kiro |
-
