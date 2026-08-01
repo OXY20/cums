@@ -1,15 +1,12 @@
+# Rust 编译产物
+/target/
+
 # 二进制文件
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# 测试文件
-*.test
-
-# 输出文件
-build/
 
 # IDE
 .vscode/
@@ -21,6 +18,12 @@ build/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 构建产物
+build/
+
+# 临时文件
+cargo_config_temp.toml
 
 # 本地配置
 uploads/

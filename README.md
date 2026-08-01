@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.3.3-blue.svg" alt="version">
-  <img src="https://img.shields.io/badge/Go-1.21+-00ADD8.svg" alt="Go">
+  <img src="https://img.shields.io/badge/Rust-1.70+-DEA584.svg" alt="Rust">
   <img src="https://img.shields.io/badge/license-MIT-green.svg" alt="license">
 </p>
 
@@ -18,7 +18,7 @@
 - 🌐 **局域网访问** - 支持学生机通过局域网地址访问
 - 🔧 **Web 管理后台** - 可通过浏览器管理科目、班级、作业配置
 - 📝 **实时日志** - 控制台和文件双重日志记录
-- 💻 **跨平台** - 支持 Windows / Linux / macOS
+- 💻 **跨平台** - 支持 Windows / Linux / macOS（Rust 编译）
 
 ## 🚀 快速开始
 
@@ -35,12 +35,11 @@
 git clone https://github.com/OXY20/cums.git
 cd cums
 
-# 运行
-go run main.go
+# 编译（需要 Rust 环境）
+cargo build --release
 
-# 或编译后运行
-go build -o cums.exe .
-./cums.exe
+# 运行
+./target/release/cums.exe
 ```
 
 ## 📖 使用说明
@@ -120,18 +119,22 @@ uploads/
 
 ```
 cums/
-├── main.go           # 后端主程序
-├── embed.go          # 嵌入文件
-├── config.json       # 配置文件
+├── src/              # Rust 源码
+│   ├── main.rs      # 入口 + 路由
+│   ├── handlers.rs   # API 处理器
+│   ├── models.rs    # 数据结构
+│   ├── config.rs    # 配置管理
+│   └── utils.rs     # 工具函数
+├── config.json      # 配置文件
 ├── static/
-│   ├── index.html    # 学生端页面
-│   └── admin.html    # 管理后台页面
-├── uploads/          # 上传文件目录
-├── logs/             # 日志目录
-└── docs/             # 详细文档
-    ├── README.md     # 详细说明
-    ├── CONFIG.md     # 配置详解
-    ├── API.md        # API 文档
+│   ├── index.html   # 学生端页面
+│   └── admin.html   # 管理后台页面
+├── uploads/         # 上传文件目录
+├── logs/            # 日志目录
+└── docs/            # 详细文档
+    ├── README.md    # 详细说明
+    ├── CONFIG.md    # 配置详解
+    ├── API.md       # API 文档
     └── ...
 ```
 
