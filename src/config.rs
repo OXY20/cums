@@ -1,7 +1,10 @@
-use crate::models::Config;
+use crate::models::{Config, OperationLog};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
+
+/// 操作日志最大条数
+const MAX_OP_LOGS: usize = 500;
 
 /// 应用状态
 pub struct AppState {
@@ -9,6 +12,7 @@ pub struct AppState {
     pub base_dir: PathBuf,
     pub upload_dir: PathBuf,
     pub admin_tokens: RwLock<HashMap<String, chrono::DateTime<chrono::Local>>>,
+    pub op_logs: RwLock<Vec<OperationLog>>,
 }
 
 impl AppState {
@@ -26,6 +30,7 @@ impl AppState {
             base_dir,
             upload_dir,
             admin_tokens: RwLock::new(HashMap::new()),
+            op_logs: RwLock::new(Vec::new()),
         }
     }
 
@@ -48,12 +53,35 @@ impl AppState {
         let now = chrono::Local::now();
         tokens.retain(|_, expiry| &now < expiry);
     }
+
+    /// 记录操作日志
+    pub fn log_operation(&self, action: &str, detail: &str) {
+        let entry = OperationLog {
+            timestamp: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: action.to_string(),
+            detail: detail.to_string(),
+        };
+        let mut logs = self.op_logs.write().unwrap();
+        logs.push(entry);
+        // 保留最近的 MAX_OP_LOGS 条
+        if logs.len() > MAX_OP_LOGS {
+            let drain_count = logs.len() - MAX_OP_LOGS;
+            logs.drain(0..drain_count);
+        }
+    }
+
+    /// 获取操作日志（最近 count 条）
+    pub fn get_op_logs(&self, count: usize) -> Vec<OperationLog> {
+        let logs = self.op_logs.read().unwrap();
+        let start = if logs.len() > count { logs.len() - count } else { 0 };
+        logs[start..].to_vec()
+    }
 }
 
 /// 获取程序所在目录
 fn get_base_dir() -> PathBuf {
-    // 如果当前目录有 go.mod 或 Cargo.toml，说明是开发环境
-    if Path::new("go.mod").exists() || Path::new("Cargo.toml").exists() {
+    // 如果当前目录有 Cargo.toml，说明是开发环境
+    if Path::new("Cargo.toml").exists() {
         return PathBuf::from(".");
     }
     // 生产环境：使用可执行文件所在目录

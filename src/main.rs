@@ -113,6 +113,13 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/admin/config", web::route().to(handlers::admin_config))
             .route("/api/v1/admin/template/upload", web::post().to(handlers::template_upload))
             .route("/api/v1/admin/template/delete", web::post().to(handlers::template_delete))
+            // 管理员 API v2
+            .route("/api/v1/admin/files", web::get().to(handlers::admin_file_list))
+            .route("/api/v1/admin/files/delete", web::post().to(handlers::admin_file_delete))
+            .route("/api/v1/admin/stats", web::get().to(handlers::admin_stats))
+            .route("/api/v1/admin/submissions", web::get().to(handlers::admin_submissions))
+            .route("/api/v1/admin/password", web::post().to(handlers::admin_change_password))
+            .route("/api/v1/admin/logs", web::get().to(handlers::admin_logs))
             // 静态文件服务（uploads 目录）
             .service(
                 actix_files::Files::new("/uploads", "./uploads")

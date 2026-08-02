@@ -164,3 +164,84 @@ pub struct AdminConfigRequest {
 pub struct TemplateDeleteRequest {
     pub path: String,
 }
+
+// ==================== 新增：管理后台 v2 数据结构 ====================
+
+/// 文件信息
+#[derive(Debug, Serialize)]
+pub struct FileInfo {
+    pub name: String,
+    pub size: u64,
+    pub modified: String,
+    pub path: String,
+}
+
+/// 文件列表请求（查询参数）
+#[derive(Debug, Deserialize)]
+pub struct FileListQuery {
+    pub subject: Option<String>,
+    pub class: Option<String>,
+    pub homework: Option<String>,
+}
+
+/// 文件删除请求
+#[derive(Debug, Deserialize)]
+pub struct FileDeleteRequest {
+    pub path: String,
+}
+
+/// 统计数据
+#[derive(Debug, Serialize)]
+pub struct DashboardStats {
+    pub total_files: usize,
+    pub total_size: u64,
+    pub total_subjects: usize,
+    pub total_classes: usize,
+    pub total_homeworks: usize,
+    pub subject_stats: Vec<SubjectStat>,
+    pub recent_uploads: Vec<RecentUpload>,
+}
+
+/// 科目统计
+#[derive(Debug, Serialize)]
+pub struct SubjectStat {
+    pub name: String,
+    pub file_count: usize,
+    pub total_size: u64,
+    pub class_count: usize,
+    pub homework_count: usize,
+}
+
+/// 最近上传记录
+#[derive(Debug, Serialize)]
+pub struct RecentUpload {
+    pub filename: String,
+    pub path: String,
+    pub size: u64,
+    pub modified: String,
+}
+
+/// 作业提交情况
+#[derive(Debug, Serialize)]
+pub struct SubmissionStatus {
+    pub homework_name: String,
+    pub subject: String,
+    pub class: String,
+    pub submitted: Vec<String>,      // 已提交的文件名（含学号姓名）
+    pub not_submitted: Vec<String>,  // 未提交提示
+}
+
+/// 密码修改请求
+#[derive(Debug, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub old_password: String,
+    pub new_password: String,
+}
+
+/// 操作日志条目
+#[derive(Debug, Serialize, Clone)]
+pub struct OperationLog {
+    pub timestamp: String,
+    pub action: String,
+    pub detail: String,
+}

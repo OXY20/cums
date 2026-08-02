@@ -5,1558 +5,733 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CUMS - 管理员控制台</title>
     <style>
-        /* ========== 基础样式 ========== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-            min-height: 100vh;
-            color: #e8e8e8;
-        }
-
-        /* ========== 头部 ========== */
-        .header {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            padding: 16px 24px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h1 {
-            font-size: 18px;
-            font-weight: 500;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .header h1 .badge {
-            background: linear-gradient(135deg, #e94560, #ff6b6b);
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        /* ========== 按钮 ========== */
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 500;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #e94560, #ff6b6b);
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(233, 69, 96, 0.3);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
-        }
-
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.15);
-        }
-
-        .btn-danger {
-            background: transparent;
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
-        }
-
-        .btn-danger:hover {
-            background: rgba(255, 107, 107, 0.1);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #00d9a5, #00b894);
-            color: #fff;
-            box-shadow: 0 4px 15px rgba(0, 217, 165, 0.3);
-        }
-
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 217, 165, 0.4);
-        }
-
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-
-        .btn-icon {
-            width: 32px;
-            height: 32px;
-            padding: 0;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 6px;
-            font-size: 16px;
-        }
-
-        /* ========== 主内容 ========== */
-        .main {
-            max-width: 900px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            padding: 32px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-
-        .card-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-bottom: 24px;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* ========== 登录页 ========== */
-        .login-container {
-            max-width: 400px;
-            margin: 100px auto;
-        }
-
-        .login-card {
-            text-align: center;
-        }
-
-        .login-logo {
-            width: 80px;
-            height: 80px;
-            background: linear-gradient(135deg, #e94560, #ff6b6b);
-            border-radius: 20px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 36px;
-            margin-bottom: 20px;
-            box-shadow: 0 8px 24px rgba(233, 69, 96, 0.4);
-        }
-
-        .login-title {
-            font-size: 24px;
-            margin-bottom: 8px;
-        }
-
-        .login-subtitle {
-            color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 32px;
-            font-size: 14px;
-        }
-
-        /* ========== 表单 ========== */
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 12px 16px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 10px;
-            font-size: 14px;
-            background: rgba(255, 255, 255, 0.05);
-            color: #fff;
-            transition: all 0.3s ease;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #e94560;
-            box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
-        }
-
-        .form-group input::placeholder {
-            color: rgba(255, 255, 255, 0.3);
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 14px;
-            margin-top: 8px;
-        }
-
-        /* ========== 消息提示 ========== */
-        .message {
-            padding: 12px 16px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .message.success {
-            display: block;
-            background: rgba(0, 217, 165, 0.15);
-            border: 1px solid rgba(0, 217, 165, 0.3);
-            color: #00d9a5;
-        }
-
-        .message.error {
-            display: block;
-            background: rgba(255, 107, 107, 0.15);
-            border: 1px solid rgba(255, 107, 107, 0.3);
-            color: #ff6b6b;
-        }
-
-        /* ========== 科目列表 ========== */
-        .subject-list {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .subject-item {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .subject-item:hover {
-            border-color: rgba(233, 69, 96, 0.3);
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .subject-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-
-        .subject-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .subject-name .icon {
-            width: 32px;
-            height: 32px;
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-radius: 8px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-        }
-
-        .subject-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .subject-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-
-        .content-section {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-            padding: 16px;
-        }
-
-        .content-section h4 {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: rgba(255, 255, 255, 0.5);
-            margin-bottom: 12px;
-        }
-
-        .tag-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .tag {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 12px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .tag .remove-btn {
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: rgba(255, 107, 107, 0.3);
-            border: none;
-            color: #ff6b6b;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            transition: all 0.2s;
-        }
-
-        .tag .remove-btn:hover {
-            background: #ff6b6b;
-            color: #fff;
-        }
-
-        .add-tag-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 6px 12px;
-            background: transparent;
-            border: 1px dashed rgba(255, 255, 255, 0.3);
-            border-radius: 20px;
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.5);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .add-tag-btn:hover {
-            border-color: #e94560;
-            color: #e94560;
-        }
-
-        /* ========== 添加科目区域 ========== */
-        .add-subject-area {
-            margin-top: 24px;
-            padding-top: 24px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .add-form {
-            display: flex;
-            gap: 12px;
-            align-items: flex-end;
-        }
-
-        .add-form .form-group {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        /* ========== 操作栏 ========== */
-        .action-bar {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .action-bar-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .action-bar-right {
-            display: flex;
-            gap: 12px;
-        }
-
-        /* ========== 输入弹窗 ========== */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(4px);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 16px;
-            padding: 28px;
-            width: 400px;
-            max-width: 90%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-        }
-
-        .modal-header h3 {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: rgba(255, 255, 255, 0.5);
-            cursor: pointer;
-            line-height: 1;
-            transition: color 0.2s;
-        }
-
-        .modal-close:hover {
-            color: #fff;
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 24px;
-        }
-
-        .modal-actions .btn {
-            flex: 1;
-        }
-
-        /* ========== 空状态 ========== */
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: rgba(255, 255, 255, 0.5);
-        }
-
-        .empty-state .icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-
-        .empty-state p {
-            margin-bottom: 20px;
-        }
-
-        /* ========== 加载动画 ========== */
-        .loading {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* ========== 快速选择样式 ========== */
-        .quick-select-section {
-            margin-bottom: 16px;
-        }
-
-        .section-label {
-            display: block;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.7);
-        }
-
-        .quick-select-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            min-height: 40px;
-            padding: 12px;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 10px;
-        }
-
-        .quick-select-btn {
-            padding: 8px 16px;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            color: #fff;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-
-        .quick-select-btn:hover {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-color: transparent;
-            transform: translateY(-1px);
-        }
-
-        .quick-select-btn.selected {
-            background: linear-gradient(135deg, #00d9a5, #00b894);
-            border-color: transparent;
-        }
-
-        .quick-select-btn.disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            text-decoration: line-through;
-        }
-
-        .quick-select-btn.disabled:hover {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: none;
-        }
-
-        .empty-hint {
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 13px;
-            font-style: italic;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            margin: 16px 0;
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 12px;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .divider span {
-            padding: 0 12px;
-        }
-
-        /* ========== 隐藏 ========== */
+        body { font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background: linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%); min-height: 100vh; color: #e8e8e8; }
+        .header { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 18px; font-weight: 500; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .header h1 .badge { background: linear-gradient(135deg,#e94560,#ff6b6b); padding: 2px 8px; border-radius: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
+        .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; color: rgba(255,255,255,0.7); }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .btn-primary { background: linear-gradient(135deg,#e94560,#ff6b6b); color: #fff; box-shadow: 0 4px 15px rgba(233,69,96,0.3); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(233,69,96,0.4); }
+        .btn-secondary { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+        .btn-danger { background: transparent; color: #ff6b6b; border: 1px solid #ff6b6b; }
+        .btn-danger:hover { background: rgba(255,107,107,0.1); }
+        .btn-success { background: linear-gradient(135deg,#00d9a5,#00b894); color: #fff; box-shadow: 0 4px 15px rgba(0,217,165,0.3); }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,217,165,0.4); }
+        .btn-small { padding: 6px 12px; font-size: 12px; }
+        .btn-icon { width: 32px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 16px; }
+        .main { max-width: 1100px; margin: 40px auto; padding: 0 20px; }
+        .card { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); border-radius: 16px; padding: 32px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.3); margin-bottom: 24px; }
+        .card-title { font-size: 20px; font-weight: 600; margin-bottom: 24px; color: #fff; display: flex; align-items: center; gap: 10px; }
+        /* 登录页 */
+        .login-container { max-width: 400px; margin: 100px auto; }
+        .login-card { text-align: center; }
+        .login-logo { width: 80px; height: 80px; background: linear-gradient(135deg,#e94560,#ff6b6b); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(233,69,96,0.4); }
+        .login-title { font-size: 24px; margin-bottom: 8px; }
+        .login-subtitle { color: rgba(255,255,255,0.5); margin-bottom: 32px; font-size: 14px; }
+        /* 表单 */
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 8px; font-size: 14px; color: rgba(255,255,255,0.7); }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; font-size: 14px; background: rgba(255,255,255,0.05); color: #fff; transition: all 0.3s ease; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #e94560; box-shadow: 0 0 0 3px rgba(233,69,96,0.2); }
+        .form-group input::placeholder { color: rgba(255,255,255,0.3); }
+        .submit-btn { width: 100%; padding: 14px; margin-top: 8px; }
+        /* 消息提示 */
+        .message { padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 14px; display: none; }
+        .message.success { display: block; background: rgba(0,217,165,0.15); border: 1px solid rgba(0,217,165,0.3); color: #00d9a5; }
+        .message.error { display: block; background: rgba(255,107,107,0.15); border: 1px solid rgba(255,107,107,0.3); color: #ff6b6b; }
+        /* Tab 导航 */
+        .tab-nav { display: flex; gap: 4px; margin-bottom: 24px; background: rgba(0,0,0,0.2); border-radius: 12px; padding: 4px; }
+        .tab-btn { flex: 1; padding: 12px 16px; border: none; border-radius: 10px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.3s ease; background: transparent; color: rgba(255,255,255,0.5); }
+        .tab-btn.active { background: linear-gradient(135deg,#e94560,#ff6b6b); color: #fff; box-shadow: 0 4px 15px rgba(233,69,96,0.3); }
+        .tab-btn:hover:not(.active) { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        /* 统计卡片 */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: rgba(0,0,0,0.2); border-radius: 12px; padding: 20px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+        .stat-card .stat-value { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+        .stat-card .stat-label { font-size: 12px; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 1px; }
+        .stat-card:nth-child(1) .stat-value { color: #e94560; }
+        .stat-card:nth-child(2) .stat-value { color: #00d9a5; }
+        .stat-card:nth-child(3) .stat-value { color: #667eea; }
+        .stat-card:nth-child(4) .stat-value { color: #ffd93d; }
+        .stat-card:nth-child(5) .stat-value { color: #ff6b6b; }
+        /* 科目列表 */
+        .subject-list { display: flex; flex-direction: column; gap: 16px; }
+        .subject-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; transition: all 0.3s ease; }
+        .subject-item:hover { border-color: rgba(233,69,96,0.3); background: rgba(255,255,255,0.05); }
+        .subject-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .subject-name { font-size: 18px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .subject-name .icon { width: 32px; height: 32px; background: linear-gradient(135deg,#667eea,#764ba2); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; }
+        .subject-actions { display: flex; gap: 8px; }
+        .subject-content { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .content-section { background: rgba(0,0,0,0.2); border-radius: 10px; padding: 16px; }
+        .content-section h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.5); margin-bottom: 12px; }
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: rgba(255,255,255,0.1); border-radius: 20px; font-size: 13px; color: rgba(255,255,255,0.8); }
+        .tag .remove-btn { width: 16px; height: 16px; border-radius: 50%; background: rgba(255,107,107,0.3); border: none; color: #ff6b6b; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; transition: all 0.2s; }
+        .tag .remove-btn:hover { background: #ff6b6b; color: #fff; }
+        .add-tag-btn { display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; background: transparent; border: 1px dashed rgba(255,255,255,0.3); border-radius: 20px; font-size: 13px; color: rgba(255,255,255,0.5); cursor: pointer; transition: all 0.2s; }
+        .add-tag-btn:hover { border-color: #e94560; color: #e94560; }
+        .add-subject-area { margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .add-form { display: flex; gap: 12px; align-items: flex-end; }
+        .add-form .form-group { flex: 1; margin-bottom: 0; }
+        .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .action-bar-left { display: flex; align-items: center; gap: 12px; }
+        .action-bar-right { display: flex; gap: 12px; }
+        /* 文件表格 */
+        .file-table { width: 100%; border-collapse: collapse; }
+        .file-table th, .file-table td { padding: 12px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; }
+        .file-table th { color: rgba(255,255,255,0.5); font-weight: 500; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+        .file-table tr:hover { background: rgba(255,255,255,0.03); }
+        .file-table .file-name { color: #667eea; }
+        /* 日志列表 */
+        .log-list { display: flex; flex-direction: column; gap: 8px; max-height: 500px; overflow-y: auto; }
+        .log-item { display: flex; gap: 16px; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 13px; }
+        .log-time { color: rgba(255,255,255,0.4); white-space: nowrap; min-width: 140px; }
+        .log-action { color: #667eea; min-width: 80px; font-weight: 500; }
+        .log-detail { color: rgba(255,255,255,0.7); }
+        /* 弹窗 */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); justify-content: center; align-items: center; z-index: 1000; }
+        .modal.active { display: flex; }
+        .modal-content { background: linear-gradient(135deg,#1a1a2e 0%,#16213e 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 28px; width: 400px; max-width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .modal-header h3 { font-size: 18px; font-weight: 600; }
+        .modal-close { background: none; border: none; font-size: 24px; color: rgba(255,255,255,0.5); cursor: pointer; line-height: 1; transition: color 0.2s; }
+        .modal-close:hover { color: #fff; }
+        .modal-actions { display: flex; gap: 12px; margin-top: 24px; }
+        .modal-actions .btn { flex: 1; }
+        .modal-large .modal-content { max-width: 560px; width: 560px; }
+        /* 快速选择 */
+        .quick-select-section { margin-bottom: 16px; }
+        .section-label { display: block; margin-bottom: 10px; font-size: 14px; color: rgba(255,255,255,0.7); }
+        .quick-select-list { display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px; padding: 12px; background: rgba(0,0,0,0.2); border-radius: 10px; }
+        .quick-select-btn { padding: 8px 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 20px; color: #fff; font-size: 13px; cursor: pointer; transition: all 0.2s ease; }
+        .quick-select-btn:hover { background: linear-gradient(135deg,#667eea,#764ba2); border-color: transparent; transform: translateY(-1px); }
+        .quick-select-btn.selected { background: linear-gradient(135deg,#00d9a5,#00b894); border-color: transparent; }
+        .quick-select-btn.disabled { opacity: 0.4; cursor: not-allowed; text-decoration: line-through; }
+        .divider { display: flex; align-items: center; margin: 16px 0; color: rgba(255,255,255,0.4); font-size: 12px; }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
+        .divider span { padding: 0 12px; }
         .hidden { display: none !important; }
-
-        /* ========== 大模态框 ========== */
-        .modal-large .modal-content {
-            max-width: 560px;
-            width: 560px;
-        }
-
-        /* ========== 有附加信息的作业标签 ========== */
-        .tag-with-info {
-            background: rgba(0, 217, 165, 0.2);
-            border: 1px solid rgba(0, 217, 165, 0.4);
-        }
-
-        .info-badge {
-            margin-left: 4px;
-            color: #00d9a5;
-            font-size: 11px;
-        }
-
-        .tag-clickable {
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .tag-clickable:hover {
-            background: rgba(233, 69, 96, 0.3);
-            border-color: #e94560;
-        }
-
-        /* ========== 模板列表 ========== */
-        .template-list {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .template-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 10px 14px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-        }
-
-        .template-item-name {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 13px;
-            color: rgba(255, 255, 255, 0.8);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .template-item-name .icon {
-            font-size: 16px;
-        }
-
-        .template-item .remove-btn {
-            background: rgba(255, 107, 107, 0.2);
-            border: none;
-            color: #ff6b6b;
-            width: 24px;
-            height: 24px;
-            border-radius: 4px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .template-item .remove-btn:hover {
-            background: #ff6b6b;
-            color: #fff;
-        }
-
-        .template-upload {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .template-upload input[type="file"] {
-            flex: 1;
-            padding: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px dashed rgba(255, 255, 255, 0.3);
-            border-radius: 8px;
-            color: rgba(255, 255, 255, 0.7);
-            font-size: 13px;
-        }
-
-        .template-empty {
-            color: rgba(255, 255, 255, 0.4);
-            font-size: 13px;
-            font-style: italic;
-            padding: 12px;
-            text-align: center;
-        }
-
-        /* ========== 返回链接 ========== */
-        .back-link {
-            color: rgba(255, 255, 255, 0.5);
-            text-decoration: none;
-            font-size: 14px;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: color 0.2s;
-        }
-
-        .back-link:hover {
-            color: #fff;
-        }
+        .tag-with-info { background: rgba(0,217,165,0.2); border: 1px solid rgba(0,217,165,0.4); }
+        .info-badge { margin-left: 4px; color: #00d9a5; font-size: 11px; }
+        .tag-clickable { cursor: pointer; transition: all 0.2s; }
+        .tag-clickable:hover { background: rgba(233,69,96,0.3); border-color: #e94560; }
+        .template-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 200px; overflow-y: auto; }
+        .template-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; }
+        .template-item-name { display: flex; align-items: center; gap: 8px; font-size: 13px; color: rgba(255,255,255,0.8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .template-item .remove-btn { background: rgba(255,107,107,0.2); border: none; color: #ff6b6b; width: 24px; height: 24px; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .template-item .remove-btn:hover { background: #ff6b6b; color: #fff; }
+        .template-upload { display: flex; gap: 8px; align-items: center; }
+        .template-upload input[type="file"] { flex: 1; padding: 8px; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.3); border-radius: 8px; color: rgba(255,255,255,0.7); font-size: 13px; }
+        .template-empty { color: rgba(255,255,255,0.4); font-size: 13px; font-style: italic; padding: 12px; text-align: center; }
+        .back-link { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; transition: color 0.2s; }
+        .back-link:hover { color: #fff; }
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* 筛选栏 */
+        .filter-bar { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: flex-end; }
+        .filter-bar .form-group { margin-bottom: 0; min-width: 150px; }
+        .filter-bar select { appearance: none; -webkit-appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+        .empty-state { text-align: center; padding: 60px 20px; color: rgba(255,255,255,0.5); }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+        /* 密码修改 */
+        .password-form { max-width: 400px; }
+        /* 最近上传 */
+        .recent-list { display: flex; flex-direction: column; gap: 8px; }
+        .recent-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 13px; }
+        .recent-item .recent-name { color: #667eea; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+        .recent-item .recent-meta { color: rgba(255,255,255,0.4); display: flex; gap: 16px; }
     </style>
 </head>
 <body>
-    <!-- 登录页面 -->
-    <div id="loginPage">
-        <div class="login-container">
-            <div class="card login-card">
-                <div class="login-logo">🔐</div>
-                <h2 class="login-title">管理员登录</h2>
-                <p class="login-subtitle">请输入管理员密码以继续</p>
-                
-                <div class="message" id="loginMessage"></div>
-                
-                <form onsubmit="handleAdminLogin(event)">
-                    <div class="form-group">
-                        <label>管理员密码</label>
-                        <input type="password" id="adminPassword" placeholder="请输入密码" required autocomplete="off">
-                    </div>
-                    <button type="submit" class="btn btn-primary submit-btn" id="loginBtn">
-                        登录
-                    </button>
-                </form>
-                
-                <div style="margin-top: 24px;">
-                    <a href="/" class="back-link">← 返回首页</a>
-                </div>
+    <!-- 登录页 -->
+    <div id="loginPage" class="login-container">
+        <div class="card login-card">
+            <div class="login-logo">🔐</div>
+            <h2 class="login-title">CUMS 管理后台</h2>
+            <p class="login-subtitle">请输入管理员密码以继续</p>
+            <div id="loginMsg" class="message"></div>
+            <div class="form-group">
+                <label>管理员密码</label>
+                <input type="password" id="loginPassword" placeholder="输入密码..." autocomplete="off">
             </div>
+            <button class="btn btn-primary submit-btn" onclick="doLogin()">登 录</button>
         </div>
     </div>
 
-    <!-- 管理页面 -->
-    <div id="adminPage" class="hidden">
-        <!-- 头部 -->
-        <header class="header">
-            <h1>
-                CUMS 管理控制台
-                <span class="badge">Admin</span>
-            </h1>
+    <!-- 主界面 -->
+    <div id="mainApp" class="hidden">
+        <div class="header">
+            <h1>CUMS <span class="badge">Admin</span></h1>
             <div class="user-info">
-                <a href="/" class="back-link">← 返回首页</a>
-                <button class="btn btn-secondary btn-small" onclick="logout()">退出登录</button>
+                <span id="headerTime"></span>
+                <button class="btn btn-secondary btn-small" onclick="doLogout()">退出登录</button>
             </div>
-        </header>
+        </div>
+        <div class="main">
+            <!-- Tab 导航 -->
+            <div class="tab-nav">
+                <button class="tab-btn active" onclick="switchTab('dashboard')">📊 仪表盘</button>
+                <button class="tab-btn" onclick="switchTab('subjects')">📚 科目管理</button>
+                <button class="tab-btn" onclick="switchTab('files')">📁 文件管理</button>
+                <button class="tab-btn" onclick="switchTab('submissions')">📋 提交情况</button>
+                <button class="tab-btn" onclick="switchTab('settings')">⚙️ 设置</button>
+                <button class="tab-btn" onclick="switchTab('logs')">📝 操作日志</button>
+            </div>
 
-        <!-- 主内容 -->
-        <main class="main">
-            <div class="card">
-                <div class="action-bar">
-                    <div class="action-bar-left">
-                        <h2 class="card-title" style="margin-bottom: 0;">📚 科目管理</h2>
-                    </div>
-                    <div class="action-bar-right">
-                        <button class="btn btn-secondary" onclick="refreshConfig()">🔄 刷新</button>
-                        <button class="btn btn-success" onclick="saveConfig()">💾 保存配置</button>
+            <!-- 仪表盘 -->
+            <div id="tab-dashboard" class="tab-content active">
+                <div class="card">
+                    <div class="card-title">📊 系统概览</div>
+                    <div id="statsGrid" class="stats-grid">
+                        <div class="stat-card"><div class="stat-value" id="statFiles">--</div><div class="stat-label">总文件数</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statSize">--</div><div class="stat-label">总大小</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statSubjects">--</div><div class="stat-label">科目数</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statClasses">--</div><div class="stat-label">班级数</div></div>
+                        <div class="stat-card"><div class="stat-value" id="statHomeworks">--</div><div class="stat-label">作业数</div></div>
                     </div>
                 </div>
-
-                <div class="message" id="adminMessage"></div>
-
-                <!-- 科目列表 -->
-                <div class="subject-list" id="subjectList">
-                    <!-- 动态生成 -->
+                <div class="card">
+                    <div class="card-title">📈 科目统计</div>
+                    <div id="subjectStatsContainer"></div>
                 </div>
+                <div class="card">
+                    <div class="card-title">🕐 最近上传</div>
+                    <div id="recentUploadsContainer" class="recent-list"></div>
+                </div>
+            </div>
 
-                <!-- 添加科目 -->
-                <div class="add-subject-area">
-                    <div class="add-form">
-                        <div class="form-group">
-                            <label>添加新科目</label>
-                            <input type="text" id="newSubjectName" placeholder="输入科目名称">
+            <!-- 科目管理 -->
+            <div id="tab-subjects" class="tab-content">
+                <div class="card">
+                    <div class="card-title">📚 科目管理</div>
+                    <div id="subjectList" class="subject-list"></div>
+                    <div class="add-subject-area">
+                        <div class="add-form">
+                            <div class="form-group">
+                                <label>新科目名称</label>
+                                <input type="text" id="newSubjectName" placeholder="输入科目名称...">
+                            </div>
+                            <button class="btn btn-primary" onclick="addSubject()">添加科目</button>
                         </div>
-                        <button class="btn btn-primary" onclick="addSubject()">+ 添加科目</button>
                     </div>
                 </div>
             </div>
-        </main>
-    </div>
 
-    <!-- 输入弹窗 -->
-    <div class="modal" id="inputModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modalTitle">添加</h3>
-                <button class="modal-close" onclick="hideModal()">&times;</button>
+            <!-- 文件管理 -->
+            <div id="tab-files" class="tab-content">
+                <div class="card">
+                    <div class="card-title">📁 文件管理</div>
+                    <div class="filter-bar">
+                        <div class="form-group">
+                            <label>科目</label>
+                            <select id="fileFilterSubject" onchange="loadFiles()"><option value="">全部</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>班级</label>
+                            <select id="fileFilterClass" onchange="loadFiles()"><option value="">全部</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>作业</label>
+                            <select id="fileFilterHomework" onchange="loadFiles()"><option value="">全部</option></select>
+                        </div>
+                        <button class="btn btn-secondary btn-small" onclick="loadFiles()" style="margin-bottom:0;align-self:flex-end">🔄 刷新</button>
+                    </div>
+                    <div id="fileTableContainer">
+                        <table class="file-table">
+                            <thead><tr><th>文件名</th><th>大小</th><th>修改时间</th><th>路径</th><th>操作</th></tr></thead>
+                            <tbody id="fileTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="fileEmptyState" class="empty-state hidden">
+                        <div class="icon">📂</div>
+                        <p>暂无文件</p>
+                    </div>
+                </div>
             </div>
-            <div class="form-group">
-                <label id="modalLabel">名称</label>
-                <input type="text" id="modalInput" placeholder="请输入">
+
+            <!-- 提交情况 -->
+            <div id="tab-submissions" class="tab-content">
+                <div class="card">
+                    <div class="card-title">📋 作业提交情况</div>
+                    <div class="filter-bar">
+                        <div class="form-group">
+                            <label>科目</label>
+                            <select id="subFilterSubject" onchange="onSubFilterChange()"><option value="">选择科目</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>班级</label>
+                            <select id="subFilterClass" onchange="onSubFilterChange()"><option value="">选择班级</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>作业</label>
+                            <select id="subFilterHomework" onchange="loadSubmissions()"><option value="">选择作业</option></select>
+                        </div>
+                    </div>
+                    <div id="submissionsContainer"></div>
+                    <div id="submissionEmptyState" class="empty-state">
+                        <div class="icon">📋</div>
+                        <p>请选择科目、班级和作业查看提交情况</p>
+                    </div>
+                </div>
             </div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="hideModal()">取消</button>
-                <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确定</button>
+
+            <!-- 设置 -->
+            <div id="tab-settings" class="tab-content">
+                <div class="card">
+                    <div class="card-title">⚙️ 系统设置</div>
+                    <div class="password-form">
+                        <h4 style="margin-bottom:16px;color:rgba(255,255,255,0.8)">修改管理员密码</h4>
+                        <div id="passwordMsg" class="message"></div>
+                        <div class="form-group">
+                            <label>当前密码</label>
+                            <input type="password" id="oldPassword" placeholder="输入当前密码...">
+                        </div>
+                        <div class="form-group">
+                            <label>新密码</label>
+                            <input type="password" id="newPassword" placeholder="输入新密码（至少4位）...">
+                        </div>
+                        <div class="form-group">
+                            <label>确认新密码</label>
+                            <input type="password" id="confirmPassword" placeholder="再次输入新密码...">
+                        </div>
+                        <button class="btn btn-primary submit-btn" onclick="changePassword()">修改密码</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作日志 -->
+            <div id="tab-logs" class="tab-content">
+                <div class="card">
+                    <div class="card-title">📝 操作日志</div>
+                    <div style="margin-bottom:16px">
+                        <button class="btn btn-secondary btn-small" onclick="loadLogs()">🔄 刷新</button>
+                    </div>
+                    <div id="logList" class="log-list"></div>
+                    <div id="logEmptyState" class="empty-state hidden">
+                        <div class="icon">📝</div>
+                        <p>暂无操作日志</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- 班级选择弹窗 -->
-    <div class="modal" id="classModal">
+    <!-- 通用弹窗 -->
+    <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>添加班级</h3>
-                <button class="modal-close" onclick="hideClassModal()">&times;</button>
+                <h3 id="modalTitle">确认操作</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
             </div>
-
-            <!-- 快速选择区域 -->
-            <div class="quick-select-section" id="quickSelectSection">
-                <label class="section-label">快速选择已有班级</label>
-                <div class="quick-select-list" id="existingClassList">
-                    <!-- 动态生成 -->
-                </div>
-            </div>
-
-            <!-- 分隔线 -->
-            <div class="divider" id="classDivider">
-                <span>或者</span>
-            </div>
-
-            <!-- 手动输入区域 -->
-            <div class="form-group">
-                <label>输入新班级名称</label>
-                <input type="text" id="newClassInput" placeholder="如：三班">
-            </div>
-
+            <div id="modalBody"></div>
             <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="hideClassModal()">取消</button>
-                <button class="btn btn-primary" onclick="confirmAddClass()">确定</button>
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确认</button>
             </div>
         </div>
     </div>
 
-    <!-- 作业编辑弹窗 -->
-    <div class="modal modal-large" id="homeworkEditModal">
+    <!-- 上传模板弹窗 -->
+    <div id="uploadModal" class="modal modal-large">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>编辑作业</h3>
-                <button class="modal-close" onclick="hideHomeworkEditModal()">&times;</button>
+                <h3 id="uploadModalTitle">上传模板</h3>
+                <button class="modal-close" onclick="closeUploadModal()">&times;</button>
             </div>
-            <div class="form-group">
-                <label>作业名称</label>
-                <input type="text" id="hwEditName" readonly style="background: rgba(255,255,255,0.02); cursor: not-allowed;">
-            </div>
-            <div class="form-group">
-                <label>作业说明</label>
-                <textarea id="hwEditDescription" rows="3" placeholder="输入作业要求、注意事项等" style="width:100%; padding:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.2); border-radius:10px; color:#fff; font-size:14px; resize:vertical;"></textarea>
-            </div>
-            <div class="form-group">
-                <label>模板文件</label>
-                <div class="template-list" id="hwTemplateList">
-                    <!-- 动态生成 -->
-                </div>
-                <div class="template-upload">
-                    <input type="file" id="hwTemplateInput" multiple>
-                    <button class="btn btn-secondary btn-small" onclick="uploadTemplates()">📤 上传</button>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-secondary" onclick="hideHomeworkEditModal()">取消</button>
-                <button class="btn btn-primary" onclick="saveHomeworkEdit()">保存</button>
-            </div>
+            <div id="uploadModalBody"></div>
         </div>
     </div>
 
     <script>
-        // ==================== 全局状态 ====================
-        let adminToken = null;
-        let configData = null;
-        let pendingChanges = false;
-        let modalCallback = null;
+    // ========== 全局状态 ==========
+    let adminToken = '';
+    let currentConfig = null;
+    let modalCallback = null;
 
-        // ==================== 工具函数 ====================
+    // ========== API 工具 ==========
+    async function api(method, path, body) {
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (adminToken) opts.headers['X-Admin-Token'] = adminToken;
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch('/api/v1' + path, opts);
+        return res.json();
+    }
 
-        // HTML 转义函数，防止 XSS 攻击
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
+    function showMsg(el, text, type) {
+        el.textContent = text;
+        el.className = 'message ' + type;
+        setTimeout(() => { el.className = 'message'; }, 4000);
+    }
 
-        // ==================== 初始化 ====================
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(1) + ' MB';
+    }
 
-        async function init() {
-            // 检查是否有保存的令牌
-            const savedToken = sessionStorage.getItem('admin_token');
-            if (savedToken) {
-                adminToken = savedToken;
-                const valid = await verifyToken();
-                if (valid) {
-                    showAdminPage();
-                    await loadConfig();
-                } else {
-                    sessionStorage.removeItem('admin_token');
-                    showLoginPage();
-                }
-            }
-        }
-
-        // 验证令牌
-        async function verifyToken() {
-            try {
-                const res = await fetch('/api/v1/admin/config', {
-                    method: 'GET',
-                    headers: { 'X-Admin-Token': adminToken }
-                });
-                const data = await res.json();
-                return data.success;
-            } catch (e) {
-                return false;
-            }
-        }
-
-        // ==================== 登录处理 ====================
-
-        async function handleAdminLogin(e) {
-            e.preventDefault();
-            
-            const password = document.getElementById('adminPassword').value;
-            const loginBtn = document.getElementById('loginBtn');
-            const message = document.getElementById('loginMessage');
-            
-            loginBtn.disabled = true;
-            loginBtn.innerHTML = '<span class="loading"></span>登录中...';
-            
-            try {
-                const res = await fetch('/api/v1/admin/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    adminToken = data.token;
-                    sessionStorage.setItem('admin_token', adminToken);
-                    showAdminPage();
-                    await loadConfig();
-                } else {
-                    message.textContent = data.message || '登录失败';
-                    message.className = 'message error';
-                }
-            } catch (e) {
-                message.textContent = '登录失败，请重试';
-                message.className = 'message error';
-            } finally {
-                loginBtn.disabled = false;
-                loginBtn.textContent = '登录';
-            }
-        }
-
-        function logout() {
-            if (pendingChanges && !confirm('有未保存的更改，确定要退出吗？')) {
-                return;
-            }
-            adminToken = null;
-            sessionStorage.removeItem('admin_token');
-            showLoginPage();
-        }
-
-        // ==================== 页面切换 ====================
-
-        function showLoginPage() {
-            document.getElementById('loginPage').classList.remove('hidden');
-            document.getElementById('adminPage').classList.add('hidden');
-        }
-
-        function showAdminPage() {
+    // ========== 登录/登出 ==========
+    async function doLogin() {
+        const pwd = document.getElementById('loginPassword').value.trim();
+        if (!pwd) { showMsg(document.getElementById('loginMsg'), '请输入密码', 'error'); return; }
+        const r = await api('POST', '/admin/login', { password: pwd });
+        if (r.success) {
+            adminToken = r.data.token;
             document.getElementById('loginPage').classList.add('hidden');
-            document.getElementById('adminPage').classList.remove('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            loadConfig(); loadDashboard();
+            startClock();
+        } else {
+            showMsg(document.getElementById('loginMsg'), r.message || '登录失败', 'error');
         }
+    }
 
-        // ==================== 配置加载 ====================
+    function doLogout() {
+        adminToken = '';
+        currentConfig = null;
+        document.getElementById('mainApp').classList.add('hidden');
+        document.getElementById('loginPage').classList.remove('hidden');
+        document.getElementById('loginPassword').value = '';
+    }
 
-        async function loadConfig() {
-            try {
-                const res = await fetch('/api/v1/admin/config', {
-                    method: 'GET',
-                    headers: { 'X-Admin-Token': adminToken }
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    configData = data.data;
-                    renderSubjects();
-                } else {
-                    showMessage('adminMessage', data.message || '加载配置失败', 'error');
-                }
-            } catch (e) {
-                showMessage('adminMessage', '加载配置失败', 'error');
-            }
-        }
+    document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
 
-        async function refreshConfig() {
-            if (pendingChanges && !confirm('有未保存的更改，刷新将丢失这些更改，确定要继续吗？')) {
-                return;
-            }
-            pendingChanges = false;
-            await loadConfig();
-            showMessage('adminMessage', '配置已刷新', 'success');
-        }
+    function startClock() {
+        const update = () => { document.getElementById('headerTime').textContent = new Date().toLocaleString('zh-CN'); };
+        update(); setInterval(update, 1000);
+    }
 
-        // ==================== 配置保存 ====================
+    // ========== Tab 切换 ==========
+    const tabNames = ['dashboard','subjects','files','submissions','settings','logs'];
+    const tabLabels = ['仪表盘','科目管理','文件管理','提交情况','设置','操作日志'];
+    function switchTab(name) {
+        document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabNames[i] === name));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        const loaders = { dashboard: loadDashboard, subjects: loadSubjects, files: loadFiles, submissions: () => {}, settings: () => {}, logs: loadLogs };
+        if (loaders[name]) loaders[name]();
+    }
 
-        async function saveConfig() {
-            try {
-                const res = await fetch('/api/v1/admin/config', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Admin-Token': adminToken
-                    },
-                    body: JSON.stringify({ subjects: configData.subjects })
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    pendingChanges = false;
-                    showMessage('adminMessage', '配置已保存', 'success');
-                } else {
-                    showMessage('adminMessage', data.message || '保存失败', 'error');
-                }
-            } catch (e) {
-                showMessage('adminMessage', '保存失败', 'error');
-            }
-        }
-
-        // ==================== 渲染科目列表 ====================
-
-        function renderSubjects() {
-            const container = document.getElementById('subjectList');
-            
-            if (!configData || !configData.subjects || Object.keys(configData.subjects).length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="icon">📭</div>
-                        <p>暂无科目配置</p>
-                        <p style="font-size: 14px;">在下方添加新科目开始配置</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const subjectColors = ['#667eea', '#e94560', '#00d9a5', '#ffd93d', '#6c5ce7', '#00cec9'];
-            let colorIndex = 0;
-
-            container.innerHTML = Object.entries(configData.subjects).map(([name, data]) => {
-                const color = subjectColors[colorIndex++ % subjectColors.length];
-                const escapedName = escapeHtml(name);
-                return `
-                    <div class="subject-item" data-subject="${escapedName}">
-                        <div class="subject-header">
-                            <div class="subject-name">
-                                <span class="icon" style="background: linear-gradient(135deg, ${color}, ${color}dd);">📖</span>
-                                ${escapedName}
-                            </div>
-                            <div class="subject-actions">
-                                <button class="btn btn-secondary btn-icon" onclick="editSubjectName('${escapedName}')" title="编辑名称">✏️</button>
-                                <button class="btn btn-danger btn-icon" onclick="deleteSubject('${escapedName}')" title="删除科目">🗑️</button>
-                            </div>
-                        </div>
-                        <div class="subject-content">
-                            <div class="content-section">
-                                <h4>班级</h4>
-                                <div class="tag-list">
-                                    ${data.classes.map(c => `
-                                        <span class="tag">
-                                            ${escapeHtml(c)}
-                                            <button class="remove-btn" onclick="removeClass('${escapedName}', '${escapeHtml(c)}')">&times;</button>
-                                        </span>
-                                    `).join('')}
-                                    <button class="add-tag-btn" onclick="addClass('${escapedName}')">+ 添加班级</button>
-                                </div>
-                            </div>
-                            <div class="content-section">
-                                <h4>作业</h4>
-                                <div class="tag-list">
-                                    ${data.homeworks.map(h => {
-                                        const hwName = typeof h === 'string' ? h : h.name;
-                                        const hwData = typeof h === 'string' ? { name: h } : h;
-                                        const hasInfo = hwData.description || (hwData.templates && hwData.templates.length > 0);
-                                        return `
-                                        <span class="tag tag-clickable ${hasInfo ? 'tag-with-info' : ''}"
-                                              onclick="openHomeworkEdit('${escapedName}', '${escapeHtml(hwName)}')">
-                                            ${escapeHtml(hwName)}
-                                            ${hasInfo ? '<span class="info-badge">✓</span>' : ''}
-                                            <button class="remove-btn" onclick="event.stopPropagation(); removeHomework('${escapedName}', '${escapeHtml(hwName)}')">&times;</button>
-                                        </span>
-                                    `;}).join('')}
-                                    <button class="add-tag-btn" onclick="addHomework('${escapedName}')">+ 添加作业</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // ==================== 科目操作 ====================
-
-        function addSubject() {
-            const input = document.getElementById('newSubjectName');
-            const name = input.value.trim();
-            
-            if (!name) {
-                showMessage('adminMessage', '请输入科目名称', 'error');
-                return;
-            }
-            
-            if (configData.subjects[name]) {
-                showMessage('adminMessage', '科目已存在', 'error');
-                return;
-            }
-            
-            configData.subjects[name] = {
-                classes: [],
-                homeworks: []
-            };
-            
-            input.value = '';
-            pendingChanges = true;
-            renderSubjects();
-            showMessage('adminMessage', `科目 "${name}" 已添加`, 'success');
-        }
-
-        function editSubjectName(oldName) {
-            showModal('编辑科目名称', '新名称', oldName, (newName) => {
-                if (!newName || newName === oldName) return;
-                
-                if (configData.subjects[newName]) {
-                    showMessage('adminMessage', '科目已存在', 'error');
-                    return;
-                }
-                
-                configData.subjects[newName] = configData.subjects[oldName];
-                delete configData.subjects[oldName];
-                pendingChanges = true;
-                renderSubjects();
+    // ========== 仪表盘 ==========
+    async function loadDashboard() {
+        const r = await api('GET', '/admin/stats');
+        if (!r.success) return;
+        const d = r.data;
+        document.getElementById('statFiles').textContent = d.total_files;
+        document.getElementById('statSize').textContent = formatSize(d.total_size);
+        document.getElementById('statSubjects').textContent = d.total_subjects;
+        document.getElementById('statClasses').textContent = d.total_classes;
+        document.getElementById('statHomeworks').textContent = d.total_homeworks;
+        let sh = '';
+        if (d.subject_stats && d.subject_stats.length) {
+            sh += '<table class="file-table"><thead><tr><th>科目</th><th>文件数</th><th>总大小</th><th>班级数</th><th>作业数</th></tr></thead><tbody>';
+            d.subject_stats.forEach(s => {
+                sh += '<tr><td>' + esc(s.name) + '</td><td>' + s.file_count + '</td><td>' + formatSize(s.total_size) + '</td><td>' + s.class_count + '</td><td>' + s.homework_count + '</td></tr>';
             });
-        }
-
-        function deleteSubject(name) {
-            if (!confirm(`确定要删除科目 "${name}" 吗？\n该科目下的所有班级和作业配置都将被删除。`)) {
-                return;
-            }
-            
-            delete configData.subjects[name];
-            pendingChanges = true;
-            renderSubjects();
-            showMessage('adminMessage', `科目 "${name}" 已删除`, 'success');
-        }
-
-        // ==================== 班级操作 ====================
-
-        let currentAddClassSubject = null; // 当前正在添加班级的科目
-
-        // 获取所有已存在的班级列表（去重）
-        function getAllExistingClasses() {
-            const classSet = new Set();
-            if (configData && configData.subjects) {
-                Object.values(configData.subjects).forEach(subject => {
-                    subject.classes.forEach(c => classSet.add(c));
-                });
-            }
-            return Array.from(classSet).sort();
-        }
-
-        // 显示班级选择弹窗
-        function showClassModal(subjectName) {
-            currentAddClassSubject = subjectName;
-            const subject = configData.subjects[subjectName];
-            const existingClasses = getAllExistingClasses();
-            const currentSubjectClasses = subject.classes;
-            
-            // 生成快速选择列表
-            const listContainer = document.getElementById('existingClassList');
-            const quickSelectSection = document.getElementById('quickSelectSection');
-            const divider = document.getElementById('classDivider');
-            
-            if (existingClasses.length === 0) {
-                // 没有已有班级，隐藏快速选择区域
-                quickSelectSection.style.display = 'none';
-                divider.style.display = 'none';
-            } else {
-                quickSelectSection.style.display = 'block';
-                divider.style.display = 'flex';
-                
-                listContainer.innerHTML = existingClasses.map(className => {
-                    const isInCurrentSubject = currentSubjectClasses.includes(className);
-                    return `
-                        <button class="quick-select-btn ${isInCurrentSubject ? 'disabled' : ''}" 
-                                onclick="${isInCurrentSubject ? '' : `selectExistingClass('${className}', '${subjectName}')`}"
-                                title="${isInCurrentSubject ? '该班级已添加到此科目' : '点击快速添加'}">
-                            ${className}${isInCurrentSubject ? ' ✓' : ''}
-                        </button>
-                    `;
-                }).join('');
-            }
-            
-            // 清空输入框
-            document.getElementById('newClassInput').value = '';
-            
-            // 显示弹窗
-            document.getElementById('classModal').classList.add('active');
-            document.getElementById('newClassInput').focus();
-        }
-
-        // 隐藏班级选择弹窗
-        function hideClassModal() {
-            document.getElementById('classModal').classList.remove('active');
-            currentAddClassSubject = null;
-        }
-
-        // 快速选择已有班级
-        function selectExistingClass(className, subjectName) {
-            const targetSubject = subjectName || currentAddClassSubject;
-            if (!targetSubject) return;
-            
-            const subject = configData.subjects[targetSubject];
-            if (subject.classes.includes(className)) {
-                showMessage('adminMessage', '班级已存在', 'error');
-                return;
-            }
-            
-            subject.classes.push(className);
-            pendingChanges = true;
-            hideClassModal();
-            renderSubjects();
-            showMessage('adminMessage', `班级 "${className}" 已添加到 "${targetSubject}"`, 'success');
-        }
-
-        // 确认添加班级（手动输入）
-        function confirmAddClass() {
-            const className = document.getElementById('newClassInput').value.trim();
-            
-            if (!className) {
-                showMessage('adminMessage', '请输入班级名称', 'error');
-                return;
-            }
-            
-            if (!currentAddClassSubject) return;
-            
-            const subject = configData.subjects[currentAddClassSubject];
-            if (subject.classes.includes(className)) {
-                showMessage('adminMessage', '班级已存在', 'error');
-                return;
-            }
-            
-            subject.classes.push(className);
-            pendingChanges = true;
-            hideClassModal();
-            renderSubjects();
-            showMessage('adminMessage', `班级 "${className}" 已添加到 "${currentAddClassSubject}"`, 'success');
-        }
-
-        // 原来的 addClass 函数改为调用新弹窗
-        function addClass(subjectName) {
-            showClassModal(subjectName);
-        }
-
-        function removeClass(subjectName, className) {
-            if (!confirm(`确定要从 "${subjectName}" 中移除班级 "${className}" 吗？`)) {
-                return;
-            }
-            
-            const subject = configData.subjects[subjectName];
-            subject.classes = subject.classes.filter(c => c !== className);
-            pendingChanges = true;
-            renderSubjects();
-        }
-
-        // ==================== 作业操作 ====================
-
-        // 当前编辑的作业信息
-        let currentEditSubject = null;
-        let currentEditHomework = null;
-        let currentEditTemplates = [];
-
-        function addHomework(subjectName) {
-            showModal('添加作业', '作业名称', '', (homeworkName) => {
-                if (!homeworkName) return;
-
-                const subject = configData.subjects[subjectName];
-                // 检查是否已存在
-                const exists = subject.homeworks.some(h =>
-                    (typeof h === 'string' ? h : h.name) === homeworkName
-                );
-                if (exists) {
-                    showMessage('adminMessage', '作业已存在', 'error');
-                    return;
-                }
-
-                // 添加新作业（使用对象格式）
-                subject.homeworks.push({ name: homeworkName });
-                pendingChanges = true;
-                renderSubjects();
+            sh += '</tbody></table>';
+        } else { sh = '<div class="empty-state"><p>暂无数据</p></div>'; }
+        document.getElementById('subjectStatsContainer').innerHTML = sh;
+        let rh = '';
+        if (d.recent_uploads && d.recent_uploads.length) {
+            d.recent_uploads.forEach(f => {
+                rh += '<div class="recent-item"><span class="recent-name">' + esc(f.filename) + '</span><span class="recent-meta"><span>' + formatSize(f.size) + '</span><span>' + f.modified + '</span></span></div>';
             });
-        }
+        } else { rh = '<div class="empty-state"><p>暂无上传记录</p></div>'; }
+        document.getElementById('recentUploadsContainer').innerHTML = rh;
+    }
 
-        function removeHomework(subjectName, homeworkName) {
-            if (!confirm(`确定要从 "${subjectName}" 中移除作业 "${homeworkName}" 吗？`)) {
-                return;
-            }
+    // ========== 科目管理 ==========
+    async function loadConfig() {
+        const r = await api('GET', '/admin/config');
+        if (r.success) { currentConfig = r.data; renderSubjects(); updateFileFilters(); updateSubFilters(); }
+    }
 
-            const subject = configData.subjects[subjectName];
-            subject.homeworks = subject.homeworks.filter(h =>
-                (typeof h === 'string' ? h : h.name) !== homeworkName
-            );
-            pendingChanges = true;
-            renderSubjects();
-        }
+    async function loadSubjects() { await loadConfig(); }
 
-        // 打开作业编辑模态框
-        function openHomeworkEdit(subjectName, homeworkName) {
-            currentEditSubject = subjectName;
-            currentEditHomework = homeworkName;
-
-            const subject = configData.subjects[subjectName];
-            let hwData = null;
-
-            for (let i = 0; i < subject.homeworks.length; i++) {
-                const h = subject.homeworks[i];
-                if (typeof h === 'string') {
-                    if (h === homeworkName) {
-                        hwData = { name: h, description: '', templates: [] };
-                        break;
-                    }
-                } else {
-                    if (h.name === homeworkName) {
-                        hwData = h;
-                        break;
-                    }
-                }
-            }
-
-            if (!hwData) return;
-
-            // 填充表单
-            document.getElementById('hwEditName').value = hwData.name;
-            document.getElementById('hwEditDescription').value = hwData.description || '';
-            currentEditTemplates = hwData.templates ? [...hwData.templates] : [];
-            renderTemplateList();
-
-            // 显示模态框
-            document.getElementById('homeworkEditModal').classList.add('active');
-        }
-
-        // 关闭作业编辑模态框
-        function hideHomeworkEditModal() {
-            document.getElementById('homeworkEditModal').classList.remove('active');
-            currentEditSubject = null;
-            currentEditHomework = null;
-            currentEditTemplates = [];
-        }
-
-        // 渲染模板列表
-        function renderTemplateList() {
-            const container = document.getElementById('hwTemplateList');
-            if (currentEditTemplates.length === 0) {
-                container.innerHTML = '<div class="template-empty">暂无模板文件</div>';
-                return;
-            }
-
-            container.innerHTML = currentEditTemplates.map((tpl, index) => {
-                const fileName = tpl.split('/').pop();
-                return `
-                    <div class="template-item">
-                        <span class="template-item-name">
-                            <span class="icon">📄</span>
-                            ${escapeHtml(fileName)}
-                        </span>
-                        <button class="remove-btn" onclick="removeTemplate(${index})" title="删除">×</button>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // 删除模板
-        function removeTemplate(index) {
-            currentEditTemplates.splice(index, 1);
-            renderTemplateList();
-        }
-
-        // 上传模板文件
-        async function uploadTemplates() {
-            const input = document.getElementById('hwTemplateInput');
-            if (!input.files || input.files.length === 0) {
-                alert('请先选择要上传的文件');
-                return;
-            }
-
-            // 获取上传按钮并显示上传状态
-            const uploadBtn = event.target;
-            const originalText = uploadBtn.textContent;
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = '上传中...';
-
-            let successCount = 0;
-            let failCount = 0;
-
-            for (const file of input.files) {
-                const formData = new FormData();
-                formData.append('file', file);
-
-                try {
-                    const res = await fetch('/api/v1/admin/template/upload', {
-                        method: 'POST',
-                        headers: { 'X-Admin-Token': adminToken },
-                        body: formData
-                    });
-                    const data = await res.json();
-
-                    if (data.success) {
-                        currentEditTemplates.push(data.data.path);
-                        successCount++;
-                    } else {
-                        alert('上传失败: ' + (data.message || '未知错误'));
-                        failCount++;
-                    }
-                } catch (e) {
-                    alert('上传出错: ' + e.message);
-                    failCount++;
-                }
-            }
-
-            // 恢复按钮状态
-            uploadBtn.disabled = false;
-            uploadBtn.textContent = originalText;
-
-            // 显示上传结果
-            if (successCount > 0) {
-                renderTemplateList();
-                alert(`✅ 成功上传 ${successCount} 个文件！\n\n💡 提示：请点击"保存"按钮，然后点击页面底部的【💾 保存配置】按钮，否则刷新后将丢失更改。`);
-            }
-
-            // 清空文件输入
-            input.value = '';
-        }
-
-        // 保存作业编辑
-        function saveHomeworkEdit() {
-            if (!currentEditSubject || !currentEditHomework) return;
-
-            const subject = configData.subjects[currentEditSubject];
-            const description = document.getElementById('hwEditDescription').value.trim();
-
-            // 查找并更新作业
-            for (let i = 0; i < subject.homeworks.length; i++) {
-                const h = subject.homeworks[i];
-                const hwName = typeof h === 'string' ? h : h.name;
-
-                if (hwName === currentEditHomework) {
-                    // 更新为对象格式
-                    subject.homeworks[i] = {
-                        name: currentEditHomework,
-                        description: description,
-                        templates: currentEditTemplates
-                    };
-                    break;
-                }
-            }
-
-            pendingChanges = true;
-            hideHomeworkEditModal();
-            renderSubjects();
-            showMessage('adminMessage', '作业信息已更新（请保存配置）', 'success');
-        }
-
-        // ==================== 弹窗 ====================
-
-        function showModal(title, label, defaultValue, callback) {
-            document.getElementById('modalTitle').textContent = title;
-            document.getElementById('modalLabel').textContent = label;
-            document.getElementById('modalInput').value = defaultValue || '';
-            modalCallback = callback;
-            document.getElementById('inputModal').classList.add('active');
-            document.getElementById('modalInput').focus();
-        }
-
-        function hideModal() {
-            document.getElementById('inputModal').classList.remove('active');
-            modalCallback = null;
-        }
-
-        function confirmModal() {
-            const value = document.getElementById('modalInput').value.trim();
-            if (modalCallback) {
-                modalCallback(value);
-            }
-            hideModal();
-        }
-
-        // ==================== 工具函数 ====================
-
-        function showMessage(elementId, text, type) {
-            const element = document.getElementById(elementId);
-            element.textContent = text;
-            element.className = `message ${type}`;
-            
-            setTimeout(() => {
-                element.className = 'message';
-            }, 3000);
-        }
-
-        // ==================== 事件绑定 ====================
-
-        // 点击弹窗背景关闭
-        document.getElementById('inputModal').addEventListener('click', function(e) {
-            if (e.target === this) hideModal();
+    function renderSubjects() {
+        if (!currentConfig || !currentConfig.subjects) { document.getElementById('subjectList').innerHTML = '<div class="empty-state"><p>暂无科目</p></div>'; return; }
+        const subjects = currentConfig.subjects;
+        let html = '';
+        subjects.forEach((sub, si) => {
+            const classes = sub.classes || [];
+            const homeworks = sub.homeworks || [];
+            html += '<div class="subject-item"><div class="subject-header"><div class="subject-name"><span class="icon">\uD83D\uDCDA</span>' + esc(sub.name) + '</div><div class="subject-actions"><button class="btn btn-secondary btn-small" onclick="openUploadModal(' + si + ')">\uD83D\uDCC4 模板</button><button class="btn btn-danger btn-small" onclick="deleteSubject(' + si + ')">删除科目</button></div></div><div class="subject-content"><div class="content-section"><h4>班级 (' + classes.length + ')</h4><div class="tag-list">';
+            classes.forEach((c, ci) => { html += '<span class="tag">' + esc(c) + '<button class="remove-btn" onclick="removeClass(' + si + ',' + ci + ')">\u00D7</button></span>'; });
+            html += '<button class="add-tag-btn" onclick="addClass(' + si + ')">+ 添加</button></div></div><div class="content-section"><h4>作业 (' + homeworks.length + ')</h4><div class="tag-list">';
+            homeworks.forEach((h, hi) => { html += '<span class="tag">' + esc(h.name) + '<button class="remove-btn" onclick="removeHomework(' + si + ',' + hi + ')">\u00D7</button></span>'; });
+            html += '<button class="add-tag-btn" onclick="addHomework(' + si + ')">+ 添加</button></div></div></div></div>';
         });
+        document.getElementById('subjectList').innerHTML = html || '<div class="empty-state"><p>暂无科目，请添加</p></div>';
+    }
 
-        // 点击班级弹窗背景关闭
-        document.getElementById('classModal').addEventListener('click', function(e) {
-            if (e.target === this) hideClassModal();
+    async function addSubject() {
+        const name = document.getElementById('newSubjectName').value.trim();
+        if (!name) return alert('请输入科目名称');
+        const r = await api('POST', '/admin/subjects', { name });
+        if (r.success) { document.getElementById('newSubjectName').value = ''; loadConfig(); }
+        else alert(r.message || '添加失败');
+    }
+
+    async function deleteSubject(si) {
+        if (!confirm('确定删除科目「' + currentConfig.subjects[si].name + '」？')) return;
+        const r = await api('DELETE', '/admin/subjects/' + si, null);
+        if (r.success) loadConfig(); else alert(r.message || '删除失败');
+    }
+
+    async function addClass(si) {
+        const name = prompt('输入班级名称：');
+        if (!name || !name.trim()) return;
+        const r = await api('POST', '/admin/subjects/' + si + '/classes', { name: name.trim() });
+        if (r.success) loadConfig(); else alert(r.message || '添加失败');
+    }
+
+    async function removeClass(si, ci) {
+        const r = await api('DELETE', '/admin/subjects/' + si + '/classes/' + ci, null);
+        if (r.success) loadConfig(); else alert(r.message || '删除失败');
+    }
+
+    async function addHomework(si) {
+        const name = prompt('输入作业名称：');
+        if (!name || !name.trim()) return;
+        const r = await api('POST', '/admin/subjects/' + si + '/homeworks', { name: name.trim() });
+        if (r.success) loadConfig(); else alert(r.message || '添加失败');
+    }
+
+    async function removeHomework(si, hi) {
+        const r = await api('DELETE', '/admin/subjects/' + si + '/homeworks/' + hi, null);
+        if (r.success) loadConfig(); else alert(r.message || '删除失败');
+    }
+
+    // ========== 模板管理 ==========
+    function openUploadModal(si) {
+        const sub = currentConfig.subjects[si];
+        document.getElementById('uploadModalTitle').textContent = '模板管理 - ' + sub.name;
+        let body = '';
+        if (sub.homeworks && sub.homeworks.length) {
+            body += '<div class="quick-select-section"><label class="section-label">选择作业</label><div class="quick-select-list" id="uploadHomeworkList">';
+            sub.homeworks.forEach((h, hi) => {
+                body += '<button class="quick-select-btn" onclick="selectUploadHomework(' + si + ',' + hi + ',this)">' + esc(h.name) + '</button>';
+            });
+            body += '</div></div>';
+            body += '<div id="uploadArea" class="hidden"><div class="divider"><span>上传模板文件</span></div><div class="template-upload"><input type="file" id="templateFile"><button class="btn btn-primary btn-small" onclick="uploadTemplate()">上传</button></div><div id="templateListArea" style="margin-top:16px"></div></div>';
+        } else {
+            body += '<div class="empty-state"><p>请先添加作业</p></div>';
+        }
+        document.getElementById('uploadModalBody').innerHTML = body;
+        document.getElementById('uploadModal').classList.add('active');
+    }
+
+    let uploadState = { subjectIdx: -1, homeworkIdx: -1 };
+
+    function selectUploadHomework(si, hi, btn) {
+        document.querySelectorAll('#uploadHomeworkList .quick-select-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        uploadState = { subjectIdx: si, homeworkIdx: hi };
+        document.getElementById('uploadArea').classList.remove('hidden');
+        loadTemplateList(si, hi);
+    }
+
+    async function loadTemplateList(si, hi) {
+        const sub = currentConfig.subjects[si];
+        const hw = sub.homeworks[hi];
+        const r = await api('GET', '/admin/templates?subject=' + encodeURIComponent(sub.name) + '&homework=' + encodeURIComponent(hw.name));
+        let html = '';
+        if (r.success && r.data && r.data.length) {
+            html += '<div class="template-list">';
+            r.data.forEach(t => {
+                html += '<div class="template-item"><span class="template-item-name">\uD83D\uDCC4 ' + esc(t) + '</span><button class="remove-btn" onclick="deleteTemplate(\'' + esc(sub.name) + '\',\'' + esc(hw.name) + '\',\'' + esc(t) + '\')">\uD83D\uDDD1</button></div>';
+            });
+            html += '</div>';
+        } else {
+            html = '<div class="template-empty">暂无模板文件</div>';
+        }
+        document.getElementById('templateListArea').innerHTML = html;
+    }
+
+    async function uploadTemplate() {
+        const fileInput = document.getElementById('templateFile');
+        if (!fileInput.files.length) return alert('请选择文件');
+        const sub = currentConfig.subjects[uploadState.subjectIdx];
+        const hw = sub.homeworks[uploadState.homeworkIdx];
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('subject', sub.name);
+        formData.append('homework', hw.name);
+        const res = await fetch('/api/v1/admin/templates/upload', {
+            method: 'POST',
+            headers: { 'X-Admin-Token': adminToken },
+            body: formData
         });
+        const r = await res.json();
+        if (r.success) { fileInput.value = ''; loadTemplateList(uploadState.subjectIdx, uploadState.homeworkIdx); }
+        else alert(r.message || '上传失败');
+    }
 
-        // 点击作业编辑弹窗背景关闭
-        document.getElementById('homeworkEditModal').addEventListener('click', function(e) {
-            if (e.target === this) hideHomeworkEditModal();
-        });
+    async function deleteTemplate(subject, homework, filename) {
+        if (!confirm('确定删除模板「' + filename + '」？')) return;
+        const r = await api('POST', '/admin/templates/delete', { subject, homework, filename });
+        if (r.success) loadTemplateList(uploadState.subjectIdx, uploadState.homeworkIdx);
+        else alert(r.message || '删除失败');
+    }
 
-        // Enter 键确认弹窗
-        document.getElementById('modalInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                confirmModal();
-            }
-        });
+    function closeUploadModal() { document.getElementById('uploadModal').classList.remove('active'); }
 
-        // Enter 键确认班级弹窗
-        document.getElementById('newClassInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                confirmAddClass();
-            }
-        });
+    // ========== 文件管理 ==========
+    function updateFileFilters() {
+        if (!currentConfig || !currentConfig.subjects) return;
+        const subSel = document.getElementById('fileFilterSubject');
+        const val = subSel.value;
+        subSel.innerHTML = '<option value="">全部</option>';
+        currentConfig.subjects.forEach(s => { subSel.innerHTML += '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>'; });
+        subSel.value = val;
+        updateFileClassFilter();
+    }
 
-        // 离开页面提示
-        window.addEventListener('beforeunload', function(e) {
-            if (pendingChanges) {
-                e.preventDefault();
-                e.returnValue = '';
-            }
-        });
+    function updateFileClassFilter() {
+        const subName = document.getElementById('fileFilterSubject').value;
+        const classSel = document.getElementById('fileFilterClass');
+        const hwSel = document.getElementById('fileFilterHomework');
+        classSel.innerHTML = '<option value="">全部</option>';
+        hwSel.innerHTML = '<option value="">全部</option>';
+        if (!subName || !currentConfig) return;
+        const sub = currentConfig.subjects.find(s => s.name === subName);
+        if (!sub) return;
+        (sub.classes || []).forEach(c => { classSel.innerHTML += '<option value="' + esc(c) + '">' + esc(c) + '</option>'; });
+        (sub.homeworks || []).forEach(h => { hwSel.innerHTML += '<option value="' + esc(h.name) + '">' + esc(h.name) + '</option>'; });
+    }
 
-        // 初始化
-        init();
+    document.getElementById('fileFilterSubject').addEventListener('change', updateFileClassFilter);
+
+    async function loadFiles() {
+        const subject = document.getElementById('fileFilterSubject').value;
+        const cls = document.getElementById('fileFilterClass').value;
+        const homework = document.getElementById('fileFilterHomework').value;
+        let url = '/admin/files?';
+        if (subject) url += 'subject=' + encodeURIComponent(subject) + '&';
+        if (cls) url += 'class=' + encodeURIComponent(cls) + '&';
+        if (homework) url += 'homework=' + encodeURIComponent(homework) + '&';
+        const r = await api('GET', url);
+        const tbody = document.getElementById('fileTableBody');
+        const empty = document.getElementById('fileEmptyState');
+        if (r.success && r.data && r.data.length) {
+            empty.classList.add('hidden');
+            document.getElementById('fileTableContainer').classList.remove('hidden');
+            tbody.innerHTML = r.data.map(f => '<tr><td class="file-name">' + esc(f.name) + '</td><td>' + formatSize(f.size) + '</td><td>' + f.modified + '</td><td style="color:rgba(255,255,255,0.4);font-size:11px">' + esc(f.path) + '</td><td><button class="btn btn-danger btn-small" onclick="deleteFile(\'' + esc(f.path) + '\')">删除</button></td></tr>').join('');
+        } else {
+            document.getElementById('fileTableContainer').classList.add('hidden');
+            empty.classList.remove('hidden');
+        }
+    }
+
+    async function deleteFile(path) {
+        if (!confirm('确定删除文件「' + path + '」？此操作不可恢复！')) return;
+        const r = await api('POST', '/admin/files/delete', { path });
+        if (r.success) loadFiles(); else alert(r.message || '删除失败');
+    }
+
+    // ========== 提交情况 ==========
+    function updateSubFilters() {
+        if (!currentConfig || !currentConfig.subjects) return;
+        const subSel = document.getElementById('subFilterSubject');
+        subSel.innerHTML = '<option value="">选择科目</option>';
+        currentConfig.subjects.forEach(s => { subSel.innerHTML += '<option value="' + esc(s.name) + '">' + esc(s.name) + '</option>'; });
+    }
+
+    function onSubFilterChange() {
+        const subName = document.getElementById('subFilterSubject').value;
+        const classSel = document.getElementById('subFilterClass');
+        const hwSel = document.getElementById('subFilterHomework');
+        classSel.innerHTML = '<option value="">选择班级</option>';
+        hwSel.innerHTML = '<option value="">选择作业</option>';
+        if (!subName || !currentConfig) return;
+        const sub = currentConfig.subjects.find(s => s.name === subName);
+        if (!sub) return;
+        (sub.classes || []).forEach(c => { classSel.innerHTML += '<option value="' + esc(c) + '">' + esc(c) + '</option>'; });
+        (sub.homeworks || []).forEach(h => { hwSel.innerHTML += '<option value="' + esc(h.name) + '">' + esc(h.name) + '</option>'; });
+    }
+
+    async function loadSubmissions() {
+        const subject = document.getElementById('subFilterSubject').value;
+        const cls = document.getElementById('subFilterClass').value;
+        const homework = document.getElementById('subFilterHomework').value;
+        const container = document.getElementById('submissionsContainer');
+        const empty = document.getElementById('submissionEmptyState');
+        if (!subject || !cls || !homework) { container.innerHTML = ''; empty.classList.remove('hidden'); return; }
+        let url = '/admin/submissions?subject=' + encodeURIComponent(subject) + '&class=' + encodeURIComponent(cls) + '&homework=' + encodeURIComponent(homework);
+        const r = await api('GET', url);
+        if (r.success && r.data) {
+            empty.classList.add('hidden');
+            const d = r.data;
+            let html = '<div style="margin-bottom:16px"><strong>' + esc(d.homework_name) + '</strong> - ' + esc(d.subject) + ' / ' + esc(d.class) + '</div>';
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+            html += '<div class="content-section"><h4>已提交 (' + d.submitted.length + ')</h4><div class="tag-list">';
+            d.submitted.forEach(s => { html += '<span class="tag tag-with-info">' + esc(s) + '</span>'; });
+            if (!d.submitted.length) html += '<span style="color:rgba(255,255,255,0.4);font-size:13px">无</span>';
+            html += '</div></div>';
+            html += '<div class="content-section"><h4>未提交 (' + d.not_submitted.length + ')</h4><div class="tag-list">';
+            d.not_submitted.forEach(s => { html += '<span class="tag" style="border-color:rgba(255,107,107,0.3)">' + esc(s) + '</span>'; });
+            if (!d.not_submitted.length) html += '<span style="color:rgba(255,255,255,0.4);font-size:13px">全部已提交 🎉</span>';
+            html += '</div></div></div>';
+            container.innerHTML = html;
+        } else {
+            container.innerHTML = '';
+            empty.classList.remove('hidden');
+        }
+    }
+
+    // ========== 设置 - 密码修改 ==========
+    async function changePassword() {
+        const oldPwd = document.getElementById('oldPassword').value;
+        const newPwd = document.getElementById('newPassword').value;
+        const confirmPwd = document.getElementById('confirmPassword').value;
+        const msgEl = document.getElementById('passwordMsg');
+        if (!oldPwd || !newPwd || !confirmPwd) { showMsg(msgEl, '请填写所有字段', 'error'); return; }
+        if (newPwd !== confirmPwd) { showMsg(msgEl, '两次输入的新密码不一致', 'error'); return; }
+        if (newPwd.length < 4) { showMsg(msgEl, '新密码至少4位', 'error'); return; }
+        const r = await api('POST', '/admin/password', { old_password: oldPwd, new_password: newPwd });
+        if (r.success) {
+            showMsg(msgEl, '密码修改成功，请重新登录', 'success');
+            document.getElementById('oldPassword').value = '';
+            document.getElementById('newPassword').value = '';
+            document.getElementById('confirmPassword').value = '';
+            setTimeout(doLogout, 2000);
+        } else {
+            showMsg(msgEl, r.message || '修改失败', 'error');
+        }
+    }
+
+    // ========== 操作日志 ==========
+    async function loadLogs() {
+        const r = await api('GET', '/admin/logs');
+        const container = document.getElementById('logList');
+        const empty = document.getElementById('logEmptyState');
+        if (r.success && r.data && r.data.length) {
+            empty.classList.add('hidden');
+            container.innerHTML = r.data.map(l => '<div class="log-item"><span class="log-time">' + l.timestamp + '</span><span class="log-action">' + esc(l.action) + '</span><span class="log-detail">' + esc(l.detail) + '</span></div>').join('');
+        } else {
+            container.innerHTML = '';
+            empty.classList.remove('hidden');
+        }
+    }
+
+    // ========== 弹窗 ==========
+    function openModal(title, body, callback) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalBody').innerHTML = body;
+        modalCallback = callback;
+        document.getElementById('modal').classList.add('active');
+    }
+
+    function closeModal() { document.getElementById('modal').classList.remove('active'); modalCallback = null; }
+    function confirmModal() { if (modalCallback) modalCallback(); closeModal(); }
+
+    // ========== 工具 ==========
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     </script>
 </body>
 </html>
