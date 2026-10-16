@@ -407,7 +407,23 @@ async function main() {
   const health = await api('/api/admin/health', { token })
   check('健康检查可用', health.status === 200 && health.json.database === 'ok')
   check('健康检查返回资源占用', typeof health.json.objects_bytes === 'number')
-  check('健康检查反映活动课堂数', health.json.active_sessions === 0)
+  // 活动课堂数取决于环境中的既有数据，因此只校验字段类型与一致性，
+  // 不假定一定为 0（演示数据可能已存在进行中的课堂）。
+  check(
+    '健康检查返回活动课堂数',
+    Number.isInteger(health.json.active_sessions) && health.json.active_sessions >= 0,
+    `实际 ${health.json.active_sessions}`,
+  )
+
+  const runningSessions = await api('/api/sessions', { token })
+  const runningCount = runningSessions.json.items.filter(
+    (s) => s.status === 'running' || s.status === 'paused',
+  ).length
+  check(
+    '活动课堂数与课堂列表一致',
+    health.json.active_sessions === runningCount,
+    `健康检查 ${health.json.active_sessions}，列表 ${runningCount}`,
+  )
 
   const audit = await api('/api/admin/audit-logs?limit=50', { token })
   check('审计日志可查询', audit.status === 200 && Array.isArray(audit.json.items))
