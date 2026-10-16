@@ -1,15 +1,21 @@
-// 验证远端分支的提交信息与提交历史编码是否正确。
+// 验证远端分支与提交信息编码是否正确。
 //
-// 用法：node scripts/verify-remote.mjs
+// 用法：node scripts/verify-remote.mjs [分支名]
 // 需要环境变量 GITEA_TOKEN（从 git credential fill 获取）。
+//
+// 设计说明：不硬编码任何提交信息文本，而是把远端 API 返回的提交信息
+// 与本地 `git log` 的结果逐字对比。这样脚本可长期复用，
+// 也不会因为提交信息变更而误报。
 //
 // 职责边界：本脚本只校验分支与提交信息；
 // 文件存在性与运行时数据泄露检查由 verify-remote-files.mjs 负责，
 // 因为 Gitea 的 compare 接口在跨分叉基点时不返回文件列表，不可依赖。
 
+import { execFileSync } from 'node:child_process'
+
+const BRANCH = process.argv[2] ?? process.env.GITEA_BRANCH ?? 'feature/classroom-platform'
 const HOST = process.env.GITEA_HOST ?? 'https://git.twentyy.cn'
 const REPO = process.env.GITEA_REPO ?? 'DSZZ/cums'
-const BRANCH = process.env.GITEA_BRANCH ?? 'feature/classroom-platform'
 const token = process.env.GITEA_TOKEN
 
 if (!token) {
@@ -27,32 +33,48 @@ async function getJson(path) {
   return JSON.parse(buffer.toString('utf8'))
 }
 
-const branch = await getJson(`/branches/${encodeURIComponent(BRANCH)}`)
+/** 读取本地分支的提交信息与 SHA */
+function localCommit(ref) {
+  // 用 -z 分隔，避免提交信息中的换行影响解析
+  const sha = execFileSync('git', ['rev-parse', ref], { encoding: 'utf8' }).trim()
+  const message = execFileSync('git', ['log', '-1', '--format=%B', sha], {
+    encoding: 'utf8',
+  })
+  return { sha, message }
+}
 
-console.log('=== 远端分支 ===')
-console.log('分支名:', branch.name)
-console.log('最新提交:', branch.commit.id.slice(0, 7))
-console.log('提交时间:', branch.commit.timestamp)
+const remote = await getJson(`/branches/${encodeURIComponent(BRANCH)}`)
+const local = localCommit(BRANCH)
+
+console.log('=== 分支与提交 ===')
+console.log('分支名:      ', remote.name)
+console.log('远端 HEAD:   ', remote.commit.id.slice(0, 7))
+console.log('本地 HEAD:   ', local.sha.slice(0, 7))
+console.log('提交时间:    ', remote.commit.timestamp)
 console.log()
 
-// 逐行校验提交信息，确保中文编码正确
-const lines = branch.commit.message.split('\n')
-const expectedFirst = 'test: 新增远端推送验证脚本'
+// 归一化：统一换行并去掉首尾空白，避免平台差异造成假失败
+const normalize = (text) => text.replace(/\r\n/g, '\n').trim()
+const remoteMessage = normalize(remote.commit.message)
+const localMessage = normalize(local.message)
 
-console.log('=== 提交信息 ===')
-console.log('首行:', lines[0])
-console.log('首行编码:', lines[0] === expectedFirst ? '正确' : '异常')
-console.log()
-console.log('完整信息：')
-for (const line of lines) console.log(`  ${line}`)
+console.log('=== 提交信息（远端）===')
+for (const line of remoteMessage.split('\n')) console.log(`  ${line}`)
 console.log()
 
 const checks = [
-  ['分支名正确', branch.name === BRANCH],
-  ['提交信息首行编码正确', lines[0] === expectedFirst],
-  ['提交信息正文编码正确', branch.commit.message.includes('校验远端分支的提交信息编码')],
-  ['提交信息无替换字符', !branch.commit.message.includes('\uFFFD')],
+  ['分支名正确', remote.name === BRANCH],
+  ['远端与本地 HEAD 一致', remote.commit.id === local.sha],
+  ['远端提交信息与本地逐字一致', remoteMessage === localMessage],
+  ['提交信息无替换字符（编码未损坏）', !remoteMessage.includes('\uFFFD')],
 ]
+
+if (remoteMessage !== localMessage) {
+  console.log('=== 差异 ===')
+  console.log('本地：', JSON.stringify(localMessage.slice(0, 200)))
+  console.log('远端：', JSON.stringify(remoteMessage.slice(0, 200)))
+  console.log()
+}
 
 console.log('=== 校验结果 ===')
 let failed = 0
@@ -63,6 +85,5 @@ for (const [name, ok] of checks) {
 
 console.log()
 console.log(`合计 ${checks.length} 项：通过 ${checks.length - failed}，失败 ${failed}`)
-console.log()
 console.log('提示：文件存在性与数据泄露检查请运行 verify-remote-files.mjs')
 process.exit(failed === 0 ? 0 : 1)
