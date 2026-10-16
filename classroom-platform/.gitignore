@@ -1,0 +1,22 @@
+# 运行时数据：数据库、资源文件、日志与备份
+data/
+storage/
+backups/
+app/logs/
+app/web/
+
+# 运行时配置：包含 JWT 密钥，不应提交
+app/config/config.toml
+
+# Rust 构建产物
+backend/target/
+backend/.cargo/
+
+# Node 构建产物与依赖
+frontend/node_modules/
+frontend/dist/
+
+# 临时与调试文件
+*.tmp
+*.log
+*.bak
