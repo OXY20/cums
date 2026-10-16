@@ -1,7 +1,11 @@
-// 验证远端分支的提交信息与文件清单编码是否正确。
+// 验证远端分支的提交信息与提交历史编码是否正确。
 //
 // 用法：node scripts/verify-remote.mjs
 // 需要环境变量 GITEA_TOKEN（从 git credential fill 获取）。
+//
+// 职责边界：本脚本只校验分支与提交信息；
+// 文件存在性与运行时数据泄露检查由 verify-remote-files.mjs 负责，
+// 因为 Gitea 的 compare 接口在跨分叉基点时不返回文件列表，不可依赖。
 
 const HOST = process.env.GITEA_HOST ?? 'https://git.twentyy.cn'
 const REPO = process.env.GITEA_REPO ?? 'DSZZ/cums'
@@ -15,69 +19,50 @@ if (!token) {
 
 const headers = { Authorization: `token ${token}` }
 
+/** 请求 Gitea API，显式按 UTF-8 解码，避免控制台编码干扰判断 */
 async function getJson(path) {
   const res = await fetch(`${HOST}/api/v1/repos/${REPO}${path}`, { headers })
   if (!res.ok) throw new Error(`${path} 返回 ${res.status}`)
-  // 显式按 UTF-8 解码，避免控制台编码干扰
   const buffer = Buffer.from(await res.arrayBuffer())
   return JSON.parse(buffer.toString('utf8'))
 }
 
 const branch = await getJson(`/branches/${encodeURIComponent(BRANCH)}`)
+
 console.log('=== 远端分支 ===')
 console.log('分支名:', branch.name)
 console.log('最新提交:', branch.commit.id.slice(0, 7))
 console.log('提交时间:', branch.commit.timestamp)
 console.log()
 
-const expected = 'fix: 测试断言改为数据驱动，避免依赖特定环境状态'
-console.log('=== 提交信息编码校验 ===')
-console.log('远端首行:', branch.commit.message.split('\n')[0])
-console.log('期望首行:', expected)
-console.log('结果:', branch.commit.message.startsWith(expected) ? '编码正确' : '编码异常')
+// 逐行校验提交信息，确保中文编码正确
+const lines = branch.commit.message.split('\n')
+const expectedFirst = 'test: 新增远端推送验证脚本'
+
+console.log('=== 提交信息 ===')
+console.log('首行:', lines[0])
+console.log('首行编码:', lines[0] === expectedFirst ? '正确' : '异常')
+console.log()
+console.log('完整信息：')
+for (const line of lines) console.log(`  ${line}`)
 console.log()
 
-// 统计整个分支相对 master 新增的文件
-const masterSha = (await getJson('/branches/master')).commit.id
-const compare = await getJson(`/compare/${masterSha}...${branch.commit.id}`)
-
-console.log('=== 相对 master 的变更 ===')
-console.log('提交数:', compare.total_commits)
-console.log('文件数:', compare.files?.length ?? 0)
-console.log()
-
-const platformFiles = (compare.files ?? []).filter((f) =>
-  f.filename.startsWith('classroom-platform/'),
-)
-console.log('classroom-platform 下文件:', platformFiles.length)
-
-// 确认运行时数据与构建产物未被提交
-const forbidden = [
-  'classroom-platform/data/',
-  'classroom-platform/storage/',
-  'classroom-platform/backups/',
-  'classroom-platform/app/web/',
-  'classroom-platform/app/logs/',
-  'classroom-platform/app/config/config.toml',
-  'classroom-platform/backend/target/',
-  'classroom-platform/frontend/node_modules/',
+const checks = [
+  ['分支名正确', branch.name === BRANCH],
+  ['提交信息首行编码正确', lines[0] === expectedFirst],
+  ['提交信息正文编码正确', branch.commit.message.includes('校验远端分支的提交信息编码')],
+  ['提交信息无替换字符', !branch.commit.message.includes('\uFFFD')],
 ]
-const leaked = platformFiles.filter((f) => forbidden.some((p) => f.filename.startsWith(p)))
 
-console.log()
-console.log('=== 运行时数据泄露检查 ===')
-if (leaked.length === 0) {
-  console.log('通过：数据库、资源、日志、构建产物与含密钥的配置均未提交')
-} else {
-  console.log('异常：以下不应提交的文件出现在远端')
-  for (const f of leaked) console.log('  -', f.filename)
+console.log('=== 校验结果 ===')
+let failed = 0
+for (const [name, ok] of checks) {
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}`)
+  if (!ok) failed += 1
 }
 
-const ok =
-  branch.name === BRANCH &&
-  branch.commit.message.startsWith(expected) &&
-  leaked.length === 0
-
 console.log()
-console.log(ok ? 'RESULT: 远端内容校验通过' : 'RESULT: 远端内容存在问题')
-process.exit(ok ? 0 : 1)
+console.log(`合计 ${checks.length} 项：通过 ${checks.length - failed}，失败 ${failed}`)
+console.log()
+console.log('提示：文件存在性与数据泄露检查请运行 verify-remote-files.mjs')
+process.exit(failed === 0 ? 0 : 1)
