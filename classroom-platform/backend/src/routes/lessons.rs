@@ -2,7 +2,8 @@
 
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    CreateLessonRequest, LessonRow, LessonStepRow, ListResponse, UpdateLessonRequest,
+    CreateLessonRequest, LessonDetailView, LessonResourceRow, LessonRow, LessonStepRow,
+    ListResponse, UpdateLessonRequest,
 };
 use crate::routes::AuthUser;
 use crate::state::AppState;
@@ -48,9 +49,32 @@ async fn list_lessons(
     Ok(Json(ListResponse::new(rows)))
 }
 
-/// 课时详情。
-async fn get_lesson(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<Json<LessonRow>> {
-    fetch_lesson(&state, id).await.map(Json)
+/// 课时详情：附带正文块与关联资源，编辑器可一次加载。
+async fn get_lesson(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> AppResult<Json<LessonDetailView>> {
+    let lesson = fetch_lesson(&state, id).await?;
+    let blocks = crate::routes::blocks::fetch_blocks(&state, id).await?;
+
+    let resources = sqlx::query_as::<_, LessonResourceRow>(
+        "SELECT r.id, r.name, r.storage_key, r.size_bytes, r.sha256, r.mime_type,
+                r.version, r.status, r.created_at,
+                lr.purpose, lr.required, lr.sort_order
+         FROM lesson_resources lr
+         JOIN resources r ON r.id = lr.resource_id
+         WHERE lr.lesson_id = ?1
+         ORDER BY lr.sort_order ASC, r.id ASC",
+    )
+    .bind(id)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(LessonDetailView {
+        lesson,
+        blocks,
+        resources,
+    }))
 }
 
 pub async fn fetch_lesson(state: &AppState, id: i64) -> AppResult<LessonRow> {

@@ -2,6 +2,7 @@
 
 pub mod admin;
 pub mod auth;
+pub mod blocks;
 pub mod classes;
 pub mod courses;
 pub mod events;
@@ -26,6 +27,7 @@ pub fn api_router() -> Router<AppState> {
         .merge(classes::routes())
         .merge(courses::routes())
         .merge(lessons::routes())
+        .merge(blocks::routes())
         .merge(sessions::routes())
         .merge(resources::routes())
         .merge(files::routes())

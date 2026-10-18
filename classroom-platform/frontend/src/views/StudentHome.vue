@@ -6,7 +6,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { api, type Course, type CurrentSession } from '@/api'
+import { api, fileUrl, type Course, type CurrentSession } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -113,7 +113,16 @@ function statusText(status: string) {
         class="course-card"
         @click="router.push(`/student/courses/${course.id}`)"
       >
-        <div class="course-card__cover">{{ course.title.slice(0, 2) }}</div>
+        <div class="course-card__cover">
+          <img
+            v-if="course.cover_resource_id"
+            :src="fileUrl(course.cover_resource_id)"
+            :alt="`${course.title} 封面`"
+            class="course-card__cover-img"
+            loading="lazy"
+          />
+          <template v-else>{{ course.title.slice(0, 2) }}</template>
+        </div>
         <div class="course-card__body">
           <div class="course-card__title">{{ course.title }}</div>
           <div class="course-card__desc">{{ course.description || '暂无课程简介' }}</div>

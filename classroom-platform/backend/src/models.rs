@@ -72,6 +72,9 @@ pub struct CourseRow {
     pub title: String,
     pub description: String,
     pub cover_key: Option<String>,
+    /// 封面图对应的资源 ID；为空表示未设置封面
+    #[sqlx(default)]
+    pub cover_resource_id: Option<i64>,
     pub status: String,
     pub created_at: String,
     pub updated_at: String,
@@ -94,6 +97,7 @@ pub struct UpdateCourseRequest {
     pub title: Option<String>,
     pub description: Option<String>,
     pub cover_key: Option<String>,
+    pub cover_resource_id: Option<i64>,
     pub status: Option<String>,
 }
 
@@ -126,6 +130,15 @@ pub struct UpdateLessonRequest {
     pub title: Option<String>,
     pub content_json: Option<String>,
     pub sort_order: Option<i64>,
+}
+
+/// 课时详情视图：附带图文块与关联资源，供编辑器一次加载。
+#[derive(Debug, Serialize)]
+pub struct LessonDetailView {
+    #[serde(flatten)]
+    pub lesson: LessonRow,
+    pub blocks: Vec<LessonBlockRow>,
+    pub resources: Vec<LessonResourceRow>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -170,6 +183,83 @@ pub struct RegisterResourceResponse {
     pub resource_id: i64,
     pub upload_token: String,
     pub storage_key: String,
+}
+
+/// 课时关联的资源，附带用途与排序信息。
+///
+/// `purpose` 决定前端如何呈现：`image` / `video` 内嵌展示，`attachment` 提供下载。
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct LessonResourceRow {
+    pub id: i64,
+    pub name: String,
+    pub storage_key: String,
+    pub size_bytes: i64,
+    pub sha256: String,
+    pub mime_type: String,
+    pub version: i64,
+    pub status: String,
+    pub created_at: String,
+    /// 用途：image / video / attachment
+    pub purpose: String,
+    pub required: i64,
+    pub sort_order: i64,
+}
+
+/// 关联资源时的可选用途设置。
+#[derive(Debug, Default, Deserialize)]
+pub struct AttachResourceRequest {
+    #[serde(default)]
+    pub purpose: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// 课时正文块
+// ---------------------------------------------------------------------------
+
+/// 正文块：文字与媒体按 `sort_order` 混排。
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct LessonBlockRow {
+    pub id: i64,
+    pub lesson_id: i64,
+    pub block_type: String,
+    pub text_content: String,
+    pub title: String,
+    pub resource_id: Option<i64>,
+    pub sort_order: i64,
+    /// 关联资源的展示信息（媒体块使用）
+    #[sqlx(default)]
+    pub resource_name: Option<String>,
+    #[sqlx(default)]
+    pub resource_size: Option<i64>,
+    #[sqlx(default)]
+    pub resource_mime: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateBlockRequest {
+    /// `text` / `image` / `video` / `file`
+    pub block_type: String,
+    #[serde(default)]
+    pub text_content: String,
+    #[serde(default)]
+    pub title: String,
+    #[serde(default)]
+    pub resource_id: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateBlockRequest {
+    pub text_content: Option<String>,
+    pub title: Option<String>,
+    pub resource_id: Option<i64>,
+    pub sort_order: Option<i64>,
+}
+
+/// 批量重排正文块。
+#[derive(Debug, Deserialize)]
+pub struct ReorderBlocksRequest {
+    /// 按目标顺序排列的块 ID
+    pub block_ids: Vec<i64>,
 }
 
 // ---------------------------------------------------------------------------

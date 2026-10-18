@@ -70,6 +70,73 @@ export function fileUrl(resourceId: number): string {
   return `/files/${resourceId}`
 }
 
+/**
+ * 带进度的文件上传。
+ *
+ * 使用 XHR 而非 fetch：只有 XHR 能提供上传进度事件，
+ * 大文件上传时教师需要看到进度与失败提示。
+ */
+export function uploadWithProgress<T>(
+  path: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData()
+    form.append('file', file, file.name)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', path)
+
+    const token = getToken()
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      let payload: unknown = null
+      try {
+        payload = JSON.parse(xhr.responseText)
+      } catch {
+        /* 保留 null，走通用错误分支 */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(payload as T)
+      } else {
+        const detail = payload as ApiErrorBody | null
+        reject(
+          new ApiError(
+            xhr.status,
+            detail?.error?.code ?? 'upload_failed',
+            detail?.error?.message ?? `上传失败（${xhr.status}）`,
+          ),
+        )
+      }
+    }
+
+    xhr.onerror = () => reject(new ApiError(0, 'network_error', '网络错误，上传中断'))
+    xhr.onabort = () => reject(new ApiError(0, 'aborted', '上传已取消'))
+
+    xhr.send(form)
+  })
+}
+
+/** 根据文件名判断是否为图片，用于上传前过滤 */
+export function isImageFile(file: File): boolean {
+  if (file.type.startsWith('image/')) return true
+  return /\.(jpe?g|png|gif|webp|bmp|svg)$/i.test(file.name)
+}
+
+/** 根据文件名判断是否为视频 */
+export function isVideoFile(file: File): boolean {
+  if (file.type.startsWith('video/')) return true
+  return /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name)
+}
+
 /** 列表响应 */
 export interface ListResponse<T> {
   items: T[]
@@ -98,6 +165,8 @@ export interface Course {
   title: string
   description: string
   cover_key: string | null
+  /** 封面图对应的资源 ID；为空表示未设置封面 */
+  cover_resource_id: number | null
   status: 'draft' | 'published' | 'archived'
   created_at: string
   updated_at: string
@@ -114,6 +183,9 @@ export interface Lesson {
   updated_at: string
 }
 
+/** 资源用途：图片与视频内嵌展示，其余作为附件下载 */
+export type ResourcePurpose = 'image' | 'video' | 'attachment'
+
 export interface Resource {
   id: number
   name: string
@@ -124,6 +196,36 @@ export interface Resource {
   version: number
   status: 'staging' | 'ready' | 'missing' | 'corrupt'
   created_at: string
+}
+
+/** 课时关联的资源，含用途与排序 */
+export interface LessonResource extends Resource {
+  purpose: ResourcePurpose
+  required: number
+  sort_order: number
+}
+
+/** 正文块类型：文字与媒体按顺序混排 */
+export type BlockType = 'text' | 'image' | 'video' | 'file'
+
+export interface LessonBlock {
+  id: number
+  lesson_id: number
+  block_type: BlockType
+  text_content: string
+  title: string
+  resource_id: number | null
+  sort_order: number
+  /** 媒体块附带的资源信息 */
+  resource_name: string | null
+  resource_size: number | null
+  resource_mime: string | null
+}
+
+/** 课时详情：一次返回正文块与关联资源 */
+export interface LessonDetail extends Lesson {
+  blocks: LessonBlock[]
+  resources: LessonResource[]
 }
 
 export interface ClassroomSession {
@@ -223,7 +325,8 @@ export const api = {
   copyCourse: (id: number) => request<Course>(`/api/courses/${id}/copy`, { method: 'POST' }),
 
   lessons: (courseId: number) => request<ListResponse<Lesson>>(`/api/courses/${courseId}/lessons`),
-  lesson: (id: number) => request<Lesson>(`/api/lessons/${id}`),
+  /** 课时详情：一次返回正文块与关联资源 */
+  lesson: (id: number) => request<LessonDetail>(`/api/lessons/${id}`),
   createLesson: (courseId: number, body: { title: string; content_json?: string }) =>
     request<Lesson>(`/api/courses/${courseId}/lessons`, { method: 'POST', body }),
   updateLesson: (id: number, body: Partial<Lesson>) =>
@@ -231,15 +334,49 @@ export const api = {
   deleteLesson: (id: number) => request<{ ok: boolean }>(`/api/lessons/${id}`, { method: 'DELETE' }),
 
   lessonResources: (lessonId: number) =>
-    request<ListResponse<Resource>>(`/api/lessons/${lessonId}/resources`),
-  attachResource: (lessonId: number, resourceId: number) =>
-    request<{ ok: boolean }>(`/api/lessons/${lessonId}/resources/${resourceId}`, {
+    request<ListResponse<LessonResource>>(`/api/lessons/${lessonId}/resources`),
+
+  /** 课时内直接上传：一步完成上传与关联，自动识别用途 */
+  uploadLessonResource: (
+    lessonId: number,
+    file: File,
+    onProgress?: (percent: number) => void,
+  ) => uploadWithProgress<LessonResource>(`/api/lessons/${lessonId}/resources/upload`, file, onProgress),
+
+  attachResource: (lessonId: number, resourceId: number, purpose?: ResourcePurpose) =>
+    request<LessonResource>(`/api/lessons/${lessonId}/resources/${resourceId}`, {
       method: 'POST',
+      body: purpose ? { purpose } : undefined,
     }),
   detachResource: (lessonId: number, resourceId: number) =>
     request<{ ok: boolean }>(`/api/lessons/${lessonId}/resources/${resourceId}`, {
       method: 'DELETE',
     }),
+
+  // ---- 正文块 ----
+  blocks: (lessonId: number) =>
+    request<ListResponse<LessonBlock>>(`/api/lessons/${lessonId}/blocks`),
+  createBlock: (
+    lessonId: number,
+    body: { block_type: BlockType; text_content?: string; title?: string; resource_id?: number },
+  ) => request<LessonBlock>(`/api/lessons/${lessonId}/blocks`, { method: 'POST', body }),
+  updateBlock: (
+    blockId: number,
+    body: { text_content?: string; title?: string; resource_id?: number; sort_order?: number },
+  ) => request<LessonBlock>(`/api/blocks/${blockId}`, { method: 'PUT', body }),
+  deleteBlock: (blockId: number) =>
+    request<{ ok: boolean }>(`/api/blocks/${blockId}`, { method: 'DELETE' }),
+  reorderBlocks: (lessonId: number, blockIds: number[]) =>
+    request<ListResponse<LessonBlock>>(`/api/lessons/${lessonId}/blocks/reorder`, {
+      method: 'PUT',
+      body: { block_ids: blockIds },
+    }),
+
+  /** 上传课程封面（仅接受图片） */
+  uploadCourseCover: (courseId: number, file: File, onProgress?: (percent: number) => void) =>
+    uploadWithProgress<Course>(`/api/courses/${courseId}/cover`, file, onProgress),
+  clearCourseCover: (courseId: number) =>
+    request<Course>(`/api/courses/${courseId}/cover`, { method: 'DELETE' }),
 
   resources: () => request<ListResponse<Resource>>('/api/resources'),
   registerResource: (body: { name: string; size_bytes: number; sha256?: string }) =>
@@ -254,53 +391,8 @@ export const api = {
    * 使用 XHR 而非 fetch：只有 XHR 能提供上传进度事件，
    * 大文件上传时教师需要看到进度与失败提示。
    */
-  uploadResource: (
-    resourceId: number,
-    file: File,
-    onProgress?: (percent: number) => void,
-  ): Promise<Resource> =>
-    new Promise((resolve, reject) => {
-      const form = new FormData()
-      form.append('file', file, file.name)
-
-      const xhr = new XMLHttpRequest()
-      xhr.open('POST', `/api/resources/${resourceId}/upload`)
-
-      const token = getToken()
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
-
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable && onProgress) {
-          onProgress(Math.round((event.loaded / event.total) * 100))
-        }
-      }
-
-      xhr.onload = () => {
-        let payload: unknown = null
-        try {
-          payload = JSON.parse(xhr.responseText)
-        } catch {
-          /* 保留 null，走通用错误分支 */
-        }
-        if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(payload as Resource)
-        } else {
-          const detail = payload as ApiErrorBody | null
-          reject(
-            new ApiError(
-              xhr.status,
-              detail?.error?.code ?? 'upload_failed',
-              detail?.error?.message ?? `上传失败（${xhr.status}）`,
-            ),
-          )
-        }
-      }
-
-      xhr.onerror = () => reject(new ApiError(0, 'network_error', '网络错误，上传中断'))
-      xhr.onabort = () => reject(new ApiError(0, 'aborted', '上传已取消'))
-
-      xhr.send(form)
-    }),
+  uploadResource: (resourceId: number, file: File, onProgress?: (percent: number) => void) =>
+    uploadWithProgress<Resource>(`/api/resources/${resourceId}/upload`, file, onProgress),
 
   deleteResource: (id: number) =>
     request<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' }),
