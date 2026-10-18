@@ -364,7 +364,9 @@ body {
   text-align: left;
 }
 
-.rich-content th {
+/* 表头：同时兼容 <th> 与服务端标记的 td.ql-table-header */
+.rich-content th,
+.rich-content td.ql-table-header {
   background: var(--page-bg);
   font-weight: 600;
 }

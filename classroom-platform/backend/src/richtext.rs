@@ -97,7 +97,7 @@ const ALLOWED_CLASS_EXACT: &[&str] = &[
     "ql-code-block-container",
     "ql-code-block",
     "ql-video",
-    "ql-bg-",
+    "ql-table-header",
 ];
 
 /// 判断某个 class 是否允许保留。
@@ -108,73 +108,76 @@ fn is_allowed_class(class: &str) -> bool {
             .any(|prefix| class.starts_with(prefix))
 }
 
-/// 规范化表格：把首行单元格还原为表头 `<th>`。
+/// 规范化表格：把表头单元格统一表示为带标记的 `<td>`。
 ///
-/// Quill 的剪贴板解析器会把 `<th>` 改写成 `<td data-row="1">`，
-/// 表头语义因此丢失。这里在清洗后做一次后处理：
-/// 若表格首行全是 `<td>` 且带了 `data-row="1"` 标记（或本身就是表头行），
-/// 将其还原为 `<th>`，保证学生端能看到表头样式。
+/// Quill 2 对 `<th>` 的支持有缺陷：回填时会把同一行的多个 `<th>`
+/// 合并成一个单元格，文本被拼接，表格结构因此损坏。
+/// 为保证编辑器往返不丢结构，这里把 `<th>` 转成
+/// `<td class="ql-table-header">`，表头样式由前端按该标记呈现。
 fn normalize_tables(html: &str) -> String {
-    // 逐表处理；表格一般不嵌套，这里按 <table> ... </table> 分段即可。
-    let mut result = String::with_capacity(html.len());
+    if !html.contains("<th") {
+        return html.to_string();
+    }
+
+    // 逐单元格替换，避免影响 <thead> 等容器标签。
+    let mut out = String::with_capacity(html.len() + 64);
     let mut rest = html;
 
-    while let Some(start) = rest.find("<table") {
-        result.push_str(&rest[..start]);
-        let after_start = &rest[start..];
+    while let Some(pos) = rest.find("<th") {
+        out.push_str(&rest[..pos]);
+        let after = &rest[pos..];
 
-        let Some(end) = after_start.find("</table>") else {
-            // 未闭合的表格原样保留，交给上层处理
-            result.push_str(after_start);
-            return result;
+        // 定位开标签结束位置
+        let Some(open_end) = after.find('>') else {
+            out.push_str(after);
+            return out;
+        };
+        let open_tag = &after[..open_end + 1];
+
+        // 保留已有 class，追加表头标记
+        let new_open = if let Some(class_pos) = open_tag.find("class=\"") {
+            let value_start = class_pos + "class=\"".len();
+            let value_end = open_tag[value_start..]
+                .find('"')
+                .map(|i| value_start + i)
+                .unwrap_or(open_tag.len());
+            let existing = &open_tag[value_start..value_end];
+            let merged = if existing.split_whitespace().any(|c| c == "ql-table-header") {
+                existing.to_string()
+            } else {
+                format!("{existing} ql-table-header")
+            };
+            format!(
+                "{}class=\"{}\"{}",
+                &open_tag[..class_pos],
+                merged,
+                &open_tag[value_end + 1..]
+            )
+        } else {
+            format!(
+                "<td class=\"ql-table-header\"{}",
+                &open_tag["<th".len()..]
+            )
         };
 
-        let table = &after_start[..end + "</table>".len()];
-        result.push_str(&promote_first_row_to_header(table));
-        rest = &after_start[end + "</table>".len()..];
+        out.push_str(&new_open);
+
+        // 处理单元格内容直到 </th>
+        let body = &after[open_end + 1..];
+        match body.find("</th>") {
+            Some(close) => {
+                out.push_str(&body[..close]);
+                out.push_str("</td>");
+                rest = &body[close + "</th>".len()..];
+            }
+            None => {
+                out.push_str(body);
+                return out;
+            }
+        }
     }
 
-    result.push_str(rest);
-    result
-}
-
-/// 把表格首行的 td 提升为 th。
-///
-/// 判定依据是「首行全部为 `<td>` 且表格本身没有 `<th>`」：
-/// Quill 会丢弃 `<th>` 语义，而教学场景里的表格首行基本都是表头。
-/// 数据行不受影响。
-fn promote_first_row_to_header(table: &str) -> String {
-    // 已含 th 的表格无需处理
-    if table.contains("<th") {
-        return table.to_string();
-    }
-
-    let Some(tbody_pos) = table.find("<tbody") else {
-        return table.to_string();
-    };
-    let Some(tbody_end) = table[tbody_pos..].find('>') else {
-        return table.to_string();
-    };
-    let content_start = tbody_pos + tbody_end + 1;
-
-    let Some(row_end) = table[content_start..].find("</tr>") else {
-        return table.to_string();
-    };
-    let row = &table[content_start..content_start + row_end + "</tr>".len()];
-
-    // 首行必须是纯 td 行才做提升，避免误改只有一行数据的表格
-    let has_td = row.contains("<td");
-    let td_count = row.matches("<td").count();
-    if !has_td || td_count == 0 {
-        return table.to_string();
-    }
-
-    let promoted = row.replace("<td", "<th").replace("</td>", "</th>");
-
-    let mut out = String::with_capacity(table.len());
-    out.push_str(&table[..content_start]);
-    out.push_str(&promoted);
-    out.push_str(&table[content_start + row.len()..]);
+    out.push_str(rest);
     out
 }
 
@@ -380,22 +383,22 @@ mod tests {
     }
 
     #[test]
-    fn 表格首行还原为表头() {
-        // Quill 把 th 改写成 td，保存时应把首行还原为 th
-        let quill = r#"<table><tbody><tr><td>参数</td><td>取值</td></tr><tr><td>宽度</td><td>8cm</td></tr></tbody></table>"#;
-        let cleaned = sanitize(quill);
-        assert!(cleaned.contains("<th>参数</th>"), "{cleaned}");
-        assert!(cleaned.contains("<th>取值</th>"), "{cleaned}");
-        // 数据行保持 td
+    fn 表头单元格转为带标记的_td() {
+        // Quill 2 回填多个 <th> 时会合并单元格，因此统一转成 td + class
+        let html = r#"<table><tbody><tr><th>参数</th><th>取值</th></tr><tr><td>宽度</td><td>8cm</td></tr></tbody></table>"#;
+        let cleaned = sanitize(html);
+        assert!(cleaned.contains(r#"<td class="ql-table-header">参数</td>"#), "{cleaned}");
+        assert!(cleaned.contains(r#"<td class="ql-table-header">取值</td>"#), "{cleaned}");
+        assert!(!cleaned.contains("<th"), "{cleaned}");
+        // 数据行保持普通 td
         assert!(cleaned.contains("<td>宽度</td>"), "{cleaned}");
     }
 
     #[test]
-    fn 已含表头的表格不被改动() {
-        let html = r#"<table><tbody><tr><th>表头</th></tr><tr><td>数据</td></tr></tbody></table>"#;
+    fn 表头标记不会被重复添加() {
+        let html = r#"<table><tbody><tr><th class="ql-table-header">表头</th></tr></tbody></table>"#;
         let cleaned = sanitize(html);
-        assert!(cleaned.contains("<th>表头</th>"), "{cleaned}");
-        assert!(cleaned.contains("<td>数据</td>"), "{cleaned}");
+        assert_eq!(cleaned.matches("ql-table-header").count(), 1, "{cleaned}");
     }
 
     #[test]

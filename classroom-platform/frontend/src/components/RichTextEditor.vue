@@ -270,15 +270,13 @@ defineExpose({ insertAttachment, insertMedia, getText })
   vertical-align: top;
 }
 
-.rich-editor :deep(.ql-editor th) {
+.rich-editor :deep(.ql-editor th),
+.rich-editor :deep(.ql-editor td.ql-table-header) {
   background: var(--page-bg);
   font-weight: 600;
 }
 
-/*
- * Quill 回填时会把 <th> 表示为普通单元格，因此额外按位置给首行加底色，
- * 保证教师编辑时看到的表头与最终效果一致。
- */
+/* 兼容旧数据：Quill 回填时首行可能丢失表头语义，按位置补底色 */
 .rich-editor :deep(.ql-editor table tbody tr:first-child td) {
   background: var(--page-bg);
   font-weight: 600;
