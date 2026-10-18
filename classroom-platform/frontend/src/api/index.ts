@@ -179,6 +179,10 @@ export interface Lesson {
   title: string
   sort_order: number
   content_json: string
+  /** 富文本正文（已清洗的 HTML） */
+  content_html: string
+  /** 正文格式：html 为富文本，blocks 为旧版块结构 */
+  content_format: 'html' | 'blocks'
   created_at: string
   updated_at: string
 }
@@ -246,6 +250,8 @@ export interface CurrentSession {
   course_title: string
   lesson_title: string
   lesson_content: Record<string, unknown>
+  /** 富文本正文（已清洗的 HTML），为空时回退到 lesson_content */
+  lesson_html: string
 }
 
 export interface ClassInfo {

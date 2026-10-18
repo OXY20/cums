@@ -167,14 +167,27 @@ await withPage(`${BASE}/admin/courses`, async ({ evaluate, errors }) => {
 })
 
 // -------------------------------------------------------------------------
-console.log('\n二、课时编辑器：直接上传区')
+console.log('\n二、课时编辑器：富媒体上传入口')
 // -------------------------------------------------------------------------
 await withPage(`${BASE}/admin/courses/${courseId}`, async ({ evaluate, errors }) => {
   const text = await evaluate(`document.querySelector('#app')?.innerText ?? ''`)
   check('页面含课时标题', text.includes('第 1 课时：直接上传图片'))
-  check('页面含上传提示', text.includes('拖入或点击上传图片、视频、附件'))
-  check('存在拖拽上传区', (await evaluate(`document.querySelectorAll('.inline-upload').length`)) > 0)
-  check('存在「添加文字段落」按钮', text.includes('添加文字段落'))
+  check('存在富媒体编辑器', (await evaluate(`document.querySelectorAll('.ql-editor').length`)) > 0)
+  check('存在编辑器工具栏', (await evaluate(`document.querySelectorAll('.ql-toolbar').length`)) > 0)
+  check(
+    '工具栏有图片按钮',
+    (await evaluate(`document.querySelectorAll('.ql-toolbar .ql-image').length`)) > 0,
+  )
+  check(
+    '工具栏有视频按钮',
+    (await evaluate(`document.querySelectorAll('.ql-toolbar .ql-video').length`)) > 0,
+  )
+  check(
+    '工具栏有链接按钮',
+    (await evaluate(`document.querySelectorAll('.ql-toolbar .ql-link').length`)) > 0,
+  )
+  check('存在附件上传按钮', text.includes('上传附件'))
+  check('存在保存正文按钮', text.includes('保存正文'))
   check('无控制台错误', errors.length === 0, errors.join(' | '))
 })
 
@@ -206,30 +219,28 @@ await withPage(`${BASE}/admin/courses/${courseId}`, async ({ evaluate, errors })
   check('浏览器内上传成功', uploadResult?.status === 200, `实际 ${uploadResult?.status}`)
   check('用途识别为 image', uploadResult?.purpose === 'image', uploadResult?.purpose)
 
-  // 插入正文块
+  // 把图片插入富文本正文（走真实保存链路）
   const blockResult = await evaluate(`(async () => {
-    const res = await fetch('/api/lessons/${lessonId}/blocks', {
-      method: 'POST',
+    const res = await fetch('/api/lessons/${lessonId}', {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: 'Bearer ' + localStorage.getItem('classroom.token'),
       },
       body: JSON.stringify({
-        block_type: 'image',
-        title: '界面测试图片',
-        resource_id: ${JSON.stringify(uploadResult?.id)},
+        content_html: '<p>界面测试图片：</p><p><img src="/files/${uploadResult?.id}" alt="测试"></p>',
       }),
     })
     return { status: res.status, json: await res.json() }
   })()`)
-  check('创建图片块成功', blockResult?.status === 200, `实际 ${blockResult?.status}`)
+  check('保存含图片的富文本正文', blockResult?.status === 200, `实际 ${blockResult?.status}`)
 
   // 刷新页面，确认图片在编辑器内渲染
   await evaluate(`location.reload()`)
   await new Promise((r) => setTimeout(r, 3500))
 
   const imgInfo = await evaluate(`(() => {
-    const imgs = Array.from(document.querySelectorAll('.media__image'))
+    const imgs = Array.from(document.querySelectorAll('.ql-editor img'))
     return imgs.map((img) => ({ src: img.getAttribute('src'), width: img.naturalWidth }))
   })()`)
 
@@ -284,7 +295,7 @@ if (sessionId) {
       check('学生端显示课时标题', text.includes('第 1 课时：直接上传图片'))
       check(
         '学生端出现内嵌图片',
-        (await evaluate(`document.querySelectorAll('.content-image').length`)) > 0,
+        (await evaluate(`document.querySelectorAll('.rich-content img').length`)) > 0,
       )
       check('无控制台错误', errors.length === 0, errors.join(' | '))
     })

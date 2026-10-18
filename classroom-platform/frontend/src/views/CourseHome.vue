@@ -138,14 +138,27 @@ function enterSession() {
           <template v-if="activeLesson">
             <h2 class="page-title" style="font-size: 18px">{{ activeLesson.title }}</h2>
 
-            <div v-if="lessonBlocks.length === 0" class="empty-state">
-              本课时暂无结构化内容。
-            </div>
+            <!--
+              富文本正文优先；旧数据回退到结构化字段。
+              v-html 的内容已在服务端经 ammonia 白名单清洗（标签、属性、
+              链接协议、图片路径、内联样式均受限），因此这里是安全的。
+            -->
+            <div
+              v-if="activeLesson.content_html"
+              class="rich-content"
+              v-html="activeLesson.content_html"
+            />
 
-            <div v-for="block in lessonBlocks" :key="block.key" class="lesson-block">
-              <div class="lesson-block__title">{{ block.label }}</div>
-              <div class="lesson-block__text">{{ block.text }}</div>
-            </div>
+            <template v-else>
+              <div v-if="lessonBlocks.length === 0" class="empty-state">
+                本课时暂无内容。
+              </div>
+
+              <div v-for="block in lessonBlocks" :key="block.key" class="lesson-block">
+                <div class="lesson-block__title">{{ block.label }}</div>
+                <div class="lesson-block__text">{{ block.text }}</div>
+              </div>
+            </template>
 
             <h3 class="section-title">
               相关资源

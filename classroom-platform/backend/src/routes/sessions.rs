@@ -147,7 +147,18 @@ async fn create_session(
     }
 
     // 保存课时内容快照，避免模板后续修改影响历史课堂。
+    //
+    // 快照同时保存结构化文字字段与富文本正文：
+    // 后者已在保存课时时清洗过，这里原样快照即可。
     let lesson = crate::routes::lessons::fetch_lesson(&state, payload.lesson_id).await?;
+
+    let snapshot = serde_json::json!({
+        "fields": serde_json::from_str::<serde_json::Value>(&lesson.content_json)
+            .unwrap_or_else(|_| serde_json::json!({})),
+        "html": lesson.content_html,
+        "format": lesson.content_format,
+    })
+    .to_string();
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO classroom_sessions (class_id, teacher_id, lesson_id, status, lesson_snapshot)
@@ -156,7 +167,7 @@ async fn create_session(
     .bind(payload.class_id)
     .bind(user.id())
     .bind(payload.lesson_id)
-    .bind(&lesson.content_json)
+    .bind(&snapshot)
     .fetch_one(&state.db)
     .await?;
 
@@ -277,6 +288,12 @@ async fn emit(state: &AppState, session_id: i64, event_type: &str) {
 }
 
 /// 组装学生端课堂视图。
+///
+/// 快照存在两种格式：
+/// - 新格式：`{ fields: {...}, html: "...", format: "html" }`
+/// - 旧格式：直接是结构化字段对象 `{ goal: "...", ... }`
+///
+/// 这里统一归一化，保证历史课堂仍可正常展示。
 async fn build_view(state: &AppState, session: SessionRow) -> AppResult<CurrentSessionView> {
     let meta = sqlx::query_as::<_, (String, String, String, String, String)>(
         "SELECT cl.name, u.display_name, c.title, l.title, cs.lesson_snapshot
@@ -291,12 +308,34 @@ async fn build_view(state: &AppState, session: SessionRow) -> AppResult<CurrentS
     .fetch_one(&state.db)
     .await?;
 
+    let snapshot: serde_json::Value =
+        serde_json::from_str(&meta.4).unwrap_or_else(|_| serde_json::json!({}));
+
+    let (fields, html) = if let Some(object) = snapshot.as_object() {
+        if object.contains_key("fields") || object.contains_key("html") {
+            (
+                object.get("fields").cloned().unwrap_or_else(|| serde_json::json!({})),
+                object
+                    .get("html")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+            )
+        } else {
+            // 旧格式：整个对象就是结构化字段
+            (snapshot.clone(), String::new())
+        }
+    } else {
+        (serde_json::json!({}), String::new())
+    };
+
     Ok(CurrentSessionView {
         session,
         class_name: meta.0,
         teacher_name: meta.1,
         course_title: meta.2,
         lesson_title: meta.3,
-        lesson_content: serde_json::from_str(&meta.4).unwrap_or(serde_json::json!({})),
+        lesson_content: fields,
+        lesson_html: html,
     })
 }

@@ -39,7 +39,7 @@ async fn list_lessons(
     Path(course_id): Path<i64>,
 ) -> AppResult<Json<ListResponse<LessonRow>>> {
     let rows = sqlx::query_as::<_, LessonRow>(
-        "SELECT id, course_id, title, sort_order, content_json, created_at, updated_at
+        "SELECT id, course_id, title, sort_order, content_json, content_html, content_format, created_at, updated_at
          FROM lessons WHERE course_id = ?1 ORDER BY sort_order ASC, id ASC",
     )
     .bind(course_id)
@@ -79,7 +79,7 @@ async fn get_lesson(
 
 pub async fn fetch_lesson(state: &AppState, id: i64) -> AppResult<LessonRow> {
     sqlx::query_as::<_, LessonRow>(
-        "SELECT id, course_id, title, sort_order, content_json, created_at, updated_at
+        "SELECT id, course_id, title, sort_order, content_json, content_html, content_format, created_at, updated_at
          FROM lessons WHERE id = ?1",
     )
     .bind(id)
@@ -140,6 +140,9 @@ async fn create_lesson(
 }
 
 /// 更新课时。
+///
+/// 提交 `content_html` 时按白名单清洗后入库，并将正文格式标记为 `html`；
+/// 清洗在服务端完成，学生端渲染时无需再做前端过滤。
 async fn update_lesson(
     State(state): State<AppState>,
     user: AuthUser,
@@ -148,25 +151,93 @@ async fn update_lesson(
 ) -> AppResult<Json<LessonRow>> {
     fetch_lesson(&state, id).await?;
 
+    // 富文本正文：清洗后再判断是否为空内容。
+    // 编辑器清空后常残留 `<p><br></p>`，这种内容统一归一化为空字符串。
+    let sanitized_html = payload.content_html.as_deref().map(|html| {
+        let cleaned = crate::richtext::sanitize(html);
+        if crate::richtext::is_effectively_empty(&cleaned) {
+            String::new()
+        } else {
+            cleaned
+        }
+    });
+    let format = if sanitized_html.is_some() {
+        Some("html")
+    } else {
+        None
+    };
+
     sqlx::query(
         "UPDATE lessons SET
-            title        = COALESCE(?1, title),
-            content_json = COALESCE(?2, content_json),
-            sort_order   = COALESCE(?3, sort_order),
-            updated_at   = datetime('now')
-         WHERE id = ?4",
+            title          = COALESCE(?1, title),
+            content_json   = COALESCE(?2, content_json),
+            content_html   = COALESCE(?3, content_html),
+            content_format = COALESCE(?4, content_format),
+            sort_order     = COALESCE(?5, sort_order),
+            updated_at     = datetime('now')
+         WHERE id = ?6",
     )
     .bind(payload.title.as_deref())
     .bind(payload.content_json.as_deref())
+    .bind(sanitized_html.as_deref())
+    .bind(format)
     .bind(payload.sort_order)
     .bind(id)
     .execute(&state.db)
     .await?;
 
+    // 富文本里以 /files/{id} 引用的资源需要同步到关联表：
+    // 否则删除资源时可能误删仍在正文中的文件，学生端附件列表也会缺失。
+    if let Some(html) = &sanitized_html {
+        sync_referenced_resources(&state, id, html).await?;
+    }
+
     crate::routes::auth::audit(&state, Some(user.id()), "lesson.update", "lesson", &id.to_string())
         .await;
 
     fetch_lesson(&state, id).await.map(Json)
+}
+
+/// 把正文中引用的资源登记为课时资源。
+///
+/// 只新增缺失的关联，不删除已有记录——资源可能是通过资源库显式关联的附件，
+/// 即使当前正文未引用也应保留在附件列表中。
+async fn sync_referenced_resources(
+    state: &AppState,
+    lesson_id: i64,
+    html: &str,
+) -> AppResult<()> {
+    let referenced = crate::richtext::referenced_resource_ids(html);
+    if referenced.is_empty() {
+        return Ok(());
+    }
+
+    for resource_id in referenced {
+        // 只关联确实存在且已就绪的资源，忽略正文中残留的失效引用。
+        let exists: Option<String> = sqlx::query_scalar(
+            "SELECT status FROM resources WHERE id = ?1",
+        )
+        .bind(resource_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        if exists.as_deref() != Some("ready") {
+            continue;
+        }
+
+        sqlx::query(
+            "INSERT INTO lesson_resources (lesson_id, resource_id, purpose, required, sort_order)
+             VALUES (?1, ?2, 'content', 0,
+                     COALESCE((SELECT MAX(sort_order) + 1 FROM lesson_resources WHERE lesson_id = ?1), 1))
+             ON CONFLICT(lesson_id, resource_id) DO NOTHING",
+        )
+        .bind(lesson_id)
+        .bind(resource_id)
+        .execute(&state.db)
+        .await?;
+    }
+
+    Ok(())
 }
 
 /// 删除课时；已被课堂引用时拒绝。

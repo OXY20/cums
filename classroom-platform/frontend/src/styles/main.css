@@ -242,6 +242,240 @@ body {
   white-space: pre-wrap;
 }
 
+/*
+ * 富文本正文展示样式。
+ *
+ * 内容为服务端清洗后的 HTML，因此这里只负责排版呈现；
+ * 具体的字号、颜色、对齐等由内联样式决定（编辑器写入）。
+ */
+.rich-content {
+  line-height: 1.8;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5,
+.rich-content h6 {
+  margin: 18px 0 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rich-content h1 {
+  font-size: 26px;
+}
+
+.rich-content h2 {
+  font-size: 22px;
+}
+
+.rich-content h3 {
+  font-size: 19px;
+}
+
+.rich-content h4 {
+  font-size: 17px;
+}
+
+.rich-content h5,
+.rich-content h6 {
+  font-size: 15px;
+}
+
+.rich-content p {
+  margin: 0 0 12px;
+}
+
+.rich-content ul,
+.rich-content ol {
+  margin: 0 0 12px;
+  padding-left: 26px;
+}
+
+.rich-content li {
+  margin: 4px 0;
+}
+
+.rich-content blockquote {
+  border-left: 4px solid var(--brand);
+  background: var(--brand-soft);
+  padding: 10px 14px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.rich-content pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.rich-content code {
+  background: var(--page-bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 13px;
+}
+
+.rich-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.rich-content a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.rich-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 10px 0;
+}
+
+.rich-content video {
+  max-width: 100%;
+  border-radius: 8px;
+  background: #000;
+  display: block;
+  margin: 10px 0;
+}
+
+.rich-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.rich-content th,
+.rich-content td {
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.rich-content th {
+  background: var(--page-bg);
+  font-weight: 600;
+}
+
+.rich-content hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 18px 0;
+}
+
+/*
+ * Quill 排版类。
+ *
+ * Quill 2 用 class 而非内联样式表达字号、对齐与缩进，
+ * 服务端清洗时已按前缀放行这些类，这里补上对应样式，
+ * 保证教师设置的排版在学生端同样生效。
+ */
+.rich-content .ql-align-center {
+  text-align: center;
+}
+
+.rich-content .ql-align-right {
+  text-align: right;
+}
+
+.rich-content .ql-align-justify {
+  text-align: justify;
+}
+
+.rich-content .ql-size-small {
+  font-size: 0.85em;
+}
+
+.rich-content .ql-size-large {
+  font-size: 1.5em;
+}
+
+.rich-content .ql-size-huge {
+  font-size: 2.2em;
+}
+
+.rich-content .ql-indent-1 {
+  padding-left: 2em;
+}
+
+.rich-content .ql-indent-2 {
+  padding-left: 4em;
+}
+
+.rich-content .ql-indent-3 {
+  padding-left: 6em;
+}
+
+.rich-content .ql-indent-4 {
+  padding-left: 8em;
+}
+
+.rich-content .ql-indent-5 {
+  padding-left: 10em;
+}
+
+.rich-content .ql-indent-6 {
+  padding-left: 12em;
+}
+
+.rich-content .ql-indent-7 {
+  padding-left: 14em;
+}
+
+.rich-content .ql-indent-8 {
+  padding-left: 16em;
+}
+
+.rich-content .ql-direction-rtl {
+  direction: rtl;
+  text-align: inherit;
+}
+
+/* 代码块：Quill 输出 <div class="ql-code-block-container"> 包裹多行 */
+.rich-content .ql-code-block-container {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.rich-content .ql-code-block {
+  white-space: pre-wrap;
+}
+
+.rich-content .ql-syntax {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+/* 视频嵌入 */
+.rich-content .ql-video {
+  width: 100%;
+  min-height: 320px;
+  border-radius: 8px;
+  background: #000;
+}
+
 /* 窄屏适配：侧栏折叠、卡片单列 */
 @media (max-width: 768px) {
   .current-session {

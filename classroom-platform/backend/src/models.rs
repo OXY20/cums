@@ -112,6 +112,10 @@ pub struct LessonRow {
     pub title: String,
     pub sort_order: i64,
     pub content_json: String,
+    /// 富文本正文（已清洗的 HTML）
+    pub content_html: String,
+    /// 正文格式：`html`（富文本）或 `blocks`（旧版块结构）
+    pub content_format: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -129,6 +133,8 @@ pub struct CreateLessonRequest {
 pub struct UpdateLessonRequest {
     pub title: Option<String>,
     pub content_json: Option<String>,
+    /// 富文本正文；服务端会做白名单清洗后入库
+    pub content_html: Option<String>,
     pub sort_order: Option<i64>,
 }
 
@@ -314,7 +320,10 @@ pub struct CurrentSessionView {
     pub teacher_name: String,
     pub course_title: String,
     pub lesson_title: String,
+    /// 结构化文字字段（旧版块内容或快照中的 fields）
     pub lesson_content: serde_json::Value,
+    /// 富文本正文（已清洗的 HTML），为空表示使用 lesson_content
+    pub lesson_html: String,
 }
 
 #[derive(Debug, Deserialize)]

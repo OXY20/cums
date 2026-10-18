@@ -117,8 +117,16 @@ function statusText(status: string) {
         }}
       </p>
 
+      <!--
+        富文本正文优先（课堂快照中保存的已清洗 HTML）；
+        旧课堂快照没有 html 字段时回退到结构化文字。
+      -->
+      <div v-if="view.lesson_html" class="card">
+        <div class="rich-content" v-html="view.lesson_html" />
+      </div>
+
       <!-- 快照文字内容 -->
-      <div v-if="textBlocks.length > 0" class="card">
+      <div v-else-if="textBlocks.length > 0" class="card">
         <div v-for="block in textBlocks" :key="block.key" class="lesson-block">
           <div class="lesson-block__title">{{ block.label }}</div>
           <div class="lesson-block__text">{{ block.text }}</div>
@@ -202,7 +210,12 @@ function statusText(status: string) {
       </template>
 
       <div
-        v-if="textBlocks.length === 0 && blocks.length === 0 && attachments.length === 0"
+        v-if="
+          !view.lesson_html &&
+          textBlocks.length === 0 &&
+          blocks.length === 0 &&
+          attachments.length === 0
+        "
         class="card empty-state"
       >
         本节课暂无内容。
