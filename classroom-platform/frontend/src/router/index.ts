@@ -65,6 +65,11 @@ const router = createRouter({
           component: () => import('@/views/admin/ResourceView.vue'),
         },
         {
+          path: 'submissions',
+          name: 'admin-submissions',
+          component: () => import('@/views/admin/SubmissionView.vue'),
+        },
+        {
           path: 'system',
           name: 'admin-system',
           component: () => import('@/views/admin/SystemView.vue'),

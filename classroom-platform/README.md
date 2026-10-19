@@ -129,6 +129,16 @@ npm run dev
 - 相同内容识别（按 SHA-256 提示复用）
 - 资源与课时多对多关联
 
+### 阶段四：学生作业提交
+
+- 课程页课时区域提供「提交作业」按钮，点击弹出上传窗口
+- 支持一次选择多个文件，视频、图片、文档、压缩包均可（单文件上限 20 GiB）
+- 上传时填写姓名，姓名保存在本地，机房电脑下次提交无需重复输入
+- 提交成功后立即弹出预览窗口：图片、视频、PDF、文本可内嵌预览，其余类型提供下载入口
+- 服务端记录提交时间、来源 IP 与 User-Agent，客户端无法伪造
+- 同一课时同一班级已有提交时：上传前主动提醒，提交后仍会保存并标记为重复
+- 教师端「作业提交」页可按课程/课时筛选、只看重复提交、查看详情与文件预览、标记已查看或问题
+
 ### 运维与监控
 
 - 健康检查：服务状态、数据库状态、活动课堂数、进行中下载数、资源占用、运行时长
@@ -174,6 +184,22 @@ node scripts/verify-admin-ui.mjs
 使用无头 Chrome 实际渲染 6 个页面（课堂控制台、课程管理、资源库、系统状态、学生端首页、下载中心），检查关键内容与控制台错误，全部通过，无控制台报错。
 
 界面截图见 `docs/screenshots/`。
+
+### 作业提交验证
+
+```powershell
+# 接口层：45 项
+node scripts/verify-homework-submission.mjs
+
+# 浏览器层：20 项（真实点击、选择文件、上传、预览）
+node scripts/verify-homework-ui.mjs
+```
+
+接口层覆盖提交前状态查询、多文件提交、用途推断、参数校验、重复标记、
+教师端列表/筛选/详情/审核、`inline` 预览与 Range 下载的兼容性。
+
+浏览器层通过 CDP 驱动真实页面，验证按钮出现、弹窗打开、多文件选择、
+进度与提交成功、预览窗口内容、重复提醒与重复标记，并检查无控制台报错。
 
 ## 关键设计说明
 
@@ -263,7 +289,13 @@ per_client_rate_kib = 0        # 0 表示不限速
 | GET | `/api/lessons/{id}/resources` | 课时关联资源 |
 | POST | `/api/resources/register` | 登记资源元数据 |
 | POST | `/api/resources/{id}/upload` | 上传资源内容 |
-| HEAD/GET | `/files/{id}` | 文件元信息 / 下载（支持 Range） |
+| POST | `/api/student/submissions` | 提交作业（multipart，多文件） |
+| GET | `/api/student/submissions/status` | 课时提交状态（用于重复提醒） |
+| GET | `/api/student/submissions/{id}` | 学生端回读提交（用于预览） |
+| GET | `/api/admin/submissions` | 教师端提交记录列表 |
+| GET | `/api/admin/submissions/{id}` | 教师端提交详情 |
+| POST | `/api/admin/submissions/{id}/review` | 标记已查看 / 问题 |
+| HEAD/GET | `/files/{id}` | 文件元信息 / 下载（支持 Range，`?inline=1` 内嵌预览） |
 | GET | `/api/events` | SSE 实时事件流 |
 | GET | `/api/admin/health` | 服务健康状态 |
 | GET | `/api/admin/audit-logs` | 审计日志 |
@@ -275,6 +307,9 @@ per_client_rate_kib = 0        # 0 表示不限速
 以下内容属于建设方案后续阶段，当前版本未包含：
 
 - 学生个人身份识别与下载统计（方案 4.4 指出不能仅凭 IP 判断学生身份）
+- 作业提交的学生账号绑定（当前按姓名 + IP 记录，未与 `users` 账号关联）
+- Office 文档（docx/xlsx/pptx）的页内预览，需额外的转换服务
+- 作业截止时间、评分与批注回传
 - 资源包清单与批量下载打包
 - 下载并发限制与限速的实际生效逻辑（配置项已预留）
 - 断点续传的客户端实现
