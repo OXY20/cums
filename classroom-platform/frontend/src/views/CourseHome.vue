@@ -8,6 +8,9 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api, fileUrl, type Course, type CurrentSession, type Lesson, type Resource } from '@/api'
 import { formatBytes, sessionStatusText } from '@/utils/format'
+import HomeworkSubmitDialog from '@/components/HomeworkSubmitDialog.vue'
+import SubmissionResultDialog from '@/components/SubmissionResultDialog.vue'
+import type { CreateSubmissionResponse } from '@/api'
 
 const props = defineProps<{ courseId: string }>()
 const router = useRouter()
@@ -19,12 +22,46 @@ const resources = ref<Resource[]>([])
 const current = ref<CurrentSession | null>(null)
 const loading = ref(true)
 
+/** 作业上传弹窗 */
+const submitVisible = ref(false)
+/** 提交成功后的预览弹窗 */
+const resultVisible = ref(false)
+const submitResult = ref<CreateSubmissionResponse | null>(null)
+
 const courseId = computed(() => Number(props.courseId))
 
 /** 当前课堂是否属于本课程 */
 const isCurrentCourse = computed(
   () => current.value !== null && current.value.course_title === course.value?.title,
 )
+
+/**
+ * 当前课时所属的班级。
+ *
+ * 只有在「本节课正在进行」时才能确定班级；否则为 null，
+ * 服务端会退化为按课时统计重复提交。
+ */
+const activeClassId = computed(() => {
+  if (!current.value) return null
+  if (!isCurrentCourse.value) return null
+  if (activeLesson.value && current.value.session.lesson_id !== activeLesson.value.id) return null
+  return current.value.session.class_id
+})
+
+/** 打开作业上传弹窗 */
+function openSubmit() {
+  if (!activeLesson.value) {
+    ElMessage.info('请先选择一个课时')
+    return
+  }
+  submitVisible.value = true
+}
+
+/** 提交成功：弹出预览 */
+function onSubmitted(payload: CreateSubmissionResponse) {
+  submitResult.value = payload
+  resultVisible.value = true
+}
 
 onMounted(async () => {
   try {
@@ -136,7 +173,11 @@ function enterSession() {
         <!-- 课时正文 -->
         <section class="card lesson-content">
           <template v-if="activeLesson">
-            <h2 class="page-title" style="font-size: 18px">{{ activeLesson.title }}</h2>
+            <div class="lesson-head">
+              <h2 class="page-title lesson-head__title">{{ activeLesson.title }}</h2>
+              <!-- 作业上传入口：选中课时后始终可用 -->
+              <el-button type="primary" @click="openSubmit">提交作业</el-button>
+            </div>
 
             <!--
               富文本正文优先；旧数据回退到结构化字段。
@@ -187,6 +228,18 @@ function enterSession() {
           <div v-else class="empty-state">请从左侧选择一个课时。</div>
         </section>
       </div>
+
+      <!-- 作业上传弹窗 -->
+      <HomeworkSubmitDialog
+        v-model="submitVisible"
+        :lesson-id="activeLesson?.id ?? null"
+        :lesson-title="activeLesson?.title ?? ''"
+        :class-id="activeClassId"
+        @submitted="onSubmitted"
+      />
+
+      <!-- 提交成功后的预览弹窗 -->
+      <SubmissionResultDialog v-model="resultVisible" :result="submitResult" />
     </template>
   </div>
 </template>
@@ -197,6 +250,21 @@ function enterSession() {
   grid-template-columns: 240px 1fr;
   gap: 16px;
   align-items: start;
+}
+
+/* 课时标题与「提交作业」按钮同一行 */
+.lesson-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.lesson-head__title {
+  font-size: 18px;
+  margin: 0;
 }
 
 .lesson-nav {

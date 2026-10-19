@@ -63,6 +63,8 @@ users ──┬── teacher_classes ──── classes
 | `classroom_sessions` | 实际授课场次，含内容快照 |
 | `session_events` | 课堂事件，用于 SSE 补偿与审计 |
 | `download_jobs` | 必要的下载汇总，不写高频进度 |
+| `homework_submissions` | 学生作业提交记录，含来源 IP 与重复标记 |
+| `homework_submission_files` | 提交与资源多对多关联，一次提交可含多个文件 |
 | `audit_logs` | 关键操作审计 |
 
 ### 设计要点
@@ -134,6 +136,59 @@ CREATE UNIQUE INDEX uniq_active_session_per_class
 
 **续传边界。** 服务端支持 Range 不代表浏览器关闭后会自动续传。第一版明确这一边界，可靠续传留给阶段五的 Windows 客户端。
 
+## 作业提交
+
+### 与资源库的关系
+
+作业文件不另建一套存储，而是复用 `resources` 表与 `/files` 下载接口：
+
+```text
+学生提交（multipart，多个 file 字段）
+  ├─ 每个文件：创建 staging 资源占位 → 流式落盘 → SHA-256 校验 → 移入 objects
+  ├─ 全部文件成功后：写入 homework_submissions
+  └─ 写入 homework_submission_files（提交 ↔ 资源多对多）
+```
+
+这样作业文件同样具备流式传输、SHA-256 校验、Range 下载与 `ETag` 能力，无需重复实现。任何一个文件失败都会清理本次已落盘的文件与资源记录，不留孤儿数据。
+
+### 来源 IP 的可信边界
+
+学生端提交不要求登录，因此不能采信客户端自报的地址。`client_ip` 一律由服务端从 TCP 连接信息解析（`ConnectInfo<SocketAddr>`）。
+
+只有在请求来自**回环地址**（即反向代理与服务同机部署）时，才信任 `X-Forwarded-For` 的第一跳。若信任任意私有网段的代理头，局域网内任何学生都能通过构造请求头伪造来源地址，使重复提交与代交核对失去意义。
+
+### 重复提交判定
+
+判定维度是「同一课时 + 同一班级」：
+
+```sql
+SELECT id, student_name FROM homework_submissions
+WHERE lesson_id = ?1 AND class_id = ?2
+ORDER BY created_at ASC, id ASC LIMIT 1;
+```
+
+命中时**仍然保存**本次提交，只是置 `duplicate_flag = 1` 并把 `duplicate_of` 指向最早那条记录。这里刻意选择"保存并标记"而不是"拒绝"：
+
+- 学生可能是误操作，也可能是替缺勤同学补交，直接拒绝会让作业丢失；
+- 教师需要看到完整事实（谁先交、谁后交、来源 IP），由人来判断性质；
+- 前端在提交前会查询 `/api/student/submissions/status` 主动提醒，但不作为强制拦截。
+
+班级信息缺省时（例如没有进行中的课堂），提交仍会保存，`class_id` 为空，重复判定退化为按课时统计。
+
+### 预览的实现边界
+
+预览统一走 `/files/{id}?inline=1`，服务端把 `Content-Disposition` 从 `attachment` 改为 `inline`：
+
+| 类型 | 预览方式 |
+|------|----------|
+| 图片 | `<img>` 内嵌 |
+| 视频 | `<video controls>` 播放 |
+| PDF | `<iframe>` 内嵌浏览器阅读器 |
+| 文本 | `<iframe>` 内嵌 |
+| 其他（docx/xlsx/zip 等） | 不做伪预览，提供下载入口 |
+
+Office 文档的页内预览需要额外的转换服务，第一版明确不实现，避免给出"看起来能预览但实际打不开"的假象。
+
 ## 实时同步
 
 教师开始、暂停、恢复或结束课堂时：
@@ -160,6 +215,7 @@ CREATE UNIQUE INDEX uniq_active_session_per_class
 | 路径穿越 | `storage_key` 由服务端生成；`safe_join` 做组件级与目录级双重校验 |
 | 上传损坏 | SHA-256 校验通过后才发布 |
 | 越权下载 | 资源状态非 `ready` 时拒绝下载；不开放数据库与配置目录 |
+| 伪造来源 IP | 作业提交的 `client_ip` 由服务端从连接信息解析，仅在回环代理时采信 `X-Forwarded-For` |
 | 缺少审计 | 关键操作写入 `audit_logs` |
 
 ### 路径校验实现
@@ -194,16 +250,17 @@ Windows 上 `canonicalize` 返回 `\\?\` 前缀路径，因此比较双方都必
 | `error.rs` | 统一错误类型与响应格式 |
 | `models.rs` | 请求与响应数据结构 |
 | `state.rs` | 共享状态与事件广播通道 |
-| `routes/` | 按业务拆分：认证、班级、课程、课时、课堂、资源、文件、事件、监控 |
+| `routes/` | 按业务拆分：认证、班级、课程、课时、课堂、资源、作业提交、文件、事件、监控 |
 
 ### 前端
 
 | 模块 | 职责 |
 |------|------|
-| `api/index.ts` | 接口客户端、认证头注入、错误转换、上传进度 |
+| `api/index.ts` | 接口客户端、认证头注入、错误转换、上传进度、多文件提交 |
 | `router/index.ts` | 路由定义与登录守卫 |
 | `stores/auth.ts` | 登录状态持久化与恢复 |
-| `views/` | 学生端 4 个页面 + 教师端 5 个页面 |
+| `components/` | 富文本编辑器、作业上传弹窗、提交预览弹窗、文件预览组件 |
+| `views/` | 学生端 4 个页面 + 教师端 6 个页面 |
 | `utils/format.ts` | 文件大小、时间、状态文案格式化 |
 
 ## 后续扩展方向

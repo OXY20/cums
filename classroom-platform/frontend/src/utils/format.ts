@@ -69,3 +69,17 @@ export function formatDuration(seconds: number): string {
   const minutes = Math.floor((seconds % 3600) / 60)
   return `${hours} 小时 ${minutes} 分钟`
 }
+
+/** 提交状态中文标签 */
+export function submissionStatusText(status: string): string {
+  switch (status) {
+    case 'submitted':
+      return '已提交'
+    case 'reviewed':
+      return '已查看'
+    case 'flagged':
+      return '已标记问题'
+    default:
+      return status
+  }
+}

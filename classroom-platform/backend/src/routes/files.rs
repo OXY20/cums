@@ -13,16 +13,38 @@ use crate::error::{AppError, AppResult};
 use crate::routes::resources::{fetch_resource, safe_join};
 use crate::state::AppState;
 use axum::body::Body;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
+use serde::Deserialize;
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
 use tokio_util::io::ReaderStream;
 
 pub fn routes() -> Router<AppState> {
     Router::new().route("/files/{id}", get(download_file).head(head_file))
+}
+
+/// 文件接口查询参数。
+///
+/// `inline` 用字符串接收而不是 `bool`：serde 的布尔解析只接受 `true`/`false`，
+/// 而 HTML 与脚本里更自然的是 `?inline=1`，两者都要能工作。
+#[derive(Debug, Default, Deserialize)]
+pub struct FileQuery {
+    /// 为真时以内嵌方式返回，供预览弹窗使用。
+    #[serde(default)]
+    pub inline: Option<String>,
+}
+
+impl FileQuery {
+    /// 是否要求内嵌预览。
+    fn wants_inline(&self) -> bool {
+        matches!(
+            self.inline.as_deref().map(str::trim),
+            Some("1") | Some("true") | Some("yes") | Some("on")
+        )
+    }
 }
 
 /// 单次读取的分块大小：1 MiB，兼顾内存占用与吞吐。
@@ -136,7 +158,7 @@ async fn head_file(
     // 中文文件名需要 RFC 5987 编码，否则部分浏览器会乱码。
     headers.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&content_disposition(&resource.name))
+        HeaderValue::from_str(&content_disposition(&resource.name, false))
             .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
     );
 
@@ -144,9 +166,13 @@ async fn head_file(
 }
 
 /// `GET /files/:id`：支持 Range 的流式下载。
+///
+/// 查询参数 `inline=1` 时把 `Content-Disposition` 改为 `inline`，
+/// 供作业预览弹窗内嵌 PDF / 图片 / 视频时使用；默认仍按附件下载。
 async fn download_file(
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Query(query): Query<FileQuery>,
     headers: HeaderMap,
 ) -> AppResult<Response> {
     let (resource, size) = open_resource(&state, id).await?;
@@ -192,7 +218,7 @@ async fn download_file(
     );
     out.insert(
         header::CONTENT_DISPOSITION,
-        HeaderValue::from_str(&content_disposition(&resource.name))
+        HeaderValue::from_str(&content_disposition(&resource.name, query.wants_inline()))
             .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
     );
 
@@ -241,7 +267,11 @@ async fn open_resource(state: &AppState, id: i64) -> AppResult<(crate::models::R
 }
 
 /// 生成兼容中文文件名的 Content-Disposition。
-fn content_disposition(name: &str) -> String {
+///
+/// `inline` 为真时使用 `inline`，浏览器会尝试在页面内展示（PDF、图片、视频），
+/// 否则按附件下载。
+fn content_disposition(name: &str, inline: bool) -> String {
     let encoded = urlencoding::encode(name);
-    format!("attachment; filename=\"{}\"; filename*=UTF-8''{}", encoded, encoded)
+    let kind = if inline { "inline" } else { "attachment" };
+    format!("{kind}; filename=\"{encoded}\"; filename*=UTF-8''{encoded}")
 }

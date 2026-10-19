@@ -145,6 +145,28 @@ pub async fn receive_content(
     resource: &ResourceRow,
     mut multipart: Multipart,
 ) -> AppResult<ResourceRow> {
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| AppError::BadRequest(format!("上传解析失败：{e}")))?
+    {
+        if field.name() == Some("file") {
+            return store_file_field(state, resource, field).await;
+        }
+    }
+
+    Err(AppError::BadRequest("未找到上传文件".into()))
+}
+
+/// 把单个 `file` 字段流式写入 staging，校验后发布到 objects。
+///
+/// 独立成函数后，作业提交的多文件上传可以复用同一套校验：
+/// 大小上限、空文件拒绝、SHA-256 计算与原子改名只实现一次。
+pub async fn store_file_field(
+    state: &AppState,
+    resource: &ResourceRow,
+    mut field: axum::extract::multipart::Field<'_>,
+) -> AppResult<ResourceRow> {
     let staging_path = safe_join(&state.config.staging_dir, &resource.storage_key)?;
     if let Some(parent) = staging_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -154,34 +176,23 @@ pub async fn receive_content(
     let mut written: u64 = 0;
     let mut file = tokio::fs::File::create(&staging_path).await?;
 
-    // 记录上传时实际提交的文件名，便于按扩展名判定资源类型。
-    let mut uploaded_name: Option<String> = None;
-    let mut uploaded_mime: Option<String> = None;
+    // 记录上传时实际提交的文件名与类型，便于判定用途与预览方式。
+    let uploaded_name: Option<String> = field.file_name().map(|n| n.to_string());
+    let uploaded_mime: Option<String> = field.content_type().map(|m| m.to_string());
 
-    while let Some(mut field) = multipart
-        .next_field()
+    while let Some(chunk) = field
+        .chunk()
         .await
-        .map_err(|e| AppError::BadRequest(format!("上传解析失败：{e}")))?
+        .map_err(|e| AppError::BadRequest(format!("读取上传数据失败：{e}")))?
     {
-        if field.name() == Some("file") {
-            uploaded_name = field.file_name().map(|n| n.to_string());
-            uploaded_mime = field.content_type().map(|m| m.to_string());
+        written += chunk.len() as u64;
+        if written > state.config.raw.storage.max_file_bytes {
+            drop(file);
+            let _ = tokio::fs::remove_file(&staging_path).await;
+            return Err(AppError::BadRequest("文件超出大小限制".into()));
         }
-
-        while let Some(chunk) = field
-            .chunk()
-            .await
-            .map_err(|e| AppError::BadRequest(format!("读取上传数据失败：{e}")))?
-        {
-            written += chunk.len() as u64;
-            if written > state.config.raw.storage.max_file_bytes {
-                drop(file);
-                let _ = tokio::fs::remove_file(&staging_path).await;
-                return Err(AppError::BadRequest("文件超出大小限制".into()));
-            }
-            hasher.update(&chunk);
-            tokio::io::AsyncWriteExt::write_all(&mut file, &chunk).await?;
-        }
+        hasher.update(&chunk);
+        tokio::io::AsyncWriteExt::write_all(&mut file, &chunk).await?;
     }
 
     tokio::io::AsyncWriteExt::flush(&mut file).await?;
@@ -294,7 +305,7 @@ async fn upload_lesson_resource(
     // 课时必须存在，避免上传后产生孤立资源。
     crate::routes::lessons::fetch_lesson(&state, lesson_id).await?;
 
-    let placeholder = create_staging_resource(&state, user.id(), "上传中").await?;
+    let placeholder = create_staging_resource(&state, Some(user.id()), "上传中").await?;
 
     let resource = match receive_content(&state, &placeholder, multipart).await {
         Ok(resource) => resource,
@@ -326,7 +337,7 @@ async fn upload_lesson_resource(
 /// 按 MIME 类型推断资源用途。
 ///
 /// 图片与视频内嵌展示，其余一律作为附件提供下载。
-fn infer_purpose(mime: &str, name: &str) -> &'static str {
+pub(crate) fn infer_purpose(mime: &str, name: &str) -> &'static str {
     if mime.starts_with("image/") {
         "image"
     } else if mime.starts_with("video/") {
@@ -352,9 +363,11 @@ fn infer_purpose(mime: &str, name: &str) -> &'static str {
 ///
 /// 直传时客户端无需预先提供大小与摘要，因此先落一条 `staging` 记录，
 /// 上传完成后再回填真实元数据。
-async fn create_staging_resource(
+///
+/// `uploaded_by` 为 `None` 时表示匿名提交（学生端作业上传没有登录账号）。
+pub(crate) async fn create_staging_resource(
     state: &AppState,
-    user_id: i64,
+    user_id: Option<i64>,
     name: &str,
 ) -> AppResult<ResourceRow> {
     let storage_key = format!("{}/{}", &Uuid::new_v4().to_string()[..2], Uuid::new_v4());

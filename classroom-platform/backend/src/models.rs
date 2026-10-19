@@ -333,6 +333,84 @@ pub struct CreateSessionRequest {
 }
 
 // ---------------------------------------------------------------------------
+// 作业提交
+// ---------------------------------------------------------------------------
+
+/// 一条作业提交记录。
+///
+/// `client_ip` 由服务端从连接信息或可信代理头解析，客户端无法指定。
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct SubmissionRow {
+    pub id: i64,
+    pub course_id: i64,
+    pub lesson_id: i64,
+    /// 班级可为空：学生端未选择班级时只按课时归属
+    pub class_id: Option<i64>,
+    /// 关联的课堂场次；学生端直接访问课程页时可能为空
+    pub session_id: Option<i64>,
+    pub student_name: String,
+    pub client_ip: String,
+    pub user_agent: String,
+    pub note: String,
+    /// 0 正常；1 表示该课时该班级已有其他人提交
+    pub duplicate_flag: i64,
+    /// 被重复的原始提交
+    pub duplicate_of: Option<i64>,
+    pub status: String,
+    pub created_at: String,
+    /// 冗余展示字段，列表查询时附带
+    #[sqlx(default)]
+    pub course_title: Option<String>,
+    #[sqlx(default)]
+    pub lesson_title: Option<String>,
+    #[sqlx(default)]
+    pub class_name: Option<String>,
+    #[sqlx(default)]
+    pub file_count: i64,
+}
+
+/// 提交包含的单个文件，复用资源库的存储与校验能力。
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct SubmissionFileRow {
+    pub resource_id: i64,
+    pub name: String,
+    pub size_bytes: i64,
+    pub mime_type: String,
+    pub sha256: String,
+    /// 用途：image / video / attachment，决定前端如何预览
+    pub purpose: String,
+    pub sort_order: i64,
+}
+
+/// 提交详情：记录本体 + 文件列表。
+#[derive(Debug, Serialize)]
+pub struct SubmissionDetailView {
+    #[serde(flatten)]
+    pub submission: SubmissionRow,
+    pub files: Vec<SubmissionFileRow>,
+    /// 被重复提交的提交人姓名，供前端提示
+    pub duplicate_of_name: Option<String>,
+}
+
+/// 课时提交状态：学生端上传前先查询，用于提醒「本班已有人提交」。
+#[derive(Debug, Serialize)]
+pub struct LessonSubmissionStatus {
+    pub lesson_id: i64,
+    pub class_id: Option<i64>,
+    pub total: i64,
+    /// 已有提交时给出最早一条，前端展示提交人与时间
+    pub first_submission: Option<SubmissionRow>,
+}
+
+/// 提交成功后的响应，携带重复提醒。
+#[derive(Debug, Serialize)]
+pub struct CreateSubmissionResponse {
+    pub submission: SubmissionDetailView,
+    /// 本次提交被标记为重复时给出原因
+    pub duplicate_warning: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
 // 监控
 // ---------------------------------------------------------------------------
 

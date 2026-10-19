@@ -71,6 +71,73 @@ export function fileUrl(resourceId: number): string {
 }
 
 /**
+ * 内嵌预览地址。
+ *
+ * `inline=1` 让服务端返回 `Content-Disposition: inline`，
+ * PDF / 图片 / 视频才能在预览弹窗里直接展示而不是触发下载。
+ */
+export function inlineFileUrl(resourceId: number): string {
+  return `/files/${resourceId}?inline=1`
+}
+
+/**
+ * 多文件提交（作业上传）。
+ *
+ * 与 [`uploadWithProgress`] 一样使用 XHR 以获得上传进度；
+ * 区别在于可以附带表单字段与多个文件，对应作业提交接口。
+ */
+export function submitWithProgress<T>(
+  path: string,
+  files: File[],
+  fields: Record<string, string>,
+  onProgress?: (percent: number) => void,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData()
+    for (const [key, value] of Object.entries(fields)) form.append(key, value)
+    for (const file of files) form.append('file', file, file.name)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', path)
+
+    const token = getToken()
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100))
+      }
+    }
+
+    xhr.onload = () => {
+      let payload: unknown = null
+      try {
+        payload = JSON.parse(xhr.responseText)
+      } catch {
+        /* 保留 null，走通用错误分支 */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(payload as T)
+      } else {
+        const detail = payload as ApiErrorBody | null
+        reject(
+          new ApiError(
+            xhr.status,
+            detail?.error?.code ?? 'submit_failed',
+            detail?.error?.message ?? `提交失败（${xhr.status}）`,
+          ),
+        )
+      }
+    }
+
+    xhr.onerror = () => reject(new ApiError(0, 'network_error', '网络错误，提交中断'))
+    xhr.onabort = () => reject(new ApiError(0, 'aborted', '提交已取消'))
+
+    xhr.send(form)
+  })
+}
+
+/**
  * 带进度的文件上传。
  *
  * 使用 XHR 而非 fetch：只有 XHR 能提供上传进度事件，
@@ -283,6 +350,76 @@ export interface AuditLogEntry {
 }
 
 // ---------------------------------------------------------------------------
+// 作业提交
+// ---------------------------------------------------------------------------
+
+/** 提交状态：已提交 / 已查看 / 已标记问题 */
+export type SubmissionStatus = 'submitted' | 'reviewed' | 'flagged'
+
+/** 提交中的单个文件，字段与服务端 resources 对齐 */
+export interface SubmissionFile {
+  resource_id: number
+  name: string
+  size_bytes: number
+  mime_type: string
+  sha256: string
+  /** 用途由服务端根据 MIME 与扩展名推断，决定预览方式 */
+  purpose: ResourcePurpose
+  sort_order: number
+}
+
+/** 一条作业提交记录 */
+export interface Submission {
+  id: number
+  course_id: number
+  lesson_id: number
+  class_id: number | null
+  session_id: number | null
+  student_name: string
+  /** 服务端记录的来源地址，客户端无法伪造 */
+  client_ip: string
+  user_agent: string
+  note: string
+  /** 1 表示该课时该班级已有其他人提交 */
+  duplicate_flag: number
+  duplicate_of: number | null
+  status: SubmissionStatus
+  created_at: string
+  course_title: string | null
+  lesson_title: string | null
+  class_name: string | null
+  file_count: number
+}
+
+/** 提交详情：记录本体 + 文件列表 */
+export interface SubmissionDetail extends Submission {
+  files: SubmissionFile[]
+  duplicate_of_name: string | null
+}
+
+/** 课时提交状态，用于上传前提醒 */
+export interface LessonSubmissionStatus {
+  lesson_id: number
+  class_id: number | null
+  total: number
+  first_submission: Submission | null
+}
+
+/** 提交接口的响应，携带重复提醒 */
+export interface CreateSubmissionResponse {
+  submission: SubmissionDetail
+  duplicate_warning: string | null
+}
+
+export interface SubmitHomeworkInput {
+  studentName: string
+  lessonId: number
+  classId?: number | null
+  note?: string
+  files: File[]
+}
+
+// ---------------------------------------------------------------------------
 // 接口封装
 // ---------------------------------------------------------------------------
 
@@ -406,6 +543,75 @@ export const api = {
   classes: () => request<ListResponse<ClassInfo>>('/api/classes'),
   createClass: (body: { name: string; room_name?: string }) =>
     request<ClassInfo>('/api/classes', { method: 'POST', body }),
+
+  // ---- 作业提交 ----
+
+  /**
+   * 提交作业（多文件）。
+   *
+   * 学生端无登录态也能调用；姓名与班级作为表单字段提交，
+   * 来源 IP 由服务端记录，前端不参与。
+   */
+  submitHomework: (
+    input: SubmitHomeworkInput,
+    onProgress?: (percent: number) => void,
+  ) => {
+    const fields: Record<string, string> = {
+      student_name: input.studentName,
+      lesson_id: String(input.lessonId),
+    }
+    if (input.classId !== null && input.classId !== undefined) {
+      fields.class_id = String(input.classId)
+    }
+    if (input.note) fields.note = input.note
+
+    return submitWithProgress<CreateSubmissionResponse>(
+      '/api/student/submissions',
+      input.files,
+      fields,
+      onProgress,
+    )
+  },
+
+  /** 查询某课时是否已有提交，用于上传前提醒 */
+  lessonSubmissionStatus: (lessonId: number, classId?: number | null) => {
+    const suffix = classId !== null && classId !== undefined ? `&class_id=${classId}` : ''
+    return request<LessonSubmissionStatus>(
+      `/api/student/submissions/status?lesson_id=${lessonId}${suffix}`,
+    )
+  },
+
+  /** 学生端回读自己的提交，用于上传成功后弹窗预览 */
+  studentSubmission: (id: number) =>
+    request<SubmissionDetail>(`/api/student/submissions/${id}`),
+
+  /** 教师端提交记录列表 */
+  submissions: (query: {
+    lessonId?: number
+    classId?: number
+    courseId?: number
+    duplicateOnly?: boolean
+    limit?: number
+  } = {}) => {
+    const params = new URLSearchParams()
+    if (query.lessonId !== undefined) params.set('lesson_id', String(query.lessonId))
+    if (query.classId !== undefined) params.set('class_id', String(query.classId))
+    if (query.courseId !== undefined) params.set('course_id', String(query.courseId))
+    if (query.duplicateOnly) params.set('duplicate_only', 'true')
+    if (query.limit !== undefined) params.set('limit', String(query.limit))
+    const suffix = params.toString() ? `?${params.toString()}` : ''
+    return request<ListResponse<Submission>>(`/api/admin/submissions${suffix}`)
+  },
+
+  /** 教师端提交详情 */
+  submission: (id: number) => request<SubmissionDetail>(`/api/admin/submissions/${id}`),
+
+  /** 教师端标记审阅状态 */
+  reviewSubmission: (id: number, status: SubmissionStatus) =>
+    request<SubmissionDetail>(`/api/admin/submissions/${id}/review`, {
+      method: 'POST',
+      body: { status },
+    }),
 
   health: () => request<Health>('/api/admin/health'),
 

@@ -59,9 +59,13 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("服务已就绪：http://{addr}");
 
-    axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
-        .await?;
+    // 挂载连接信息：作业提交需要记录真实来源 IP，客户端无法自行指定。
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await?;
 
     tracing::info!("服务已停止");
     Ok(())
@@ -80,7 +84,10 @@ fn build_router(state: &state::AppState) -> axum::Router {
         .with_state(state.clone());
 
     // 前端构建产物存在时一并托管，学生只需访问一个地址。
-    let static_dir = state.config.root_dir.join(&state.config.raw.server.static_dir);
+    let static_dir = state
+        .config
+        .root_dir
+        .join(&state.config.raw.server.static_dir);
     if !state.config.raw.server.static_dir.is_empty() && static_dir.exists() {
         tracing::info!(dir = %static_dir.display(), "托管前端静态资源");
         // 使用 fallback 而非 not_found_service：后者会强制 404 状态码，
