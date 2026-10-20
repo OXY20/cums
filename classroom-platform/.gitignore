@@ -20,3 +20,6 @@ frontend/dist/
 *.tmp
 *.log
 *.bak
+
+# 演示素材：由 scripts/make-fixtures.py 生成，可随时重建
+scripts/fixtures/

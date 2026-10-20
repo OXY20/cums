@@ -70,6 +70,16 @@ const router = createRouter({
           component: () => import('@/views/admin/SubmissionView.vue'),
         },
         {
+          path: 'lessons/:lessonId/review',
+          name: 'admin-lesson-review',
+          component: () => import('@/views/admin/LessonReviewView.vue'),
+        },
+        {
+          path: 'roster',
+          name: 'admin-roster',
+          component: () => import('@/views/admin/RosterView.vue'),
+        },
+        {
           path: 'system',
           name: 'admin-system',
           component: () => import('@/views/admin/SystemView.vue'),

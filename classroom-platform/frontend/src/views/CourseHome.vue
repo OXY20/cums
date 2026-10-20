@@ -138,8 +138,24 @@ function enterSession() {
     <div v-if="loading" class="card empty-state">正在加载…</div>
 
     <template v-else-if="course">
-      <h1 class="page-title">{{ course.title }}</h1>
-      <p class="page-subtitle">{{ course.description || '暂无课程简介' }}</p>
+      <!--
+        页面标题体现「课程 · 课时」的层级：
+        选中课时后顶部直接显示当前定位，无需再到右侧内容区找标题。
+      -->
+      <h1 class="page-title">
+        {{ course.title }}
+        <template v-if="activeLesson">
+          <span class="title-sep">·</span>
+          <span class="title-lesson">{{ activeLesson.title }}</span>
+        </template>
+      </h1>
+      <p class="page-subtitle">
+        <template v-if="activeLesson">
+          第 {{ activeLesson.sort_order }} 课时
+          <span class="subtitle-sep">｜</span>
+        </template>
+        {{ course.description || '暂无课程简介' }}
+      </p>
 
       <!-- 本课程正在进行时提供快捷入口 -->
       <div v-if="isCurrentCourse && current" class="card" style="margin-bottom: 16px">
@@ -173,8 +189,12 @@ function enterSession() {
         <!-- 课时正文 -->
         <section class="card lesson-content">
           <template v-if="activeLesson">
+            <!-- 课时标题已提升到页面顶部，这里只保留定位信息；右侧放作业入口 -->
             <div class="lesson-head">
-              <h2 class="page-title lesson-head__title">{{ activeLesson.title }}</h2>
+              <div class="lesson-content__head">
+                <span class="lesson-content__label">第 {{ activeLesson.sort_order }} 课时</span>
+                <span class="lesson-content__name">{{ activeLesson.title }}</span>
+              </div>
               <!-- 作业上传入口：选中课时后始终可用 -->
               <el-button type="primary" @click="openSubmit">提交作业</el-button>
             </div>
@@ -252,19 +272,14 @@ function enterSession() {
   align-items: start;
 }
 
-/* 课时标题与「提交作业」按钮同一行 */
+/* 课时定位条与「提交作业」按钮同一行 */
 .lesson-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
-}
-
-.lesson-head__title {
-  font-size: 18px;
-  margin: 0;
+  margin-bottom: 16px;
 }
 
 .lesson-nav {
@@ -297,6 +312,50 @@ function enterSession() {
 
 .lesson-content {
   min-height: 320px;
+}
+
+/* 标题层级：课程名 · 课时名 */
+.title-sep {
+  margin: 0 6px;
+  color: var(--text-sub);
+  font-weight: 400;
+}
+
+.title-lesson {
+  font-weight: 600;
+}
+
+.subtitle-sep {
+  margin: 0 4px;
+  color: var(--border-color);
+}
+
+/* 内容区的课时定位条 */
+.lesson-content__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+  flex: 1;
+  min-width: 0;
+}
+
+.lesson-content__label {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.lesson-content__name {
+  font-size: 13px;
+  color: var(--text-sub);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 768px) {

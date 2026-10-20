@@ -38,6 +38,11 @@ async function submit() {
 <template>
   <div class="login-page">
     <div class="login-card">
+      <div class="login-logo">
+        <svg class="login-logo__svg" viewBox="0 0 256 256" aria-hidden="true">
+          <path fill="#7c8bf8" d="M128 40L172 88L146 88L146 122L110 122L110 88L84 88ZM46 118L210 118L210 210Q178 220 128 220Q78 220 46 210Z"/>
+        </svg>
+      </div>
       <h1 class="login-title">教师端登录</h1>
       <p class="login-subtitle">机房教学资源平台</p>
 
@@ -87,6 +92,22 @@ async function submit() {
   margin: 0 0 2px;
   font-size: 20px;
   font-weight: 600;
+}
+
+.login-logo {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  border-radius: 20px;
+}
+
+.login-logo__svg {
+  width: 44px;
+  height: 44px;
+  display: block;
 }
 
 .login-subtitle {

@@ -1,607 +1,279 @@
 # API 文档
 
-## 📡 基础信息
+## 基础信息
 
-- **基础路径**: `/api/v1`
-- **协议**: HTTP
-- **编码**: UTF-8
-- **架构**: 以科目为中心
+- 基础路径：`/api/v1`
+- 默认地址：`http://localhost:3000`
+- 编码：UTF-8
+- 登录接口使用 `application/json`；上传接口使用 `multipart/form-data`。
+- 学生接口使用 `X-Student-Token`；管理接口使用 `X-Admin-Token`。
 
-### Content-Type
+## 学生端
 
-- **登录/配置**: `application/json`
-- **文件上传**: `multipart/form-data`
+### 学生登录
 
----
-
-## 🔐 1. 用户登录
-
-### 接口信息
-```
+```http
 POST /api/v1/login
 Content-Type: application/json
 ```
 
-### 请求参数
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `class` | string | 是 | 班级名称（从配置中自动收集） |
-| `student_id` | string | 是 | 学生学号 |
-| `student_name` | string | 是 | 学生姓名 |
-
-### 请求示例
-
 ```json
 {
-  "class": "一班",
-  "student_id": "01",
-  "student_name": "张三"
+  "student_id": "2025001",
+  "password": "000000"
 }
 ```
 
-### 响应参数
+学生必须已经由管理后台导入名单。新导入或管理员重置的学生默认密码为 `000000`，登录响应中的 `data.force_password_change` 为 `true` 时必须先改密。忘记密码时联系老师重置。
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `message` | string | 提示信息 |
-| `data.class` | string | 班级名称（标准化后） |
-| `data.student_id` | string | 学号 |
-| `data.student_name` | string | 姓名 |
-
-### 成功响应
+成功响应：
 
 ```json
 {
   "success": true,
   "message": "登录成功",
   "data": {
-    "class": "一班",
-    "student_id": "01",
-    "student_name": "张三"
+    "token": "student_xxx",
+    "class": "25计应",
+    "student_id": "2025001",
+    "student_name": "张三",
+    "force_password_change": true
   }
 }
 ```
 
-### 错误响应
+### 修改学生密码
 
-班级不存在：
-```json
-{
-  "success": false,
-  "message": "班级不存在，可选班级：一班、二班、三班",
-  "data": null
-}
-```
-
-学号或姓名为空：
-```json
-{
-  "success": false,
-  "message": "学号和姓名不能为空",
-  "data": null
-}
-```
-
-### 业务逻辑
-
-1. 验证班级是否在配置中存在（遍历所有科目的 classes）
-2. 验证学号和姓名不为空
-3. 返回标准化后的班级信息（支持"1班" → "一班"转换）
-
----
-
-## 📋 2. 获取配置
-
-### 接口信息
-```
-POST /api/v1/config
+```http
+POST /api/v1/student/password
+X-Student-Token: student_xxx
 Content-Type: application/json
 ```
 
-### 请求参数
-无（可发送空 JSON 对象 `{}`）
-
-### 响应参数
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `data.subjects` | object | 科目配置（以科目为中心） |
-
-### 响应结构
-
 ```json
 {
-  "success": true,
-  "data": {
-    "subjects": {
-      "{科目名}": {
-        "classes": ["班级1", "班级2"],
-        "homeworks": ["作业1", "作业2"]
-      }
-    }
-  }
+  "old_password": "000000",
+  "new_password": "new-password"
 }
 ```
 
-### 响应示例
+新密码至少 6 位。修改成功后，原令牌仍可在有效期内使用。
 
-```json
-{
-  "success": true,
-  "data": {
-    "subjects": {
-      "数学": {
-        "classes": ["一班", "二班", "三班"],
-        "homeworks": ["第一章作业", "第二章作业", "期中考试"]
-      },
-      "语文": {
-        "classes": ["一班", "二班"],
-        "homeworks": ["作文1", "阅读理解1"]
-      },
-      "英语": {
-        "classes": ["一班", "二班", "三班"],
-        "homeworks": ["听力练习", "单词测试"]
-      }
-    }
-  }
-}
+### 获取公共配置
+
+```http
+GET /api/v1/config
 ```
 
-### 前端使用
+返回科目、班级、作业和课时信息，不返回学生名单和密码。
 
-**初始化科目选择器**：
-```javascript
-Object.keys(configData.subjects).forEach(subject => {
-    subjectSelect.add(new Option(subject, subject));
-});
-```
+### 学生上传文件
 
-**初始化班级选择器**（登录用）：
-```javascript
-const classes = new Set();
-Object.values(configData.subjects).forEach(sub => {
-    sub.classes.forEach(c => classes.add(c));
-});
-classes.forEach(c => classSelect.add(new Option(c, c)));
-```
-
-**科目变更时过滤班级**：
-```javascript
-const selectedSubject = configData.subjects[subjectValue];
-selectedSubject.classes.forEach(c => classSelect.add(new Option(c, c)));
-```
-
----
-
-## 📤 3. 文件上传
-
-### 接口信息
-```
+```http
 POST /api/v1/upload
+X-Student-Token: student_xxx
 Content-Type: multipart/form-data
 ```
 
-### 请求参数
+表单字段：
 
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `class` | string | 是 | 班级名称 |
-| `student_id` | string | 是 | 学号 |
-| `student_name` | string | 是 | 姓名 |
-| `subject` | string | 是 | 科目名称 |
-| `homework` | string | 是 | 作业名称 |
-| `file` | file | 是 | 上传的文件 |
+| 字段 | 必填 | 说明 |
+|---|---|---|
+| `subject` | 是 | 科目名称 |
+| `homework` | 是 | 作业名称 |
+| `file` | 是 | 作业文件，最大 32MB |
 
-### 请求示例 (cURL)
+班级、学号和姓名由服务端从令牌读取，不能通过表单覆盖。学生完成首次改密前上传会返回 `403`。
+
+示例：
 
 ```bash
 curl -X POST http://localhost:3000/api/v1/upload \
-  -F "class=一班" \
-  -F "student_id=01" \
-  -F "student_name=张三" \
+  -H "X-Student-Token: student_xxx" \
   -F "subject=数学" \
   -F "homework=第一章作业" \
   -F "file=@/path/to/homework.docx"
 ```
 
-### 请求示例 (JavaScript)
+### 获取课时内容
 
-```javascript
-const formData = new FormData();
-formData.append('class', currentUser.class);
-formData.append('student_id', currentUser.student_id);
-formData.append('student_name', currentUser.student_name);
-formData.append('subject', subjectValue);
-formData.append('homework', homeworkValue);
-formData.append('file', fileInput.files[0]);
-
-fetch('/api/v1/upload', {
-    method: 'POST',
-    body: formData
-}).then(res => res.json());
+```http
+GET /api/v1/lesson?subject=数学&homework=第一章作业&lesson=第1课时
+X-Student-Token: student_xxx
 ```
 
-### 响应参数
+学生只能读取自己班级开设的科目，并且必须完成首次改密。返回值中的 `data.content` 是 Markdown 正文。页面支持标题、粗体、代码、图片、普通链接和 `@[视频](URL)` 视频语法；前端仅允许 `http`、`https` 和普通链接的 `mailto` 协议。课时简介通过公共配置中的 `lessons[].description` 提供，前端在课时列表与课时内容上方展示。
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `message` | string | 提示信息 |
-| `filename` | string | 保存的文件名 |
-| `filepath` | string | 文件完整路径 |
+### 模板、版本和更新日志
 
-### 成功响应
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/v1/template?file=templates/...` | 下载教师模板 |
+| `GET` | `/api/v1/version` | 获取版本号 |
+| `GET` | `/api/v1/changelog` | 获取更新日志 |
 
-```json
-{
-  "success": true,
-  "message": "上传成功",
-  "filename": "第一章作业_01_张三_20260121193000.docx",
-  "filepath": "C:\\Users\\ERSHI\\code\\cums\\cums\\uploads\\数学\\一班\\第一章作业\\第一章作业_01_张三_20260121193000.docx"
-}
-```
+## 管理端
 
-### 错误响应
+### 管理员登录
 
-班级不存在：
-```json
-{
-  "success": false,
-  "message": "班级不存在",
-  "filename": ""
-}
-```
-
-科目不存在：
-```json
-{
-  "success": false,
-  "message": "科目不存在",
-  "filename": ""
-}
-```
-
-班级没有该科目：
-```json
-{
-  "success": false,
-  "message": "该班级没有此科目",
-  "filename": ""
-}
-```
-
-作业不存在：
-```json
-{
-  "success": false,
-  "message": "作业不存在",
-  "filename": ""
-}
-```
-
-未选择文件：
-```json
-{
-  "success": false,
-  "message": "请选择要上传的文件",
-  "filename": ""
-}
-```
-
-### 业务逻辑
-
-1. **验证参数完整性**
-   - 班级、学号、姓名、科目、作业、文件缺一不可
-
-2. **验证班级存在性**
-   - 在配置的科目中查找班级
-
-3. **验证科目存在性**
-   - 检查科目是否在配置中
-
-4. **验证班级-科目关系**
-   - 确认该班级是否开设此科目
-
-5. **验证作业存在性**
-   - 检查作业是否在该科目的作业列表中
-
-6. **生成文件名**
-   - 格式：`{作业名}_{学号}_{姓名}_{时间戳}.{扩展名}`
-   - 时间戳格式：`20060121150405`
-
-7. **确定存储路径**
-   - 路径：`uploads/{科目}/{班级}/{作业}/`
-
-8. **保存文件**
-   - 创建目录（如不存在）
-   - 写入文件
-
-9. **记录日志**
-   - 控制台：`[时间] 班级 学号姓名提交作业作业`
-   - 文件：`cums/logs/cums.log`
-
----
-
-## 📊 4. 获取版本
-
-### 接口信息
-```
-GET /api/v1/version
-```
-
-### 请求参数
-无
-
-### 响应参数
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `version` | string | 版本号 |
-
-### 响应示例
-
-```json
-{
-  "success": true,
-  "version": "2.1.0"
-}
-```
-
----
-
-## 📝 5. 获取更新日志
-
-### 接口信息
-```
-GET /api/v1/changelog
-```
-
-### 请求参数
-无
-
-### 响应参数
-
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `changelog` | string | 更新日志内容（Markdown格式） |
-
-### 响应示例
-
-```json
-{
-  "success": true,
-  "changelog": "# 更新日志\n\n## v1.0.3 (2026-01-21)\n\n### 新增功能\n- 以科目为中心的配置架构\n- 班级下拉选择\n- 启动时显示详细配置信息\n\n### 特性\n- 简洁的登录界面\n- 文件自动重命名\n- 跨平台支持（Windows/Linux/Mac）"
-}
-```
-
----
-
-## ⚠️ 错误处理
-
-### HTTP 状态码
-
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 成功 |
-| 400 | 请求参数错误 |
-| 405 | 请求方法不允许 |
-| 500 | 服务器内部错误 |
-
-### 业务错误码
-
-所有接口统一使用 `success` 字段标识业务成功/失败：
-
-```json
-{
-  "success": false,  // 业务失败
-  "message": "具体错误信息"
-}
-```
-
-### 常见错误信息
-
-| 错误信息 | 原因 | 解决方案 |
-|---------|------|----------|
-| "班级不存在" | 配置中没有该班级 | 检查配置文件 |
-| "科目不存在" | 配置中没有该科目 | 检查配置文件 |
-| "该班级没有此科目" | 班级未开设该科目 | 检查科目配置 |
-| "作业不存在" | 科目中没有该作业 | 检查作业配置 |
-| "学号和姓名不能为空" | 未填写完整 | 填写完整信息 |
-| "缺少必要参数" | 参数缺失 | 检查请求参数 |
-| "请选择要上传的文件" | 未选择文件 | 选择文件后上传 |
-
----
-
-## 🔧 使用示例
-
-### 完整的上传流程
-
-```javascript
-// 1. 加载配置
-const configRes = await fetch('/api/v1/config', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'}
-});
-const configData = (await configRes.json()).data;
-
-// 2. 用户登录
-const loginRes = await fetch('/api/v1/login', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-        class: '一班',
-        student_id: '01',
-        student_name: '张三'
-    })
-});
-const currentUser = (await loginRes.json()).data;
-
-// 3. 上传文件
-const formData = new FormData();
-formData.append('class', currentUser.class);
-formData.append('student_id', currentUser.student_id);
-formData.append('student_name', currentUser.student_name);
-formData.append('subject', '数学');
-formData.append('homework', '第一章作业');
-formData.append('file', fileInput.files[0]);
-
-const uploadRes = await fetch('/api/v1/upload', {
-    method: 'POST',
-    body: formData
-});
-const result = await uploadRes.json();
-
-if (result.success) {
-    console.log('上传成功:', result.filename);
-} else {
-    console.error('上传失败:', result.message);
-}
-```
-
----
-
-## 🔒 6. 管理员登录
-
-### 接口信息
-```
+```http
 POST /api/v1/admin/login
 Content-Type: application/json
 ```
 
-### 请求参数
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `password` | string | 是 | 管理员密码 |
-
-### 请求示例
-
 ```json
-{
-  "password": "admin123"
-}
+{"password":"admin123"}
 ```
 
-### 响应参数
+成功响应直接返回 `token` 字段，后续请求设置 `X-Admin-Token: {token}`。
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `success` | bool | 是否成功 |
-| `message` | string | 提示信息 |
-| `token` | string | 管理员令牌（成功时返回） |
+### 管理员配置
 
-### 成功响应
+读取配置：
 
-```json
-{
-  "success": true,
-  "message": "登录成功",
-  "token": "admin_session_xxxxx"
-}
-```
-
-### 错误响应
-
-功能未启用：
-```json
-{
-  "success": false,
-  "message": "管理员功能未启用"
-}
-```
-
-密码错误：
-```json
-{
-  "success": false,
-  "message": "密码错误"
-}
-```
-
----
-
-## 🛠️ 7. 获取完整配置（管理员）
-
-### 接口信息
-```
+```http
 GET /api/v1/admin/config
-Header: X-Admin-Token: {token}
+X-Admin-Token: admin_xxx
 ```
 
-### 响应示例
+保存完整科目配置：
 
-```json
-{
-  "success": true,
-  "data": {
-    "subjects": {
-      "数学": {
-        "classes": ["一班", "二班"],
-        "homeworks": ["第一章作业", "第二章作业"]
-      }
-    }
-  }
-}
-```
-
----
-
-## ✏️ 8. 更新配置（管理员）
-
-### 接口信息
-```
+```http
 POST /api/v1/admin/config
+X-Admin-Token: admin_xxx
 Content-Type: application/json
-Header: X-Admin-Token: {token}
 ```
-
-### 请求参数
-
-| 参数 | 类型 | 必填 | 说明 |
-|------|------|------|------|
-| `subjects` | object | 是 | 完整的科目配置 |
-
-### 请求示例
 
 ```json
 {
   "subjects": {
     "数学": {
-      "classes": ["一班", "二班", "三班"],
-      "homeworks": ["第一章作业", "第二章作业", "期中测试"]
-    },
-    "语文": {
-      "classes": ["一班"],
-      "homeworks": ["作文"]
+      "classes": ["25计应"],
+      "homeworks": [
+        {"name":"第一章作业", "description":"课后练习", "lessons":[{"name":"第1课时", "description":"本节课介绍函数的基本概念。"}]}
+      ]
     }
   }
 }
 ```
 
-### 响应示例
+### 学生名单管理
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/api/v1/admin/students` | 获取名单，不返回密码 |
+| `POST` | `/api/v1/admin/students/import` | 导入或更新名单 |
+| `POST` | `/api/v1/admin/students/{student_id}/reset` | 重置密码为 `000000` |
+| `DELETE` | `/api/v1/admin/students/{student_id}` | 删除学生并使其令牌失效 |
+| `GET` | `/api/v1/admin/students/template` | 下载 XLSX 名单模板 |
+| `POST` | `/api/v1/admin/students/import-xlsx` | 上传 XLSX 名单并导入 |
+
+导入请求：
 
 ```json
 {
-  "success": true,
-  "message": "配置已更新"
+  "students": [
+    {"student_id":"2025001", "name":"张三", "class":"25计应"},
+    {"student_id":"2025002", "name":"李四", "class":"25计应", "password":"optional-password"}
+  ]
 }
 ```
 
----
+已有学生导入只更新姓名和班级，不覆盖已修改的密码；新学生默认密码为 `000000`。
 
-## 📚 相关文档
+XLSX 导入使用 `multipart/form-data` 的 `file` 字段，第一张工作表按列读取：`学号`、`姓名`、`班级`、`密码（可选）`。首行为表头时自动跳过；密码列为空时使用默认密码 `000000`。
 
-- [配置说明](./CONFIG.md)
-- [快速开始](./README.md)
-- [系统架构](./ARCHITECTURE.md)
+### 科目、班级和作业导入
 
----
+```http
+POST /api/v1/admin/subjects/import
+X-Admin-Token: admin_xxx
+Content-Type: application/json
+```
 
-**文档版本**: v2.1.0
-**更新日期**: 2026-01-26
-**架构**: 以科目为中心
+```json
+{
+  "subjects": [
+    {"subject":"数学", "class":"25计应", "homework":"第一章作业", "description":"课后练习"},
+    {"subject":"数学", "class":"25幼托", "homework":"第一章作业"}
+  ]
+}
+```
+
+同一科目、班级和作业会自动去重；`class`、`homework`、`description` 为可选字段，科目名称必填。
+
+### 课时 Markdown
+
+读取课时：
+
+```http
+GET /api/v1/admin/lesson?subject=数学&homework=第一章作业&lesson=第1课时
+X-Admin-Token: admin_xxx
+```
+
+保存课时：
+
+```http
+POST /api/v1/admin/lesson
+X-Admin-Token: admin_xxx
+Content-Type: application/json
+```
+
+```json
+{
+  "subject":"数学",
+  "homework":"第一章作业",
+  "lesson":"第1课时",
+  "content":"# 函数\n\n本课时内容。",
+  "description":"本节课介绍函数的基本概念。"
+}
+```
+
+Markdown 文件保存在 `lessons/{科目}/{作业}/{课时}.md`。保存时课时不存在会自动追加到对应作业；科目和作业必须已存在，正文最大 4MB。`description` 为课时简介（相关介绍），可选，保存后写入配置，在学生端课时列表和课时内容上方展示。
+
+### 课时媒体上传
+
+```http
+POST /api/v1/admin/lesson/media
+X-Admin-Token: admin_xxx
+Content-Type: multipart/form-data
+```
+
+表单字段为 `subject`、`homework`、`lesson`、`file`。文件最大 64MB，仅允许图片、音视频、常见 Office/PDF 和压缩附件。媒体保存到 `lesson_media/{科目}/{作业}/{课时}/`，成功响应中的 `data.url` 可直接写入 Markdown：
+
+```markdown
+![课程图片](/lesson-media/数学/第一章作业/第1课时/图片.png)
+@[视频](/lesson-media/数学/第一章作业/第1课时/讲解.mp4)
+[下载附件](/lesson-media/数学/第一章作业/第1课时/资料.pdf)
+```
+
+媒体目录由服务端配置为程序目录下的 `lesson_media`，部署时需与程序一起保留。
+
+### 其他管理接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/v1/admin/template/upload` | 上传作业模板 |
+| `GET` | `/api/v1/admin/template/list?subject=数学` | 获取模板列表 |
+| `POST` | `/api/v1/admin/template/delete` | 删除模板 |
+| `GET` | `/api/v1/admin/files` | 查询学生上传文件 |
+| `POST` | `/api/v1/admin/files/delete` | 删除学生上传文件 |
+| `GET` | `/api/v1/admin/stats` | 获取统计数据 |
+| `GET` | `/api/v1/admin/submissions` | 获取提交记录 |
+| `POST` | `/api/v1/admin/password` | 修改管理员密码 |
+| `GET` | `/api/v1/admin/logs` | 获取操作日志 |
+
+所有管理接口都要求 `X-Admin-Token`。模板和上传文件删除接口会校验路径必须位于对应目录内。
+
+## 错误处理
+
+成功响应使用 `success: true`；业务错误使用 `success: false` 和 `message`。常见状态码：
+
+| 状态码 | 含义 |
+|---|---|
+| `200` | 请求成功 |
+| `400` | 参数或文件格式错误 |
+| `401` | 登录失败、令牌缺失或令牌过期 |
+| `403` | 无权访问、管理功能关闭或首次改密未完成 |
+| `404` | 资源不存在 |
+| `500` | 服务端错误 |

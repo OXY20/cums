@@ -14,6 +14,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, fileUrl, type Course, type Lesson, type LessonResource } from '@/api'
 import { formatBytes } from '@/utils/format'
 import RichTextEditor from '@/components/RichTextEditor.vue'
+import CourseHomeworkPanel from '@/components/CourseHomeworkPanel.vue'
 
 const props = defineProps<{ courseId: string }>()
 const router = useRouter()
@@ -24,6 +25,9 @@ const active = ref<Lesson | null>(null)
 const resources = ref<LessonResource[]>([])
 const loading = ref(true)
 const saving = ref(false)
+
+/** 当前标签页：编辑内容 / 查看作业统计 */
+const activeTab = ref<'content' | 'homework'>('content')
 
 /** 正文 HTML，双向绑定到编辑器 */
 const contentHtml = ref('')
@@ -207,8 +211,8 @@ async function uploadForEditor(file: File): Promise<string> {
 
   uploadProgress.value = 0
   try {
-    const resource = await api.uploadLessonResource(active.value.id, file, (percent) => {
-      uploadProgress.value = percent
+    const resource = await api.uploadLessonResource(active.value.id, file, (info) => {
+      uploadProgress.value = info.percent
     })
     resources.value.push(resource)
     dirty.value = true
@@ -236,8 +240,8 @@ function pickAttachment() {
       if (!active.value) return
       uploadProgress.value = 0
       try {
-        const resource = await api.uploadLessonResource(active.value.id, file, (percent) => {
-          uploadProgress.value = percent
+        const resource = await api.uploadLessonResource(active.value.id, file, (info) => {
+          uploadProgress.value = info.percent
         })
         resources.value.push(resource)
         ElMessage.success(`${file.name} 已上传为附件`)
@@ -278,38 +282,58 @@ function openFile(resourceId: number | null) {
 <template>
   <div>
     <el-button link @click="router.push('/admin/courses')">← 返回课程列表</el-button>
-    <h1 class="page-title">{{ course?.title || '课程' }}</h1>
-    <p class="page-subtitle">{{ course?.description || '暂无课程简介' }}</p>
+    <!-- 标题体现「课程 · 课时」层级，与学生端保持一致 -->
+    <h1 class="page-title">
+      {{ course?.title || '课程' }}
+      <template v-if="active">
+        <span class="title-sep">·</span>
+        <span class="title-lesson">{{ active.title }}</span>
+      </template>
+    </h1>
+    <p class="page-subtitle">
+      <template v-if="active">
+        第 {{ active.sort_order }} 课时
+        <span class="subtitle-sep">｜</span>
+      </template>
+      {{ course?.description || '暂无课程简介' }}
+    </p>
 
     <div v-if="loading" class="card empty-state">正在加载…</div>
 
-    <div v-else class="editor-layout">
-      <!-- 课时列表 -->
-      <aside class="card">
-        <div style="display: flex; align-items: center; justify-content: space-between">
-          <strong>课时列表</strong>
-          <el-button size="small" type="primary" @click="addLesson">新增</el-button>
-        </div>
+    <!--
+      两个视角：编辑课时内容 / 查看作业提交情况。
+      课程详情是教师进入某门课的入口，既可能来改内容，也可能来查作业收齐没，
+      因此用标签页分开，避免作业统计挤占编辑区。
+    -->
+    <el-tabs v-if="!loading" v-model="activeTab" class="course-tabs">
+      <el-tab-pane label="课时内容" name="content">
+        <div class="editor-layout">
+          <!-- 课时列表 -->
+          <aside class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between">
+              <strong>课时列表</strong>
+              <el-button size="small" type="primary" @click="addLesson">新增</el-button>
+            </div>
 
-        <div v-if="lessons.length === 0" class="empty-state" style="padding: 18px">
-          暂无课时，点击「新增」开始。
-        </div>
+            <div v-if="lessons.length === 0" class="empty-state" style="padding: 18px">
+              暂无课时，点击「新增」开始。
+            </div>
 
-        <div
-          v-for="lesson in lessons"
-          :key="lesson.id"
-          class="lesson-row"
-          :class="{ 'lesson-row--active': active?.id === lesson.id }"
-          @click="select(lesson)"
-        >
-          <span class="lesson-row__title">第 {{ lesson.sort_order }} 课时 · {{ lesson.title }}</span>
-          <span class="lesson-row__actions" @click.stop>
-            <el-button link size="small" title="上移" @click="moveLesson(lesson, -1)">↑</el-button>
-            <el-button link size="small" title="下移" @click="moveLesson(lesson, 1)">↓</el-button>
-            <el-button link size="small" title="重命名" @click="renameLesson(lesson)">改</el-button>
-            <el-button link size="small" type="danger" title="删除" @click="removeLesson(lesson)">
-              删
-            </el-button>
+            <div
+              v-for="lesson in lessons"
+              :key="lesson.id"
+              class="lesson-row"
+              :class="{ 'lesson-row--active': active?.id === lesson.id }"
+              @click="select(lesson)"
+            >
+              <span class="lesson-row__title">第 {{ lesson.sort_order }} 课时 · {{ lesson.title }}</span>
+              <span class="lesson-row__actions" @click.stop>
+                <el-button link size="small" title="上移" @click="moveLesson(lesson, -1)">↑</el-button>
+                <el-button link size="small" title="下移" @click="moveLesson(lesson, 1)">↓</el-button>
+                <el-button link size="small" title="重命名" @click="renameLesson(lesson)">改</el-button>
+                <el-button link size="small" type="danger" title="删除" @click="removeLesson(lesson)">
+                  删
+                </el-button>
           </span>
         </div>
       </aside>
@@ -317,8 +341,9 @@ function openFile(resourceId: number | null) {
       <!-- 课时内容 -->
       <section class="card">
         <template v-if="active">
+          <!-- 课时名已提升到页面顶部，这里只保留序号与保存操作 -->
           <div class="editor-head">
-            <h2 style="margin: 0; font-size: 17px">{{ active.title }}</h2>
+            <span class="editor-head__label">第 {{ active.sort_order }} 课时</span>
             <div>
               <el-tag v-if="dirty" size="small" type="warning" style="margin-right: 8px">
                 未保存
@@ -378,11 +403,23 @@ function openFile(resourceId: number | null) {
 
         <div v-else class="empty-state">请从左侧选择一个课时，或先新增课时。</div>
       </section>
-    </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="作业统计" name="homework">
+        <div class="card">
+          <CourseHomeworkPanel v-if="courseId" :course-id="courseId" />
+        </div>
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <style scoped>
+.course-tabs {
+  margin-top: 8px;
+}
+
 .editor-layout {
   display: grid;
   grid-template-columns: 280px 1fr;
@@ -429,6 +466,30 @@ function openFile(resourceId: number | null) {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.editor-head__label {
+  font-size: 12px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+/* 标题层级：课程名 · 课时名 */
+.title-sep {
+  margin: 0 6px;
+  color: var(--text-sub);
+  font-weight: 400;
+}
+
+.title-lesson {
+  font-weight: 600;
+}
+
+.subtitle-sep {
+  margin: 0 4px;
+  color: var(--border-color);
 }
 
 .editor-hint {

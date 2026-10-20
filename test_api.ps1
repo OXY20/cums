@@ -1,232 +1,179 @@
-﻿# CUMS Rust API Test Script
-# Usage: .\test_api.ps1
-# Prerequisite: Server running at http://localhost:3000
+# CUMS Rust API 冒烟测试
+# 使用前先启动服务：cargo run
 
 Add-Type -AssemblyName System.Net.Http
 
 $BaseUrl = "http://localhost:3000"
 $Pass = 0
 $Fail = 0
+$AdminToken = ""
+$StudentToken = ""
+$TestStudentId = "__cums_api_test_$([DateTime]::Now.ToString('yyyyMMddHHmmssfff'))"
+$TestUploadPath = ""
+$TemplatePath = ""
+$OriginalSubjects = $null
+$SubjectName = ""
+$HomeworkName = ""
+$ClassName = ""
 
-function Test-JsonEndpoint {
-    param([string]$Name, [string]$Method="GET", [string]$Path, [object]$Body=$null, [string]$Token="", [int]$Expect=200)
-    Write-Host ""
-    Write-Host "--- $Name ---" -ForegroundColor Cyan
-    $url = "$BaseUrl$Path"
+function Get-StatusCode($exception) {
+    try { return [int]$exception.Exception.Response.StatusCode.value__ } catch { return 0 }
+}
+
+function Invoke-JsonRequest {
+    param(
+        [string]$Method = "GET",
+        [string]$Path,
+        [object]$Body = $null,
+        [string]$AdminToken = "",
+        [string]$StudentToken = ""
+    )
     $headers = @{}
-    if ($Token -ne "") { $headers["X-Admin-Token"] = $Token }
-    
+    if ($AdminToken) { $headers["X-Admin-Token"] = $AdminToken }
+    if ($StudentToken) { $headers["X-Student-Token"] = $StudentToken }
     try {
-        if ($Method -eq "GET") {
-            $response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers -ContentType "application/json; charset=utf-8"
+        if ($Method -eq "GET" -or $Method -eq "DELETE") {
+            $response = Invoke-WebRequest -Uri "$BaseUrl$Path" -Method $Method -Headers $headers -UseBasicParsing
         } else {
-            $jsonBody = $Body | ConvertTo-Json -Compress -Depth 10
-            $response = Invoke-RestMethod -Uri $url -Method Post -Headers $headers -ContentType "application/json; charset=utf-8" -Body ([System.Text.Encoding]::UTF8.GetBytes($jsonBody))
+            $json = $Body | ConvertTo-Json -Compress -Depth 20
+            $response = Invoke-WebRequest -Uri "$BaseUrl$Path" -Method $Method -Headers $headers -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($json)) -UseBasicParsing
         }
-        $bodyStr = $response | ConvertTo-Json -Compress
-        $statusCode = 200
+        $json = $null
+        if ($response.Content -and $response.Content.TrimStart().StartsWith("{")) { try { $json = $response.Content | ConvertFrom-Json } catch {} }
+        return @{ StatusCode = [int]$response.StatusCode; Body = $response.Content; Json = $json }
     } catch {
-        $statusCode = $_.Exception.Response.StatusCode.value__
-        if (-not $statusCode) { $statusCode = 0 }
-        try {
-            $reader = [System.IO.StreamReader]::new($_.Exception.Response.GetResponseStream())
-            $bodyStr = $reader.ReadToEnd()
-            $reader.Close()
-        } catch {
-            $bodyStr = $_.Exception.Message
-        }
+        $status = Get-StatusCode $_
+        $body = ""
+        try { $body = $_.Exception.Response.Content.ReadAsStringAsync().Result } catch { $body = $_.Exception.Message }
+        $json = $null
+        try { $json = $body | ConvertFrom-Json } catch {}
+        return @{ StatusCode = $status; Body = $body; Json = $json }
     }
-    
-    $ok = ($statusCode -eq $Expect)
-    if ($ok) { $script:Pass++ } else { $script:Fail++ }
-    
-    $color = if ($ok) { "Green" } else { "Red" }
-    Write-Host "  Status: $statusCode (expected $Expect)" -ForegroundColor $color
-    if ($bodyStr.Length -gt 200) { Write-Host "  Body: $($bodyStr.Substring(0,200))..." } else { Write-Host "  Body: $bodyStr" }
-    Write-Host "  Result: $(if($ok){'PASS'}else{'FAIL'})" -ForegroundColor $color
-    return $response
 }
 
-function Test-GetEndpoint {
-    param([string]$Name, [string]$Path, [int]$Expect=200)
-    Write-Host ""
-    Write-Host "--- $Name ---" -ForegroundColor Cyan
-    $url = "$BaseUrl$Path"
-    
-    try {
-        $result = Invoke-WebRequest -Uri $url -Method Get -UseBasicParsing
-        $statusCode = [int]$result.StatusCode
-        $body = $result.Content
-    } catch {
-        $statusCode = [int]$_.Exception.Response.StatusCode.value__
-        try {
-            $reader = [System.IO.StreamReader]::new($_.Exception.Response.GetResponseStream())
-            $body = $reader.ReadToEnd()
-            $reader.Close()
-        } catch {
-            $body = $_.Exception.Message
-        }
-    }
-    
-    $ok = ($statusCode -eq $Expect)
+function Test-Endpoint {
+    param(
+        [string]$Name,
+        [string]$Method = "GET",
+        [string]$Path,
+        [object]$Body = $null,
+        [int]$Expect = 200,
+        [string]$AdminToken = "",
+        [string]$StudentToken = ""
+    )
+    $result = Invoke-JsonRequest -Method $Method -Path $Path -Body $Body -AdminToken $AdminToken -StudentToken $StudentToken
+    $ok = $result.StatusCode -eq $Expect
     if ($ok) { $script:Pass++ } else { $script:Fail++ }
-    
     $color = if ($ok) { "Green" } else { "Red" }
-    Write-Host "  Status: $statusCode (expected $Expect)" -ForegroundColor $color
-    if ($body.Length -gt 200) { Write-Host "  Body: $($body.Substring(0,200))..." } else { Write-Host "  Body: $body" }
-    Write-Host "  Result: $(if($ok){'PASS'}else{'FAIL'})" -ForegroundColor $color
+    Write-Host "[$(if($ok){'通过'}else{'失败'})] $Name：$($result.StatusCode)（期望 $Expect）" -ForegroundColor $color
+    if ($result.Body -and $result.Body.Length -gt 240) { Write-Host "  $($result.Body.Substring(0,240))..." } else { Write-Host "  $($result.Body)" }
+    return $result
 }
 
-# Multipart 上传辅助函数（使用 HttpClient 正确处理 UTF-8 编码）
 function Send-MultipartUpload {
     param(
-        [string]$Uri,
+        [string]$Path,
         [hashtable]$Fields,
-        [string]$FilePath = "",
-        [string]$FileFieldName = "file",
-        [string]$Token = ""
+        [string]$FilePath,
+        [string]$AdminToken = "",
+        [string]$StudentToken = ""
     )
-    
-    $httpClient = [System.Net.Http.HttpClient]::new()
+    $client = [Net.Http.HttpClient]::new()
     try {
-        if ($Token -ne "") {
-            $httpClient.DefaultRequestHeaders.Add("X-Admin-Token", $Token)
-        }
-        
-        $content = [System.Net.Http.MultipartFormDataContent]::new()
-        
+        if ($AdminToken) { $client.DefaultRequestHeaders.Add("X-Admin-Token", $AdminToken) }
+        if ($StudentToken) { $client.DefaultRequestHeaders.Add("X-Student-Token", $StudentToken) }
+        $content = [Net.Http.MultipartFormDataContent]::new()
         foreach ($key in $Fields.Keys) {
-            $fieldContent = [System.Net.Http.StringContent]::new($Fields[$key], [System.Text.Encoding]::UTF8, "text/plain")
-            $content.Add($fieldContent, $key)
+            $content.Add([Net.Http.StringContent]::new([string]$Fields[$key], [Text.Encoding]::UTF8, "text/plain"), $key)
         }
-        
-        if ($FilePath -ne "") {
-            $fileBytes = [System.IO.File]::ReadAllBytes($FilePath)
-            $fileContent = [System.Net.Http.ByteArrayContent]::new($fileBytes)
-            $fileName = [System.IO.Path]::GetFileName($FilePath)
-            $content.Add($fileContent, $FileFieldName, $fileName)
-        }
-        
-        $response = $httpClient.PostAsync($Uri, $content).Result
-        $statusCode = [int]$response.StatusCode
+        $bytes = [IO.File]::ReadAllBytes($FilePath)
+        $content.Add([Net.Http.ByteArrayContent]::new($bytes), "file", [IO.Path]::GetFileName($FilePath))
+        $response = $client.PostAsync("$BaseUrl$Path", $content).Result
         $body = $response.Content.ReadAsStringAsync().Result
-        return @{StatusCode=$statusCode; Body=$body}
+        $json = $null
+        try { $json = $body | ConvertFrom-Json } catch {}
+        return @{ StatusCode = [int]$response.StatusCode; Body = $body; Json = $json }
     } finally {
-        $httpClient.Dispose()
+        $client.Dispose()
     }
 }
 
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Yellow
-Write-Host "  CUMS Rust API Full Test" -ForegroundColor Yellow
-Write-Host "  Target: $BaseUrl" -ForegroundColor Yellow
-Write-Host "========================================" -ForegroundColor Yellow
+Write-Host "开始测试：$BaseUrl" -ForegroundColor Cyan
+try {
+    Test-Endpoint -Name "学生端首页" -Path "/"
+    Test-Endpoint -Name "管理员页面" -Path "/admin"
+    Test-Endpoint -Name "版本接口" -Path "/api/v1/version"
+    Test-Endpoint -Name "配置接口" -Path "/api/v1/config"
+    Test-Endpoint -Name "缺少学生名单时登录失败" -Method POST -Path "/api/v1/login" -Body @{ student_id = "__missing__"; password = "000000" } -Expect 401
 
-# 1. Index page
-Test-GetEndpoint -Name "1. GET / - Index page" -Path "/"
+    $adminLogin = Test-Endpoint -Name "管理员登录" -Method POST -Path "/api/v1/admin/login" -Body @{ password = "admin123" }
+    if ($adminLogin.Json.token) { $AdminToken = $adminLogin.Json.token }
+    Test-Endpoint -Name "管理员错误密码" -Method POST -Path "/api/v1/admin/login" -Body @{ password = "wrong" } -Expect 401
+    Test-Endpoint -Name "管理员配置读取" -Path "/api/v1/admin/config" -AdminToken $AdminToken
+    Test-Endpoint -Name "未授权管理员请求" -Path "/api/v1/admin/config" -AdminToken "bad_token" -Expect 401
 
-# 2. Version
-Test-JsonEndpoint -Name "2. GET /api/v1/version" -Path "/api/v1/version"
+    $configResult = Invoke-JsonRequest -Path "/api/v1/admin/config" -AdminToken $AdminToken
+    if ($configResult.Json.data.subjects.PSObject.Properties.Count -gt 0) {
+        $subjectProperty = $configResult.Json.data.subjects.PSObject.Properties | Select-Object -First 1
+        $SubjectName = $subjectProperty.Name
+        $subjectConfig = $subjectProperty.Value
+        if ($subjectConfig.classes.Count -gt 0) { $ClassName = [string]$subjectConfig.classes[0] }
+        if ($subjectConfig.homeworks.Count -gt 0) {
+            $homeworkItem = $subjectConfig.homeworks[0]
+            $HomeworkName = if ($homeworkItem -is [string]) { $homeworkItem } else { [string]$homeworkItem.name }
+        }
+        $OriginalSubjects = $configResult.Json.data.subjects
+    }
 
-# 3. Changelog
-Test-JsonEndpoint -Name "3. GET /api/v1/changelog" -Path "/api/v1/changelog"
-
-# 4. Config
-Test-JsonEndpoint -Name "4. GET /api/v1/config" -Path "/api/v1/config"
-
-# 5. Login success (use actual class from config.json: "25计应")
-Test-JsonEndpoint -Name "5. POST /api/v1/login (success)" -Method POST -Path "/api/v1/login" -Body @{class="25计应"; student_id="001"; student_name="测试学生"}
-
-# 6. Login - class not found
-Test-JsonEndpoint -Name "6. POST /api/v1/login (class not found)" -Method POST -Path "/api/v1/login" -Body @{class="XX"; student_id="001"; student_name="test"} -Expect 400
-
-# 7. Login - empty student_id
-Test-JsonEndpoint -Name "7. POST /api/v1/login (empty id)" -Method POST -Path "/api/v1/login" -Body @{class="25计应"; student_id=""; student_name="test"} -Expect 400
-
-# 8. Admin page
-Test-GetEndpoint -Name "8. GET /admin" -Path "/admin"
-
-# 9. Admin login
-$loginResp = Test-JsonEndpoint -Name "9. POST /api/v1/admin/login" -Method POST -Path "/api/v1/admin/login" -Body @{password="admin123"}
-$token = ""
-if ($loginResp) {
-    $token = $loginResp.token
-    Write-Host "  [Token] $token" -ForegroundColor Magenta
-}
-
-# 10. Admin login - wrong password
-Test-JsonEndpoint -Name "10. POST /api/v1/admin/login (wrong pwd)" -Method POST -Path "/api/v1/admin/login" -Body @{password="wrong"} -Expect 401
-
-# 11. Admin config GET
-if ($token -ne "") {
-    Test-JsonEndpoint -Name "11. GET /api/v1/admin/config" -Path "/api/v1/admin/config" -Token $token
-} else { Write-Host "`n--- SKIP: 11 (no token) ---" -ForegroundColor Yellow }
-
-# 12. Admin config - unauthorized
-Test-JsonEndpoint -Name "12. GET /api/v1/admin/config (unauthorized)" -Path "/api/v1/admin/config" -Token "bad_token" -Expect 401
-
-# 13. File upload (multipart) - use actual subject/class/homework from config.json
-Write-Host ""
-Write-Host "--- 13. POST /api/v1/upload (multipart) ---" -ForegroundColor Cyan
-$testFile = Join-Path $env:TEMP "test_upload.txt"
-"Test file content for CUMS" | Out-File -FilePath $testFile -Encoding utf8 -Force
-$uploadResp = Send-MultipartUpload -Uri "$BaseUrl/api/v1/upload" -Fields @{class="25计应"; student_id="001"; student_name="test"; subject="文字处理"; homework="WT16"} -FilePath $testFile
-$uploadStatus = [string]$uploadResp.StatusCode
-$uploadBody = $uploadResp.Body
-$uploadOk = ($uploadStatus -eq "200")
-if ($uploadOk) { $script:Pass++ } else { $script:Fail++ }
-Write-Host "  Status: $uploadStatus" -ForegroundColor $(if($uploadOk){"Green"}else{"Red"})
-Write-Host "  Body: $uploadBody"
-Write-Host "  Result: $(if($uploadOk){'PASS'}else{'FAIL'})" -ForegroundColor $(if($uploadOk){"Green"}else{"Red"})
-
-# 14. Admin config POST
-if ($token -ne "") {
-    $configBody = @{
-        subjects = @{
-            "文字处理" = @{
-                classes = @("25计应", "25幼托")
-                homeworks = @(@{name="WT16"})
-            }
+    if ($ClassName) {
+        $studentImport = @{ students = @(@{ student_id = $TestStudentId; name = "接口测试学生"; class = $ClassName }) }
+        Test-Endpoint -Name "导入临时学生" -Method POST -Path "/api/v1/admin/students/import" -Body $studentImport -AdminToken $AdminToken
+        $studentLogin = Test-Endpoint -Name "默认密码登录" -Method POST -Path "/api/v1/login" -Body @{ student_id = $TestStudentId; password = "000000" }
+        if ($studentLogin.Json.data.token) { $StudentToken = $studentLogin.Json.data.token }
+        $testFile = Join-Path $env:TEMP "cums_api_test.txt"
+        "CUMS API test" | Out-File -FilePath $testFile -Encoding utf8 -Force
+        $initialUpload = Send-MultipartUpload -Path "/api/v1/upload" -Fields @{ subject = $SubjectName; homework = $HomeworkName } -FilePath $testFile -StudentToken $StudentToken
+        $initialUploadOk = $initialUpload.StatusCode -eq 403
+        if ($initialUploadOk) { $script:Pass++ } else { $script:Fail++ }
+        Write-Host "[$(if($initialUploadOk){'通过'}else{'失败'})] 初始密码禁止上传：$($initialUpload.StatusCode)（期望 403）" -ForegroundColor $(if($initialUploadOk){"Green"}else{"Red"})
+    }
+    if ($StudentToken) {
+        Test-Endpoint -Name "学生修改初始密码" -Method POST -Path "/api/v1/student/password" -Body @{ old_password = "000000"; new_password = "cums-test-password" } -StudentToken $StudentToken
+        $studentLogin = Test-Endpoint -Name "新密码登录" -Method POST -Path "/api/v1/login" -Body @{ student_id = $TestStudentId; password = "cums-test-password" }
+        if ($studentLogin.Json.data.token) { $StudentToken = $studentLogin.Json.data.token }
+    }
+    if ($SubjectName -and $HomeworkName -and $ClassName) {
+        $testFile = Join-Path $env:TEMP "cums_api_test.txt"
+        "CUMS API test" | Out-File -FilePath $testFile -Encoding utf8 -Force
+        $upload = Send-MultipartUpload -Path "/api/v1/upload" -Fields @{ subject = $SubjectName; homework = $HomeworkName } -FilePath $testFile -StudentToken $StudentToken
+        $uploadOk = $upload.StatusCode -eq 200
+        if ($uploadOk) { $script:Pass++ } else { $script:Fail++ }
+        Write-Host "[$(if($uploadOk){'通过'}else{'失败'})] 修改密码后上传：$($upload.StatusCode)（期望 200）" -ForegroundColor $(if($uploadOk){"Green"}else{"Red"})
+        $files = Invoke-JsonRequest -Path ("/api/v1/admin/files?subject=" + [Uri]::EscapeDataString($SubjectName) + "&class=" + [Uri]::EscapeDataString($ClassName) + "&homework=" + [Uri]::EscapeDataString($HomeworkName)) -AdminToken $AdminToken
+        if ($files.Json.data.files) {
+            $testUpload = $files.Json.data.files | Where-Object { $_.name -like "*$TestStudentId*" } | Select-Object -First 1
+            if ($testUpload) { $TestUploadPath = $testUpload.path }
         }
     }
-    Test-JsonEndpoint -Name "14. POST /api/v1/admin/config" -Method POST -Path "/api/v1/admin/config" -Body $configBody -Token $token
-} else { Write-Host "`n--- SKIP: 14 (no token) ---" -ForegroundColor Yellow }
 
-# 15. Template download - not found
-Test-JsonEndpoint -Name "15. GET /api/v1/template (not found)" -Path "/api/v1/template?file=templates/noexist.txt" -Expect 404
+    if ($OriginalSubjects) {
+        Test-Endpoint -Name "管理员配置原样保存" -Method POST -Path "/api/v1/admin/config" -Body @{ subjects = $OriginalSubjects } -AdminToken $AdminToken
+    }
 
-# 16. Template download - illegal path
-Test-JsonEndpoint -Name "16. GET /api/v1/template (illegal)" -Path "/api/v1/template?file=../etc/passwd" -Expect 403
+    if ($AdminToken -and $SubjectName -and $HomeworkName) {
+        $templateFile = Join-Path $env:TEMP "cums_api_template.txt"
+        "CUMS template test" | Out-File -FilePath $templateFile -Encoding utf8 -Force
+        $template = Send-MultipartUpload -Path "/api/v1/admin/template/upload" -Fields @{ subject = $SubjectName; homework = $HomeworkName } -FilePath $templateFile -AdminToken $AdminToken
+        $templateOk = $template.StatusCode -eq 200
+        if ($templateOk) { $script:Pass++ } else { $script:Fail++ }
+        Write-Host "[$(if($templateOk){'通过'}else{'失败'})] 模板上传：$($template.StatusCode)（期望 200）" -ForegroundColor $(if($templateOk){"Green"}else{"Red"})
+        if ($template.Json.data.path) { $TemplatePath = $template.Json.data.path }
+    }
+} finally {
+    if ($AdminToken -and $TestUploadPath) { Test-Endpoint -Name "清理测试上传文件" -Method POST -Path "/api/v1/admin/files/delete" -Body @{ path = $TestUploadPath } -AdminToken $AdminToken | Out-Null }
+    if ($AdminToken -and $TemplatePath) { Test-Endpoint -Name "清理测试模板" -Method POST -Path "/api/v1/admin/template/delete" -Body @{ path = $TemplatePath } -AdminToken $AdminToken | Out-Null }
+    if ($AdminToken) { Test-Endpoint -Name "删除临时学生" -Method DELETE -Path ("/api/v1/admin/students/" + [Uri]::EscapeDataString($TestStudentId)) -AdminToken $AdminToken | Out-Null }
+}
 
-# 17. Template upload (admin)
-if ($token -ne "") {
-    Write-Host ""
-    Write-Host "--- 17. POST /api/v1/admin/template/upload ---" -ForegroundColor Cyan
-    $tplFile = Join-Path $env:TEMP "test_template.txt"
-    "Template test content" | Out-File -FilePath $tplFile -Encoding utf8 -Force
-    $tplResp = Send-MultipartUpload -Uri "$BaseUrl/api/v1/admin/template/upload" -Fields @{subject="文字处理"; homework="WT16"} -FilePath $tplFile -Token $token
-    $tplStatus = [string]$tplResp.StatusCode
-    $tplBody = $tplResp.Body
-    $tplOk = ($tplStatus -eq "200")
-    if ($tplOk) { $script:Pass++ } else { $script:Fail++ }
-    Write-Host "  Status: $tplStatus" -ForegroundColor $(if($tplOk){"Green"}else{"Red"})
-    Write-Host "  Body: $tplBody"
-    Write-Host "  Result: $(if($tplOk){'PASS'}else{'FAIL'})" -ForegroundColor $(if($tplOk){"Green"}else{"Red"})
-    # 提取上传路径用于测试 18 删除
-    $tplPath = ""
-    try { $tplJson = $tplBody | ConvertFrom-Json; $tplPath = $tplJson.data.path } catch {}
-} else { Write-Host "`n--- SKIP: 17 (no token) ---" -ForegroundColor Yellow }
-
-# 18. Template delete (admin)
-if ($token -ne "") {
-    $deletePath = if ($tplPath -ne "") { $tplPath } else { "templates/文字处理/test_template.txt" }
-    Test-JsonEndpoint -Name "18. POST /api/v1/admin/template/delete" -Method POST -Path "/api/v1/admin/template/delete" -Body @{path=$deletePath} -Token $token
-} else { Write-Host "`n--- SKIP: 18 (no token) ---" -ForegroundColor Yellow }
-
-# Summary
-Write-Host ""
-Write-Host "========================================" -ForegroundColor Yellow
-Write-Host "  RESULTS: Pass=$Pass  Fail=$Fail  Total=$($Pass+$Fail)" -ForegroundColor Yellow
-Write-Host "========================================" -ForegroundColor Yellow
-if ($Fail -eq 0) { Write-Host "  ALL TESTS PASSED!" -ForegroundColor Green }
-else { Write-Host "  $Fail TEST(S) FAILED!" -ForegroundColor Red }
+Write-Host "完成：通过 $Pass，失败 $Fail" -ForegroundColor $(if($Fail -eq 0){"Green"}else{"Red"})
+if ($Fail -gt 0) { exit 1 }

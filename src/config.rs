@@ -12,6 +12,7 @@ pub struct AppState {
     pub base_dir: PathBuf,
     pub upload_dir: PathBuf,
     pub admin_tokens: RwLock<HashMap<String, chrono::DateTime<chrono::Local>>>,
+    pub student_tokens: RwLock<HashMap<String, (String, chrono::DateTime<chrono::Local>)>>,
     pub op_logs: RwLock<Vec<OperationLog>>,
 }
 
@@ -30,6 +31,7 @@ impl AppState {
             base_dir,
             upload_dir,
             admin_tokens: RwLock::new(HashMap::new()),
+            student_tokens: RwLock::new(HashMap::new()),
             op_logs: RwLock::new(Vec::new()),
         }
     }
@@ -52,6 +54,24 @@ impl AppState {
         let mut tokens = self.admin_tokens.write().unwrap();
         let now = chrono::Local::now();
         tokens.retain(|_, expiry| &now < expiry);
+
+        let mut student_tokens = self.student_tokens.write().unwrap();
+        student_tokens.retain(|_, (_, expiry)| &now < expiry);
+    }
+
+    /// 验证学生令牌并返回学生编号。
+    pub fn validate_student_token(&self, token: &str) -> Option<String> {
+        if token.is_empty() {
+            return None;
+        }
+        let tokens = self.student_tokens.read().unwrap();
+        tokens.get(token).and_then(|(student_id, expiry)| {
+            if chrono::Local::now() < *expiry {
+                Some(student_id.clone())
+            } else {
+                None
+            }
+        })
     }
 
     /// 记录操作日志
@@ -73,7 +93,11 @@ impl AppState {
     /// 获取操作日志（最近 count 条）
     pub fn get_op_logs(&self, count: usize) -> Vec<OperationLog> {
         let logs = self.op_logs.read().unwrap();
-        let start = if logs.len() > count { logs.len() - count } else { 0 };
+        let start = if logs.len() > count {
+            logs.len() - count
+        } else {
+            0
+        };
         logs[start..].to_vec()
     }
 }
@@ -110,6 +134,8 @@ fn init_upload_dirs(base_dir: &Path, config: &Config) -> std::io::Result<()> {
     // 确保其他必要目录存在
     std::fs::create_dir_all(base_dir.join("logs"))?;
     std::fs::create_dir_all(base_dir.join("templates"))?;
+    std::fs::create_dir_all(base_dir.join("lessons"))?;
+    std::fs::create_dir_all(base_dir.join("lesson_media"))?;
 
     Ok(())
 }
@@ -119,11 +145,15 @@ pub fn load_config() -> Result<Config, String> {
     let base_dir = get_base_dir();
     let config_path = base_dir.join("config.json");
 
-    let data = std::fs::read_to_string(&config_path)
-        .map_err(|_| format!("配置文件不存在 {}\n请确认config.json与程序在同一目录", config_path.display()))?;
+    let data = std::fs::read_to_string(&config_path).map_err(|_| {
+        format!(
+            "配置文件不存在 {}\n请确认config.json与程序在同一目录",
+            config_path.display()
+        )
+    })?;
 
-    let config: Config = serde_json::from_str(&data)
-        .map_err(|e| format!("解析配置文件失败: {}", e))?;
+    let config: Config =
+        serde_json::from_str(&data).map_err(|e| format!("解析配置文件失败: {}", e))?;
 
     if config.version.is_empty() {
         return Err("配置文件缺少版本号(version)".to_string());
@@ -135,11 +165,10 @@ pub fn load_config() -> Result<Config, String> {
 /// 保存配置到文件
 pub fn save_config(config: &Config, base_dir: &Path) -> Result<(), String> {
     let config_path = base_dir.join("config.json");
-    let data = serde_json::to_string_pretty(config)
-        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    let data =
+        serde_json::to_string_pretty(config).map_err(|e| format!("序列化配置失败: {}", e))?;
 
-    std::fs::write(&config_path, data)
-        .map_err(|e| format!("写入配置文件失败: {}", e))?;
+    std::fs::write(&config_path, data).map_err(|e| format!("写入配置文件失败: {}", e))?;
 
     Ok(())
 }

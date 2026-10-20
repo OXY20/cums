@@ -40,20 +40,8 @@ function handleLogout() {
     <header class="app-header">
       <div class="app-header__inner">
         <div class="app-header__brand" @click="router.push('/student')">
-          <!-- SVG 图标：建设方案要求使用 SVG，不使用 emoji -->
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path
-              d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 1 4 15.5v-10Z"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linejoin="round"
-            />
-            <path
-              d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h4.5a1.5 1.5 0 0 0 1.5-1.5v-10Z"
-              stroke="currentColor"
-              stroke-width="1.6"
-              stroke-linejoin="round"
-            />
+          <svg class="app-header__brand-logo" viewBox="0 0 256 256" aria-hidden="true">
+            <path fill="#7c8bf8" d="M128 40L172 88L146 88L146 122L110 122L110 88L84 88ZM46 118L210 118L210 210Q178 220 128 220Q78 220 46 210Z"/>
           </svg>
           <span>机房教学资源平台</span>
         </div>
@@ -134,6 +122,12 @@ function handleLogout() {
   font-weight: 600;
   color: var(--brand);
   cursor: pointer;
+}
+
+.app-header__brand-logo {
+  width: 26px;
+  height: 26px;
+  display: block;
 }
 
 .app-header__nav {

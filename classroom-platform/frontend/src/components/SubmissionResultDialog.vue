@@ -47,7 +47,7 @@ function downloadAll() {
 <template>
   <el-dialog v-model="visible" title="作业已提交" width="760px" top="6vh">
     <div v-if="detail" class="result">
-      <!-- 重复提交提示 -->
+      <!-- 重复提交提示：不指名道姓，避免暴露其他同学的提交信息 -->
       <el-alert
         v-if="isDuplicate"
         type="warning"
@@ -55,9 +55,8 @@ function downloadAll() {
         show-icon
         class="result__alert"
       >
-        <template #title>本次提交被标记为重复</template>
-        本节课本班级已有提交（{{ detail.duplicate_of_name || '其他同学' }}，编号
-        {{ detail.duplicate_of }}），你的提交已保存并标记，教师可在后台核对。
+        <template #title>本次提交已标记为重复</template>
+        本节课该设备或本班已有提交，你的这次提交已保存，教师可在后台核对每次记录。
       </el-alert>
 
       <!-- 提交信息 -->

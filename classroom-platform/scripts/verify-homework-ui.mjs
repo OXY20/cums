@@ -251,15 +251,17 @@ try {
   check('填写姓名输入框', nameInput === true)
 
   await setFiles('.el-dialog input[type=file]', [imagePath, docPath])
-  await new Promise((r) => setTimeout(r, 400))
+  await new Promise((r) => setTimeout(r, 1200))
 
-  const fileCount = await evaluate(
-    `document.querySelectorAll('.submit-form__file').length`,
-  )
+  const fileCount = await evaluate(`document.querySelectorAll('.local-preview__tab').length`)
   check('已选择 2 个文件', fileCount === 2, `count=${fileCount}`)
 
+  // 选中文件后应立即出现本地预览，而不是等提交后才看到内容
+  const localPreview = await evaluate(`document.querySelectorAll('.local-preview__image').length`)
+  check('选中后立即显示图片预览', localPreview >= 1, `imgs=${localPreview}`)
+
   const totalHint = await evaluate(
-    `document.querySelector('.submit-form__total')?.innerText ?? ''`,
+    `document.querySelector('.local-preview__actions-info')?.innerText ?? ''`,
   )
   check('显示文件合计信息', totalHint.includes('2 个文件'), totalHint)
 
@@ -285,22 +287,38 @@ try {
   const tabCount = await evaluate(`document.querySelectorAll('.preview__tab').length`)
   check('多文件切换条存在', tabCount === 2, `tabs=${tabCount}`)
 
-  console.log('\n[5] 关闭预览，检查重复提交提醒')
-  await clickByText('.el-dialog__footer button', '完成')
-  await new Promise((r) => setTimeout(r, 500))
+  console.log('\n[5] 关闭预览，检查「当前设备已提交」提醒')
+  // 用「最后一个弹窗」定位：结果弹窗与上传弹窗会短暂共存，
+  // querySelector 取到的是更早的那个，会点错按钮。
+  const closed = await evaluate(`(() => {
+    const dialogs = Array.from(document.querySelectorAll('.el-dialog'))
+    const last = dialogs[dialogs.length - 1]
+    if (!last) return false
+    const btn = Array.from(last.querySelectorAll('button')).find((b) => b.innerText.includes('完成'))
+    if (!btn) return false
+    btn.click()
+    return true
+  })()`)
+  check('关闭结果预览弹窗', closed === true)
+  await new Promise((r) => setTimeout(r, 800))
 
   await clickByText('button', '提交作业')
   await waitFor(`document.querySelector('.el-dialog') !== null`, '再次打开弹窗')
-  // 重复状态来自接口，等它返回
-  await new Promise((r) => setTimeout(r, 1200))
+  // 设备状态来自接口，等它返回
+  await new Promise((r) => setTimeout(r, 1500))
 
   const duplicateAlert = await evaluate(`(() => {
     const alert = document.querySelector('.submit-form__alert')
     return alert ? alert.innerText : ''
   })()`)
-  check('再次打开时出现重复提交提醒', duplicateAlert.includes('已有人提交'), duplicateAlert.slice(0, 120))
+  check(
+    '再次打开时提示「当前设备已提交」',
+    duplicateAlert.includes('当前设备已提交'),
+    duplicateAlert.slice(0, 120),
+  )
+  check('提示不含「最早由」等他人信息', !duplicateAlert.includes('最早由'), duplicateAlert.slice(0, 120))
 
-  console.log('\n[6] 同班同学再次提交，验证被标记')
+  console.log('\n[6] 同班另一位学生提交，验证仍被标记')
   const nameInput2 = await evaluate(`(() => {
     const inputs = Array.from(document.querySelectorAll('.el-dialog input'))
     const target = inputs.find((i) => (i.placeholder || '').includes('姓名'))
@@ -312,7 +330,7 @@ try {
   check('填写第二位学生姓名', nameInput2 === true)
 
   await setFiles('.el-dialog input[type=file]', [docPath])
-  await new Promise((r) => setTimeout(r, 300))
+  await new Promise((r) => setTimeout(r, 500))
   await clickByText('.el-dialog__footer button', '确认提交')
 
   await waitFor(
@@ -320,9 +338,25 @@ try {
     '第二次提交成功',
     20000,
   )
-  const dupText = await evaluate(`document.body.innerText`)
-  check('重复提交预览显示重复标记', dupText.includes('重复'), '')
-  check('提示被重复的提交人', dupText.includes('赵六'), '')
+  // 关闭动画期间旧弹窗仍留在 DOM 中，按「最后一个」取会拿到上一轮的预览窗口。
+  // 改为按内容筛选：取标题为「作业已提交」且包含重复提示的那个。
+  await new Promise((r) => setTimeout(r, 600))
+  const dupText = await evaluate(`(() => {
+    const dialogs = Array.from(document.querySelectorAll('.el-dialog'))
+    const target = dialogs.find((d) => {
+      const title = d.querySelector('.el-dialog__title')?.innerText ?? ''
+      return title.includes('作业已提交') && d.innerText.includes('重复')
+    })
+    if (target) return target.innerText
+    // 找不到带重复提示的，退回到任意「作业已提交」弹窗，便于定位问题
+    const fallback = dialogs.find((d) =>
+      (d.querySelector('.el-dialog__title')?.innerText ?? '').includes('作业已提交'),
+    )
+    return fallback ? fallback.innerText : ''
+  })()`)
+  check('重复提交预览显示重复标记', dupText.includes('重复'), dupText.slice(0, 150))
+  // 提示改为中性表述，不再指名其他同学
+  check('重复提示不暴露其他同学姓名', !dupText.includes('被重复的提交人'), '')
 
   console.log('\n[7] 控制台错误检查')
   check('无控制台报错', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '))

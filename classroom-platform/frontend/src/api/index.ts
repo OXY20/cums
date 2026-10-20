@@ -81,6 +81,22 @@ export function inlineFileUrl(resourceId: number): string {
 }
 
 /**
+ * 上传进度信息。
+ *
+ * 除百分比外同时给出已传/总字节数，让调用方能算速度与剩余时间。
+ * 解析成结构化对象而不是单个百分比，是因为「还要多久」需要原始字节数，
+ * 从百分比反推会丢失精度（大文件尤其明显）。
+ */
+export interface UploadProgress {
+  /** 已上传字节数 */
+  loaded: number
+  /** 总字节数 */
+  total: number
+  /** 百分比，0–100 的整数 */
+  percent: number
+}
+
+/**
  * 多文件提交（作业上传）。
  *
  * 与 [`uploadWithProgress`] 一样使用 XHR 以获得上传进度；
@@ -90,7 +106,7 @@ export function submitWithProgress<T>(
   path: string,
   files: File[],
   fields: Record<string, string>,
-  onProgress?: (percent: number) => void,
+  onProgress?: (progress: UploadProgress) => void,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const form = new FormData()
@@ -105,7 +121,11 @@ export function submitWithProgress<T>(
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
-        onProgress(Math.round((event.loaded / event.total) * 100))
+        onProgress({
+          loaded: event.loaded,
+          total: event.total,
+          percent: Math.round((event.loaded / event.total) * 100),
+        })
       }
     }
 
@@ -146,7 +166,7 @@ export function submitWithProgress<T>(
 export function uploadWithProgress<T>(
   path: string,
   file: File,
-  onProgress?: (percent: number) => void,
+  onProgress?: (progress: UploadProgress) => void,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
     const form = new FormData()
@@ -160,7 +180,11 @@ export function uploadWithProgress<T>(
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) {
-        onProgress(Math.round((event.loaded / event.total) * 100))
+        onProgress({
+          loaded: event.loaded,
+          total: event.total,
+          percent: Math.round((event.loaded / event.total) * 100),
+        })
       }
     }
 
@@ -356,6 +380,29 @@ export interface AuditLogEntry {
 /** 提交状态：已提交 / 已查看 / 已标记问题 */
 export type SubmissionStatus = 'submitted' | 'reviewed' | 'flagged'
 
+/**
+ * 审阅标签：好 / 通过 / 不通过 / 其他。
+ *
+ * 空字符串表示「尚未评价」，因此类型里带上 `''`。
+ * 四类标签覆盖教师实际批改习惯：多数是通过，特别好的是好，
+ * 需要退回重做的是不通过，其余需要单独沟通的归入其他。
+ */
+export type ReviewLabel = '' | 'good' | 'pass' | 'fail' | 'other'
+
+/** 标签的展示顺序与配色，界面与统计共用同一份定义 */
+export const REVIEW_LABEL_META: { value: ReviewLabel; text: string; type: string }[] = [
+  { value: 'good', text: '好', type: 'success' },
+  { value: 'pass', text: '通过', type: 'primary' },
+  { value: 'fail', text: '不通过', type: 'danger' },
+  { value: 'other', text: '其他', type: 'info' },
+]
+
+/** 取标签的中文名；未知值原样返回，便于排查 */
+export function reviewLabelText(label: string): string {
+  const found = REVIEW_LABEL_META.find((item) => item.value === label)
+  return found ? found.text : label || '未评价'
+}
+
 /** 提交中的单个文件，字段与服务端 resources 对齐 */
 export interface SubmissionFile {
   resource_id: number
@@ -376,6 +423,8 @@ export interface Submission {
   class_id: number | null
   session_id: number | null
   student_name: string
+  /** 学号；未从名单选择时为空字符串 */
+  student_no: string
   /** 服务端记录的来源地址，客户端无法伪造 */
   client_ip: string
   user_agent: string
@@ -389,6 +438,14 @@ export interface Submission {
   lesson_title: string | null
   class_name: string | null
   file_count: number
+  /** 审阅标签；空字符串表示尚未评价 */
+  review_label: ReviewLabel
+  /** 审阅分数 0–100；未打分为 null */
+  review_score: number | null
+  /** 教师评语 */
+  review_comment: string
+  /** 最近一次审阅时间；未审阅为 null */
+  reviewed_at: string | null
 }
 
 /** 提交详情：记录本体 + 文件列表 */
@@ -397,12 +454,27 @@ export interface SubmissionDetail extends Submission {
   duplicate_of_name: string | null
 }
 
-/** 课时提交状态，用于上传前提醒 */
+/** 当前设备在本课时的提交摘要 */
+export interface DeviceSubmission {
+  /** 该设备已提交的记录数 */
+  total: number
+  /** 该设备最近一次提交 */
+  latest: Submission
+}
+
+/**
+ * 课时提交状态，用于上传前提醒。
+ *
+ * 提示以 `device` 为准（这台机器是否交过），
+ * `classTotal` 仅作背景数字，不指名道姓，避免把教师视角的信息暴露给学生端。
+ */
 export interface LessonSubmissionStatus {
   lesson_id: number
   class_id: number | null
-  total: number
-  first_submission: Submission | null
+  /** 本班该课时提交总数（不区分设备） */
+  class_total: number
+  /** 当前设备的提交情况；无提交时为 null */
+  device: DeviceSubmission | null
 }
 
 /** 提交接口的响应，携带重复提醒 */
@@ -413,10 +485,167 @@ export interface CreateSubmissionResponse {
 
 export interface SubmitHomeworkInput {
   studentName: string
+  /** 学号；从班级名单选择自己时带上，便于教师统计「谁没交」 */
+  studentNo?: string
   lessonId: number
   classId?: number | null
   note?: string
+  /** 本设备标识，用于判断「本设备是否已提交」 */
+  deviceId?: string
   files: File[]
+}
+
+// ---------------------------------------------------------------------------
+// 班级学生名单与作业统计
+// ---------------------------------------------------------------------------
+
+/** 班级名单中的一条学生记录 */
+export interface ClassStudent {
+  id: number
+  class_id: number
+  student_no: string
+  student_name: string
+  created_at: string
+}
+
+/** 名单导入结果 */
+export interface ImportStudentsResult {
+  /** 新增条数 */
+  inserted: number
+  /** 学号已存在、仅更新姓名的条数 */
+  updated: number
+  /** 解析失败的行 */
+  invalid: InvalidStudentRow[]
+  /** 导入后名单总人数 */
+  total: number
+}
+
+export interface InvalidStudentRow {
+  line: number
+  raw: string
+  reason: string
+}
+
+/** 课程作业总览 */
+export interface CourseHomeworkOverview {
+  course_id: number
+  course_title: string
+  class_id: number | null
+  class_name: string | null
+  /** 名单人数；未指定班级时为 0 */
+  roster_total: number
+  /** 这门课实际用过的班级；只有一个班时前端自动选中 */
+  used_class_ids: number[]
+  lessons: LessonHomeworkSummary[]
+}
+
+/** 单课时作业汇总 */
+export interface LessonHomeworkSummary {
+  lesson_id: number
+  lesson_title: string
+  sort_order: number
+  /** 提交份数（含重复提交） */
+  submitted_count: number
+  /** 去重后的提交人数 */
+  submitter_count: number
+  /** 被标记为重复的份数 */
+  duplicate_count: number
+  /** 名单中尚未提交的人数 */
+  missing_count: number
+}
+
+/** 某课时的提交看板 */
+export interface LessonSubmissionBoard {
+  lesson_id: number
+  lesson_title: string
+  course_id: number
+  course_title: string
+  class_id: number | null
+  class_name: string | null
+  roster_total: number
+  /** 已提交（按学生去重） */
+  submitted: StudentSubmissionState[]
+  /** 未提交 */
+  missing: MissingStudent[]
+  /** 名单外的提交者 */
+  unlisted: StudentSubmissionState[]
+}
+
+export interface StudentSubmissionState {
+  student_no: string
+  student_name: string
+  submission_count: number
+  latest_at: string
+  latest_submission_id: number
+  has_duplicate: boolean
+  client_ip: string
+  status: SubmissionStatus
+}
+
+export interface MissingStudent {
+  student_no: string
+  student_name: string
+}
+
+// ---------------------------------------------------------------------------
+// 作业审阅
+// ---------------------------------------------------------------------------
+
+/**
+ * 一次审阅的变更内容。
+ *
+ * 字段缺席 = 不修改；显式传 `null` / `''` = 清除。
+ * 这样教师点「好」不会顺手把已打的 95 分清空。
+ */
+export interface ReviewInput {
+  status?: SubmissionStatus
+  /** 传空串清除标签 */
+  label?: ReviewLabel
+  /** 传 null 清除分数 */
+  score?: number | null
+  /** 传空串清除评语 */
+  comment?: string
+}
+
+/** 课时审阅统计 */
+export interface ReviewStats {
+  total: number
+  good: number
+  pass: number
+  fail: number
+  other: number
+  /** 已提交但尚未评价 */
+  unreviewed: number
+  /** 打了分数的份数 */
+  scored: number
+  /** 平均分；无人打分为 null */
+  average_score: number | null
+  /** 名单中尚未提交的人数 */
+  missing: number
+}
+
+/**
+ * 课时审阅看板：按提交展开。
+ *
+ * 与 `LessonSubmissionBoard` 的区别是**不按学生聚合**：
+ * 一个学生交两次就是两条，教师需要分别批改。
+ */
+export interface LessonReviewBoard {
+  lesson_id: number
+  lesson_title: string
+  course_id: number
+  course_title: string
+  class_id: number | null
+  class_name: string | null
+  roster_total: number
+  stats: ReviewStats
+  items: SubmissionDetail[]
+}
+
+/** 批量审阅结果 */
+export interface BatchReviewResult {
+  updated: number
+  stats: ReviewStats | null
 }
 
 // ---------------------------------------------------------------------------
@@ -483,7 +712,7 @@ export const api = {
   uploadLessonResource: (
     lessonId: number,
     file: File,
-    onProgress?: (percent: number) => void,
+    onProgress?: (progress: UploadProgress) => void,
   ) => uploadWithProgress<LessonResource>(`/api/lessons/${lessonId}/resources/upload`, file, onProgress),
 
   attachResource: (lessonId: number, resourceId: number, purpose?: ResourcePurpose) =>
@@ -516,8 +745,11 @@ export const api = {
     }),
 
   /** 上传课程封面（仅接受图片） */
-  uploadCourseCover: (courseId: number, file: File, onProgress?: (percent: number) => void) =>
-    uploadWithProgress<Course>(`/api/courses/${courseId}/cover`, file, onProgress),
+  uploadCourseCover: (
+    courseId: number,
+    file: File,
+    onProgress?: (progress: UploadProgress) => void,
+  ) => uploadWithProgress<Course>(`/api/courses/${courseId}/cover`, file, onProgress),
   clearCourseCover: (courseId: number) =>
     request<Course>(`/api/courses/${courseId}/cover`, { method: 'DELETE' }),
 
@@ -534,8 +766,11 @@ export const api = {
    * 使用 XHR 而非 fetch：只有 XHR 能提供上传进度事件，
    * 大文件上传时教师需要看到进度与失败提示。
    */
-  uploadResource: (resourceId: number, file: File, onProgress?: (percent: number) => void) =>
-    uploadWithProgress<Resource>(`/api/resources/${resourceId}/upload`, file, onProgress),
+  uploadResource: (
+    resourceId: number,
+    file: File,
+    onProgress?: (progress: UploadProgress) => void,
+  ) => uploadWithProgress<Resource>(`/api/resources/${resourceId}/upload`, file, onProgress),
 
   deleteResource: (id: number) =>
     request<{ ok: boolean }>(`/api/resources/${id}`, { method: 'DELETE' }),
@@ -554,7 +789,7 @@ export const api = {
    */
   submitHomework: (
     input: SubmitHomeworkInput,
-    onProgress?: (percent: number) => void,
+    onProgress?: (progress: UploadProgress) => void,
   ) => {
     const fields: Record<string, string> = {
       student_name: input.studentName,
@@ -563,6 +798,8 @@ export const api = {
     if (input.classId !== null && input.classId !== undefined) {
       fields.class_id = String(input.classId)
     }
+    if (input.deviceId) fields.device_id = input.deviceId
+    if (input.studentNo) fields.student_no = input.studentNo
     if (input.note) fields.note = input.note
 
     return submitWithProgress<CreateSubmissionResponse>(
@@ -573,12 +810,22 @@ export const api = {
     )
   },
 
-  /** 查询某课时是否已有提交，用于上传前提醒 */
-  lessonSubmissionStatus: (lessonId: number, classId?: number | null) => {
-    const suffix = classId !== null && classId !== undefined ? `&class_id=${classId}` : ''
-    return request<LessonSubmissionStatus>(
-      `/api/student/submissions/status?lesson_id=${lessonId}${suffix}`,
-    )
+  /**
+   * 查询当前设备在某课时的提交情况，用于上传前提醒。
+   *
+   * `deviceId` 是本机生成的稳定标识，让服务端能认出「这台机器」，
+   * 而不是按人统计——机房电脑多人轮用，按设备判断才有意义。
+   */
+  lessonSubmissionStatus: (
+    lessonId: number,
+    options: { classId?: number | null; deviceId?: string } = {},
+  ) => {
+    const params = new URLSearchParams({ lesson_id: String(lessonId) })
+    if (options.classId !== null && options.classId !== undefined) {
+      params.set('class_id', String(options.classId))
+    }
+    if (options.deviceId) params.set('device_id', options.deviceId)
+    return request<LessonSubmissionStatus>(`/api/student/submissions/status?${params.toString()}`)
   },
 
   /** 学生端回读自己的提交，用于上传成功后弹窗预览 */
@@ -591,6 +838,8 @@ export const api = {
     classId?: number
     courseId?: number
     duplicateOnly?: boolean
+    /** 按审阅标签筛选；`unreviewed` 表示尚未评价 */
+    reviewLabel?: ReviewLabel | 'unreviewed'
     limit?: number
   } = {}) => {
     const params = new URLSearchParams()
@@ -598,6 +847,7 @@ export const api = {
     if (query.classId !== undefined) params.set('class_id', String(query.classId))
     if (query.courseId !== undefined) params.set('course_id', String(query.courseId))
     if (query.duplicateOnly) params.set('duplicate_only', 'true')
+    if (query.reviewLabel) params.set('review_label', query.reviewLabel)
     if (query.limit !== undefined) params.set('limit', String(query.limit))
     const suffix = params.toString() ? `?${params.toString()}` : ''
     return request<ListResponse<Submission>>(`/api/admin/submissions${suffix}`)
@@ -606,12 +856,71 @@ export const api = {
   /** 教师端提交详情 */
   submission: (id: number) => request<SubmissionDetail>(`/api/admin/submissions/${id}`),
 
-  /** 教师端标记审阅状态 */
-  reviewSubmission: (id: number, status: SubmissionStatus) =>
+  /** 教师端审阅单份提交：状态 / 标签 / 分数 / 评语可任选其一 */
+  reviewSubmission: (id: number, input: ReviewInput) =>
     request<SubmissionDetail>(`/api/admin/submissions/${id}/review`, {
       method: 'POST',
-      body: { status },
+      body: input,
     }),
+
+  /** 教师端批量审阅：对所选提交施加同一套评价 */
+  batchReviewSubmission: (ids: number[], input: ReviewInput, lessonId?: number) =>
+    request<BatchReviewResult>('/api/admin/submissions/batch-review', {
+      method: 'POST',
+      body: { ids, ...input, lesson_id: lessonId ?? null },
+    }),
+
+  // ---- 班级学生名单 ----
+
+  /** 班级名单 */
+  classStudents: (classId: number) =>
+    request<ListResponse<ClassStudent>>(`/api/classes/${classId}/students`),
+
+  /** 新增单个学生（学号已存在时更新姓名） */
+  addClassStudent: (classId: number, studentNo: string, studentName: string) =>
+    request<ClassStudent>(`/api/classes/${classId}/students`, {
+      method: 'POST',
+      body: { student_no: studentNo, student_name: studentName },
+    }),
+
+  /** 批量导入名单；replace 为真时先清空原名单 */
+  importClassStudents: (classId: number, text: string, replace = false) =>
+    request<ImportStudentsResult>(`/api/classes/${classId}/students/import`, {
+      method: 'POST',
+      body: { text, replace },
+    }),
+
+  /** 删除名单中的学生 */
+  removeClassStudent: (classId: number, studentId: number) =>
+    request<{ ok: boolean }>(`/api/classes/${classId}/students/${studentId}`, {
+      method: 'DELETE',
+    }),
+
+  // ---- 作业统计 ----
+
+  /** 课程作业总览：每个课时的提交与未交情况 */
+  homeworkOverview: (courseId: number, classId?: number | null) =>
+    request<CourseHomeworkOverview>(
+      `/api/courses/${courseId}/homework-overview${
+        classId !== null && classId !== undefined ? `?class_id=${classId}` : ''
+      }`,
+    ),
+
+  /** 课时提交看板：谁交了、谁没交 */
+  submissionBoard: (lessonId: number, classId?: number | null) =>
+    request<LessonSubmissionBoard>(
+      `/api/lessons/${lessonId}/submission-board${
+        classId !== null && classId !== undefined ? `?class_id=${classId}` : ''
+      }`,
+    ),
+
+  /** 课时审阅看板：按提交展开，供批量批改 */
+  lessonReviewBoard: (lessonId: number, classId?: number | null) =>
+    request<LessonReviewBoard>(
+      `/api/lessons/${lessonId}/review-board${
+        classId !== null && classId !== undefined ? `?class_id=${classId}` : ''
+      }`,
+    ),
 
   health: () => request<Health>('/api/admin/health'),
 

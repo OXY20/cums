@@ -3,12 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <title>CUMS - 管理员控制台</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background: linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%); min-height: 100vh; color: #e8e8e8; }
         .header { background: rgba(255,255,255,0.05); backdrop-filter: blur(10px); padding: 16px 24px; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; }
         .header h1 { font-size: 18px; font-weight: 500; color: #fff; display: flex; align-items: center; gap: 10px; }
+        .header h1 .brand-icon { width: 26px; height: 26px; display: block; }
         .header h1 .badge { background: linear-gradient(135deg,#e94560,#ff6b6b); padding: 2px 8px; border-radius: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; }
         .user-info { display: flex; align-items: center; gap: 16px; font-size: 14px; color: rgba(255,255,255,0.7); }
         .btn { padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
@@ -28,7 +30,8 @@
         /* 登录页 */
         .login-container { max-width: 400px; margin: 100px auto; }
         .login-card { text-align: center; }
-        .login-logo { width: 80px; height: 80px; background: linear-gradient(135deg,#e94560,#ff6b6b); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 36px; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(233,69,96,0.4); }
+        .login-logo { width: 88px; height: 88px; background: linear-gradient(135deg,#eef1ff,#e0e6ff); border-radius: 22px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 20px; box-shadow: 0 8px 24px rgba(124,139,248,0.25); }
+        .login-logo svg { width: 56px; height: 56px; display: block; }
         .login-title { font-size: 24px; margin-bottom: 8px; }
         .login-subtitle { color: rgba(255,255,255,0.5); margin-bottom: 32px; font-size: 14px; }
         /* 表单 */
@@ -59,7 +62,20 @@
         .stat-card:nth-child(3) .stat-value { color: #667eea; }
         .stat-card:nth-child(4) .stat-value { color: #ffd93d; }
         .stat-card:nth-child(5) .stat-value { color: #ff6b6b; }
-        /* 科目列表 */
+        .student-import-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .student-import-grid .form-group { margin-bottom: 12px; }
+        .student-import-help { color: rgba(255,255,255,0.55); font-size: 12px; line-height: 1.6; margin: 10px 0 16px; }
+        .student-import-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .file-button { position: relative; overflow: hidden; cursor: pointer; }
+        .file-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        .student-table-wrap { overflow-x: auto; }
+        .student-table { width: 100%; border-collapse: collapse; }
+        .student-table th, .student-table td { padding: 11px 12px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; white-space: nowrap; }
+        .student-table th { color: rgba(255,255,255,0.55); font-size: 11px; }
+        .student-actions { display: flex; gap: 6px; }
+        .status-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 11px; background: rgba(255,193,7,0.15); color: #ffd166; }
+        .status-badge.ready { background: rgba(0,217,165,0.15); color: #00d9a5; }        /* 科目列表 */
         .subject-list { display: flex; flex-direction: column; gap: 16px; }
         .subject-item { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 20px; transition: all 0.3s ease; }
         .subject-item:hover { border-color: rgba(233,69,96,0.3); background: rgba(255,255,255,0.05); }
@@ -146,13 +162,131 @@
         .recent-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.03); border-radius: 8px; font-size: 13px; }
         .recent-item .recent-name { color: #667eea; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
         .recent-item .recent-meta { color: rgba(255,255,255,0.4); display: flex; gap: 16px; }
+        .icon-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+        .ui-icon { width: 1.1em; height: 1.1em; display: inline-block; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.15em; }
+        .ui-icon-xl { width: 1.6em; height: 1.6em; stroke-width: 1.6; }
+        .tab-btn .ui-icon { width: 1.2em; height: 1.2em; }
+        .login-logo .ui-icon { width: 42px; height: 42px; }
+
+        :root {
+            --page-bg: linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+            --surface: rgba(255,255,255,0.05);
+            --surface-strong: rgba(0,0,0,0.2);
+            --surface-soft: rgba(255,255,255,0.03);
+            --border: rgba(255,255,255,0.1);
+            --text: #e8e8e8;
+            --heading: #fff;
+            --muted: rgba(255,255,255,0.6);
+            --input-bg: rgba(255,255,255,0.05);
+            --shadow: rgba(0,0,0,0.3);
+        }
+        html.day-mode {
+            --page-bg: linear-gradient(135deg,#f5f7fb 0%,#edf2f7 50%,#dfe9f5 100%);
+            --surface: rgba(255,255,255,0.82);
+            --surface-strong: rgba(31,41,55,0.07);
+            --surface-soft: rgba(31,41,55,0.04);
+            --border: rgba(31,41,55,0.12);
+            --text: #263244;
+            --heading: #172033;
+            --muted: rgba(38,50,68,0.68);
+            --input-bg: rgba(255,255,255,0.78);
+            --shadow: rgba(31,41,55,0.12);
+        }
+        body { background: var(--page-bg); color: var(--text); transition: background .25s ease, color .25s ease; }
+        .header { position: sticky; top: 0; z-index: 20; margin-left: 260px; background: var(--surface); border-color: var(--border); transition: margin-left .25s ease, background .25s ease; }
+        .header-left { display: flex; align-items: center; gap: 14px; }
+        .header h1 { color: var(--heading); }
+        .user-info { color: var(--muted); }
+        .header-action { white-space: nowrap; }
+        .main { max-width: none; margin: 0 0 0 260px; padding: 32px; transition: margin-left .25s ease; }
+        .card { background: var(--surface); border-color: var(--border); box-shadow: 0 8px 32px var(--shadow); }
+        .card-title, .subject-name, .stat-card .stat-value { color: var(--heading); }
+        .form-group label, .content-section h4, .stat-card .stat-label, .empty-state, .login-subtitle { color: var(--muted); }
+        .form-group input, .form-group select, .form-group textarea { background: var(--input-bg); color: var(--text); border-color: var(--border); }
+        .form-group select option { background: #1a1a2e; color: #fff; }
+        html.day-mode .form-group select option { background: #fff; color: #263244; }
+        .btn-secondary { background: var(--surface-strong); color: var(--text); border-color: var(--border); }
+        .btn-secondary:hover { background: var(--surface-soft); }
+        .tab-nav { background: transparent; }
+        .stat-card, .content-section { background: var(--surface-strong); border-color: var(--border); }
+        .subject-item, .recent-item, .template-item { background: var(--surface-soft); border-color: var(--border); }
+        .tag { background: var(--surface-strong); color: var(--muted); }
+        .file-table th, .file-table td { border-color: var(--border); }
+        .file-table th, .quick-select-btn, .add-tag-btn { color: var(--muted); }
+        .quick-select-list { background: var(--surface-strong); }
+        .quick-select-btn { background: var(--surface-strong); border-color: var(--border); color: var(--text); }
+        .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 30; width: 260px; display: flex; flex-direction: column; padding: 22px 16px; background: var(--surface-strong); border-right: 1px solid var(--border); backdrop-filter: blur(18px); transition: width .25s ease, transform .25s ease, background .25s ease; }
+        .sidebar-brand { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 28px; padding: 0 8px; }
+        .sidebar-brand strong { color: var(--heading); font-size: 17px; letter-spacing: .3px; white-space: nowrap; overflow: hidden; }
+        .sidebar-toggle, .menu-toggle { width: 36px; height: 36px; flex: 0 0 36px; padding: 0; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); cursor: pointer; font-size: 18px; }
+        .menu-toggle { display: none; }
+        .sidebar .tab-nav { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; }
+        .sidebar .tab-btn { display: flex; align-items: center; gap: 12px; flex: none; width: 100%; padding: 13px 14px; text-align: left; color: var(--muted); }
+        .sidebar .tab-btn.active { color: #fff; }
+        .sidebar-footer { display: flex; flex-direction: column; gap: 10px; margin-top: auto; padding: 12px 0 0; border-top: 1px solid var(--border); }
+        .sidebar-footer .btn { width: 100%; text-align: left; }
+        .theme-toggle { display: flex; align-items: center; gap: 10px; }
+        .sidebar-collapsed .sidebar { width: 76px; }
+        .sidebar-collapsed .header, .sidebar-collapsed .main { margin-left: 76px; }
+        .sidebar-collapsed .sidebar-brand strong, .sidebar-collapsed .sidebar .tab-btn span, .sidebar-collapsed .sidebar-footer .btn > span:last-child { display: none; }
+        .sidebar-collapsed .sidebar-brand { justify-content: center; padding: 0; }
+        .sidebar-collapsed .sidebar .tab-btn, .sidebar-collapsed .sidebar-footer .btn { justify-content: center; padding-left: 8px; padding-right: 8px; }
+        .sidebar-overlay { display: none; }
+        html.day-mode .sidebar { background: rgba(255,255,255,0.74); }
+        html.day-mode .header h1 .badge { color: #fff; }
+        html.day-mode .tab-btn:hover:not(.active) { background: rgba(31,41,55,0.06); color: var(--heading); }
+        html.day-mode .form-group input::placeholder { color: rgba(38,50,68,0.42); }
+        @media (max-width: 800px) {
+            .sidebar { width: 260px; transform: translateX(-100%); box-shadow: 12px 0 30px rgba(0,0,0,.2); }
+            .sidebar-open .sidebar { transform: translateX(0); }
+            .sidebar-open .sidebar-overlay { display: block; position: fixed; inset: 0; z-index: 25; background: rgba(0,0,0,.42); }
+            .sidebar-collapsed .sidebar { width: 260px; }
+            .sidebar-collapsed .header, .sidebar-collapsed .main, .header, .main { margin-left: 0; }
+            .sidebar-collapsed .sidebar-brand strong, .sidebar-collapsed .sidebar .tab-btn span, .sidebar-collapsed .sidebar-footer .btn > span:last-child { display: inline; }
+            .sidebar-collapsed .sidebar-brand { justify-content: space-between; padding: 0 8px; }
+            .sidebar-collapsed .sidebar .tab-btn, .sidebar-collapsed .sidebar-footer .btn { justify-content: flex-start; padding-left: 14px; padding-right: 14px; }
+            .menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+            .header { padding: 14px 16px; }
+            .header h1 { font-size: 16px; }
+            .header .header-action { display: none; }
+            .main { padding: 20px 14px; }
+            .card { padding: 22px 18px; }
+        }
     </style>
+    <script>
+        if (localStorage.getItem('cums-admin-theme') === 'day') document.documentElement.classList.add('day-mode');
+    </script>
 </head>
 <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+        <symbol id="icon-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"></path></symbol>
+        <symbol id="icon-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></symbol>
+        <symbol id="icon-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20c.5-3.3 2.5-5 6-5s5.5 1.7 6 5M16 5.5a3 3 0 0 1 0 5.8M17 15c2.4.2 3.8 1.8 4 5"></path></symbol>
+        <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 15v5h14v-5"></path></symbol>
+        <symbol id="icon-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></symbol>
+        <symbol id="icon-book-open" viewBox="0 0 24 24"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3H11v16H5.5A2.5 2.5 0 0 0 3 21.5z"></path><path d="M21 5.5A2.5 2.5 0 0 0 18.5 3H13v16h5.5a2.5 2.5 0 0 1 2.5 2.5z"></path></symbol>
+        <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h4l2 2H18.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path></symbol>
+        <symbol id="icon-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"></rect><path d="M9 4V3h6v1M8 9h8M8 13h8M8 17h5"></path></symbol>
+        <symbol id="icon-settings" viewBox="0 0 24 24"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z"></path><path d="m19.4 15 .1.1-1.5 2.6-.2-.1a2 2 0 0 0-2 .2l-.3.2a2 2 0 0 0-.8 1.7v.2h-3v-.2a2 2 0 0 0-1.2-1.8l-.3-.1a2 2 0 0 0-2 .2l-.2.1-1.5-2.6.2-.1a2 2 0 0 0 .8-1.8v-.4a2 2 0 0 0-1.1-1.7l-.2-.1.9-2.9.2.1a2 2 0 0 0 2-.2l.3-.2a2 2 0 0 0 .8-1.7V6h3v.2a2 2 0 0 0 1.2 1.8l.3.1a2 2 0 0 0 2-.2l.2-.1 1.5 2.6-.2.1a2 2 0 0 0-.8 1.8v.4A2 2 0 0 0 19.4 15z"></path></symbol>
+        <symbol id="icon-note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"></path><path d="M15 3v5h4M8 12h8M8 16h6"></path></symbol>
+        <symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></symbol>
+        <symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 8.5 8.5 0 1 0 20 15.5z"></path></symbol>
+        <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M14 4H5v16h9M11 12h10M17 8l4 4-4 4"></path></symbol>
+        <symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></symbol>
+        <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"></path><path d="m7 15 3-4 3 2 5-7"></path></symbol>
+        <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7v5l3 2"></path></symbol>
+        <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.7-3L3 11M3 6v5h5M4 13a8 8 0 0 0 14.7 3L21 13m0 5v-5h-5"></path></symbol>
+        <symbol id="icon-folder-open" viewBox="0 0 24 24"><path d="M3 7h7l2 2h9l-2 10H5z"></path><path d="M3 7V5h6l2 2"></path></symbol>
+        <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 13h6M9 17h6"></path></symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3"></path></symbol>
+        <symbol id="icon-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></symbol>
+        <symbol id="icon-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"></path></symbol>
+        <symbol id="icon-check-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></symbol>
+    </svg>
     <!-- 登录页 -->
     <div id="loginPage" class="login-container">
         <div class="card login-card">
-            <div class="login-logo">🔐</div>
+            <div class="login-logo"><svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#7c8bf8" d="M128 40L172 88L146 88L146 122L110 122L110 88L84 88ZM46 118L210 118L210 210Q178 220 128 220Q78 220 46 210Z"/></svg></div>
             <h2 class="login-title">CUMS 管理后台</h2>
             <p class="login-subtitle">请输入管理员密码以继续</p>
             <div id="loginMsg" class="message"></div>
@@ -166,28 +300,40 @@
 
     <!-- 主界面 -->
     <div id="mainApp" class="hidden">
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-brand">
+                <strong>CUMS 管理后台</strong>
+                <button class="sidebar-toggle" type="button" onclick="toggleSidebar()" aria-label="收起菜单">‹</button>
+            </div>
+            <nav class="tab-nav" aria-label="管理菜单">
+                <button class="tab-btn active" onclick="switchTab('dashboard')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg><span>仪表盘</span></button>
+                <button class="tab-btn" onclick="switchTab('subjects')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-book-open"></use></svg><span>科目管理</span></button><button class="tab-btn" onclick="switchTab('students')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-users"></use></svg><span>名单管理</span></button>
+                <button class="tab-btn" onclick="switchTab('files')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder"></use></svg><span>文件管理</span></button>
+                <button class="tab-btn" onclick="switchTab('submissions')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-clipboard"></use></svg><span>提交情况</span></button>
+                <button class="tab-btn" onclick="switchTab('settings')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg><span>设置</span></button>
+                <button class="tab-btn" onclick="switchTab('logs')"><svg class="ui-icon" aria-hidden="true"><use href="#icon-note"></use></svg><span>操作日志</span></button>
+            </nav>
+            <div class="sidebar-footer">
+                <a class="btn btn-secondary" href="/" target="_blank" rel="noopener"><svg class="ui-icon" aria-hidden="true"><use href="#icon-home"></use></svg><span>访问首页</span></a>
+                <button id="themeToggle" class="btn btn-secondary theme-toggle" type="button" onclick="toggleTheme()"><span><svg class="ui-icon" aria-hidden="true"><use href="#icon-sun"></use></svg></span><span>日间模式</span></button>
+                <button class="btn btn-secondary" type="button" onclick="doLogout()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-logout"></use></svg><span>退出登录</span></button>
+            </div>
+        </aside>
+        <div class="sidebar-overlay" onclick="closeSidebar()"></div>
         <div class="header">
-            <h1>CUMS <span class="badge">Admin</span></h1>
+            <div class="header-left">
+                <button class="menu-toggle" type="button" onclick="toggleSidebar()" aria-label="打开菜单"><svg class="ui-icon" aria-hidden="true"><use href="#icon-menu"></use></svg></button>
+                <h1><svg class="brand-icon" viewBox="0 0 256 256" aria-hidden="true"><path fill="#7c8bf8" d="M128 40L172 88L146 88L146 122L110 122L110 88L84 88ZM46 118L210 118L210 210Q178 220 128 220Q78 220 46 210Z"/></svg>CUMS <span class="badge">Admin</span></h1>
+            </div>
             <div class="user-info">
                 <span id="headerTime"></span>
-                <button class="btn btn-secondary btn-small" onclick="doLogout()">退出登录</button>
             </div>
         </div>
         <div class="main">
-            <!-- Tab 导航 -->
-            <div class="tab-nav">
-                <button class="tab-btn active" onclick="switchTab('dashboard')">📊 仪表盘</button>
-                <button class="tab-btn" onclick="switchTab('subjects')">📚 科目管理</button>
-                <button class="tab-btn" onclick="switchTab('files')">📁 文件管理</button>
-                <button class="tab-btn" onclick="switchTab('submissions')">📋 提交情况</button>
-                <button class="tab-btn" onclick="switchTab('settings')">⚙️ 设置</button>
-                <button class="tab-btn" onclick="switchTab('logs')">📝 操作日志</button>
-            </div>
-
             <!-- 仪表盘 -->
             <div id="tab-dashboard" class="tab-content active">
                 <div class="card">
-                    <div class="card-title">📊 系统概览</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-dashboard"></use></svg>系统概览</div>
                     <div id="statsGrid" class="stats-grid">
                         <div class="stat-card"><div class="stat-value" id="statFiles">--</div><div class="stat-label">总文件数</div></div>
                         <div class="stat-card"><div class="stat-value" id="statSize">--</div><div class="stat-label">总大小</div></div>
@@ -197,11 +343,11 @@
                     </div>
                 </div>
                 <div class="card">
-                    <div class="card-title">📈 科目统计</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-chart"></use></svg>科目统计</div>
                     <div id="subjectStatsContainer"></div>
                 </div>
                 <div class="card">
-                    <div class="card-title">🕐 最近上传</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-clock"></use></svg>最近上传</div>
                     <div id="recentUploadsContainer" class="recent-list"></div>
                 </div>
             </div>
@@ -209,8 +355,15 @@
             <!-- 科目管理 -->
             <div id="tab-subjects" class="tab-content">
                 <div class="card">
-                    <div class="card-title">📚 科目管理</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-book-open"></use></svg>科目管理</div>
                     <div id="subjectList" class="subject-list"></div>
+                    <div class="add-subject-area">
+                        <div class="card-title" style="font-size:16px;margin-bottom:12px;"><svg class="ui-icon" aria-hidden="true"><use href="#icon-upload"></use></svg>按行导入科目</div>
+                        <p class="student-import-help">每行格式：科目,班级,作业,描述。也支持 JSON 数组。只填写科目即可创建科目，只填写科目和班级可批量维护班级。</p>
+                        <div class="form-group"><textarea id="subjectImportText" rows="5" placeholder="科目,班级,作业,描述&#10;高等数学,25计应,第一章作业,完成课后习题"></textarea></div>
+                        <button class="btn btn-secondary" onclick="importSubjects()">导入科目</button>
+                        <span id="subjectImportMsg" class="message" style="margin:0 0 0 10px"></span>
+                    </div>
                     <div class="add-subject-area">
                         <div class="add-form">
                             <div class="form-group">
@@ -226,7 +379,7 @@
             <!-- 文件管理 -->
             <div id="tab-files" class="tab-content">
                 <div class="card">
-                    <div class="card-title">📁 文件管理</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder"></use></svg>文件管理</div>
                     <div class="filter-bar">
                         <div class="form-group">
                             <label>科目</label>
@@ -240,7 +393,7 @@
                             <label>作业</label>
                             <select id="fileFilterHomework" onchange="loadFiles()"><option value="">全部</option></select>
                         </div>
-                        <button class="btn btn-secondary btn-small" onclick="loadFiles()" style="margin-bottom:0;align-self:flex-end">🔄 刷新</button>
+                        <button class="btn btn-secondary btn-small" onclick="loadFiles()" style="margin-bottom:0;align-self:flex-end"><svg class="ui-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>刷新</button>
                     </div>
                     <div id="fileTableContainer">
                         <table class="file-table">
@@ -249,7 +402,7 @@
                         </table>
                     </div>
                     <div id="fileEmptyState" class="empty-state hidden">
-                        <div class="icon">📂</div>
+                        <div class="icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder-open"></use></svg></div>
                         <p>暂无文件</p>
                     </div>
                 </div>
@@ -258,7 +411,7 @@
             <!-- 提交情况 -->
             <div id="tab-submissions" class="tab-content">
                 <div class="card">
-                    <div class="card-title">📋 作业提交情况</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-clipboard"></use></svg>作业提交情况</div>
                     <div class="filter-bar">
                         <div class="form-group">
                             <label>科目</label>
@@ -275,16 +428,52 @@
                     </div>
                     <div id="submissionsContainer"></div>
                     <div id="submissionEmptyState" class="empty-state">
-                        <div class="icon">📋</div>
+                        <div class="icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-clipboard"></use></svg></div>
                         <p>请选择科目、班级和作业查看提交情况</p>
                     </div>
                 </div>
             </div>
 
+            <!-- 名单管理 -->
+            <div id="tab-students" class="tab-content">
+                <div class="card">
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-users"></use></svg>学生名单管理</div>
+                    <p class="student-import-help">支持粘贴 CSV/TSV、JSON 或导入 XLSX 文件。XLSX 模板列为：学号、姓名、班级、密码（可选）。新导入学生默认密码为 000000；已有学生只更新姓名和班级，不会覆盖已修改的密码。</p>
+                    <div class="student-import-toolbar">
+                        <button class="btn btn-secondary btn-small" type="button" onclick="downloadStudentTemplate()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-file"></use></svg>下载 XLSX 模板</button>
+                        <label class="btn btn-secondary btn-small file-button"><svg class="ui-icon" aria-hidden="true"><use href="#icon-upload"></use></svg>选择 XLSX 导入<input id="studentXlsxFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange="importStudentXlsx(this)"></label>
+                        <span id="studentXlsxMsg" class="message"></span>
+                    </div>
+<div class="form-group">
+                        <label>名单内容</label>
+                        <textarea id="studentImportText" rows="8" placeholder="学号,姓名,班级&#10;2025001,张三,25计应&#10;2025002,李四,25计应"></textarea>
+                    </div>
+                    <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;">
+                        <button class="btn btn-primary" onclick="importStudents()">导入名单</button>
+                        <button class="btn btn-secondary" onclick="loadStudents()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>刷新名单</button>
+                        <span id="studentImportMsg" class="message" style="margin:0"></span>
+                    </div>
+                    <div class="student-table-wrap"><table class="student-table"><thead><tr><th>学号</th><th>姓名</th><th>班级</th><th>密码状态</th><th>操作</th></tr></thead><tbody id="studentTableBody"></tbody></table></div>
+                    <div id="studentEmptyState" class="empty-state"><p>暂无学生名单</p></div>
+                </div>
+            </div>
             <!-- 设置 -->
             <div id="tab-settings" class="tab-content">
                 <div class="card">
-                    <div class="card-title">⚙️ 系统设置</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg>当前课程设置</div>
+                    <div id="currentCourseMsg" class="message"></div>
+                    <div class="form-group">
+                        <label>当前进行中科目</label>
+                        <select id="currentSubject" onchange="onCurrentSubjectChange()"><option value="">选择科目</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label>当前进行中班级</label>
+                        <select id="currentClass"><option value="">选择班级</option></select>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveCurrentCourse()">保存当前课程设置</button>
+                </div>
+                <div class="card">
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-settings"></use></svg>系统设置</div>
                     <div class="password-form">
                         <h4 style="margin-bottom:16px;color:rgba(255,255,255,0.8)">修改管理员密码</h4>
                         <div id="passwordMsg" class="message"></div>
@@ -308,13 +497,13 @@
             <!-- 操作日志 -->
             <div id="tab-logs" class="tab-content">
                 <div class="card">
-                    <div class="card-title">📝 操作日志</div>
+                    <div class="card-title"><svg class="ui-icon" aria-hidden="true"><use href="#icon-note"></use></svg>操作日志</div>
                     <div style="margin-bottom:16px">
-                        <button class="btn btn-secondary btn-small" onclick="loadLogs()">🔄 刷新</button>
+                        <button class="btn btn-secondary btn-small" onclick="loadLogs()"><svg class="ui-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg>刷新</button>
                     </div>
                     <div id="logList" class="log-list"></div>
                     <div id="logEmptyState" class="empty-state hidden">
-                        <div class="icon">📝</div>
+                        <div class="icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-note"></use></svg></div>
                         <p>暂无操作日志</p>
                     </div>
                 </div>
@@ -332,7 +521,7 @@
             <div id="modalBody"></div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeModal()">取消</button>
-                <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确认</button>
+                <button class="btn btn-primary" id="modalConfirmBtn" onclick="confirmModal()">确认</button><button class="btn btn-success hidden" id="lessonSaveBtn" onclick="saveLessonContent()">保存课时</button>
             </div>
         </div>
     </div>
@@ -360,6 +549,10 @@
         if (adminToken) opts.headers['X-Admin-Token'] = adminToken;
         if (body) opts.body = JSON.stringify(body);
         const res = await fetch('/api/v1' + path, opts);
+        if (res.status === 401) {
+            doLogout();
+            showMsg(document.getElementById('loginMsg'), '登录已过期，请重新登录', 'error');
+        }
         return res.json();
     }
 
@@ -375,15 +568,65 @@
         return (bytes / 1048576).toFixed(1) + ' MB';
     }
 
+    function icon(name, className = 'ui-icon') {
+        return '<svg class="' + className + '" aria-hidden="true"><use href="#icon-' + name + '"></use></svg>';
+    }
+
+    function updateThemeButton() {
+        const button = document.getElementById('themeToggle');
+        if (!button) return;
+        const isDay = document.documentElement.classList.contains('day-mode');
+        button.querySelector('span').innerHTML = icon(isDay ? 'moon' : 'sun');
+        button.querySelectorAll('span')[1].textContent = isDay ? '夜间模式' : '日间模式';
+        button.setAttribute('aria-label', isDay ? '切换到夜间模式' : '切换到日间模式');
+    }
+
+    function updateSidebarButton() {
+        const button = document.querySelector('.sidebar-toggle');
+        if (!button) return;
+        const collapsed = document.body.classList.contains('sidebar-collapsed');
+        button.textContent = collapsed ? '›' : '‹';
+        button.setAttribute('aria-label', collapsed ? '展开菜单' : '收起菜单');
+    }
+
+    function toggleTheme() {
+        const isDay = document.documentElement.classList.toggle('day-mode');
+        localStorage.setItem('cums-admin-theme', isDay ? 'day' : 'night');
+        updateThemeButton();
+    }
+
+    function toggleSidebar() {
+        if (window.innerWidth <= 800) {
+            document.body.classList.toggle('sidebar-open');
+            return;
+        }
+        const collapsed = document.body.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('cums-admin-sidebar', collapsed ? 'collapsed' : 'expanded');
+        updateSidebarButton();
+    }
+
+    function closeSidebar() {
+        document.body.classList.remove('sidebar-open');
+    }
+
+    function initializeAdminLayout() {
+        if (localStorage.getItem('cums-admin-sidebar') === 'collapsed' && window.innerWidth > 800) {
+            document.body.classList.add('sidebar-collapsed');
+        }
+        updateThemeButton();
+        updateSidebarButton();
+    }
+
     // ========== 登录/登出 ==========
     async function doLogin() {
         const pwd = document.getElementById('loginPassword').value.trim();
         if (!pwd) { showMsg(document.getElementById('loginMsg'), '请输入密码', 'error'); return; }
         const r = await api('POST', '/admin/login', { password: pwd });
         if (r.success) {
-            adminToken = r.data.token;
+            adminToken = r.token;
             document.getElementById('loginPage').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
+            initializeAdminLayout();
             loadConfig(); loadDashboard();
             startClock();
         } else {
@@ -394,6 +637,7 @@
     function doLogout() {
         adminToken = '';
         currentConfig = null;
+        closeSidebar();
         document.getElementById('mainApp').classList.add('hidden');
         document.getElementById('loginPage').classList.remove('hidden');
         document.getElementById('loginPassword').value = '';
@@ -407,13 +651,14 @@
     }
 
     // ========== Tab 切换 ==========
-    const tabNames = ['dashboard','subjects','files','submissions','settings','logs'];
-    const tabLabels = ['仪表盘','科目管理','文件管理','提交情况','设置','操作日志'];
+    const tabNames = ['dashboard','subjects','students','files','submissions','settings','logs'];
+    const tabLabels = ['仪表盘','科目管理','名单管理','文件管理','提交情况','设置','操作日志'];
     function switchTab(name) {
         document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', tabNames[i] === name));
         document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.getElementById('tab-' + name).classList.add('active');
-        const loaders = { dashboard: loadDashboard, subjects: loadSubjects, files: loadFiles, submissions: () => {}, settings: () => {}, logs: loadLogs };
+        closeSidebar();
+        const loaders = { dashboard: loadDashboard, subjects: loadSubjects, students: loadStudents, files: loadFiles, submissions: () => {}, settings: () => {}, logs: loadLogs };
         if (loaders[name]) loaders[name]();
     }
 
@@ -448,7 +693,27 @@
     // ========== 科目管理 ==========
     async function loadConfig() {
         const r = await api('GET', '/admin/config');
-        if (r.success) { currentConfig = r.data; renderSubjects(); updateFileFilters(); updateSubFilters(); }
+        if (r.success) {
+            currentConfig = {
+                subjects: Object.entries(r.data.subjects || {}).map(([name, value]) => ({ name, ...value })),
+                current_course: r.data.current_course
+            };
+            renderSubjects(); updateFileFilters(); updateSubFilters();
+            initCurrentCourseSelects();
+        }
+    }
+
+    async function saveConfig() {
+        const subjects = {};
+        (currentConfig.subjects || []).forEach(subject => {
+            subjects[subject.name] = {
+                classes: subject.classes || [],
+                homeworks: (subject.homeworks || []).map(homework => ({ ...homework }))
+            };
+        });
+        const r = await api('POST', '/admin/config', { subjects });
+        if (!r.success) alert(r.message || '保存配置失败');
+        return r.success;
     }
 
     async function loadSubjects() { await loadConfig(); }
@@ -460,11 +725,19 @@
         subjects.forEach((sub, si) => {
             const classes = sub.classes || [];
             const homeworks = sub.homeworks || [];
-            html += '<div class="subject-item"><div class="subject-header"><div class="subject-name"><span class="icon">\uD83D\uDCDA</span>' + esc(sub.name) + '</div><div class="subject-actions"><button class="btn btn-secondary btn-small" onclick="openUploadModal(' + si + ')">\uD83D\uDCC4 模板</button><button class="btn btn-danger btn-small" onclick="deleteSubject(' + si + ')">删除科目</button></div></div><div class="subject-content"><div class="content-section"><h4>班级 (' + classes.length + ')</h4><div class="tag-list">';
+            html += '<div class="subject-item"><div class="subject-header"><div class="subject-name"><span class="icon">' + icon('book-open') + '</span>' + esc(sub.name) + '</div><div class="subject-actions"><button class="btn btn-secondary btn-small" onclick="editCourseMeta(' + si + ')">' + icon('settings') + '编辑信息</button><button class="btn btn-secondary btn-small" onclick="openUploadModal(' + si + ')">' + icon('file') + '模板</button><button class="btn btn-danger btn-small" onclick="deleteSubject(' + si + ')">删除科目</button></div></div><div class="subject-content"><div class="content-section"><h4>班级 (' + classes.length + ')</h4><div class="tag-list">';
             classes.forEach((c, ci) => { html += '<span class="tag">' + esc(c) + '<button class="remove-btn" onclick="removeClass(' + si + ',' + ci + ')">\u00D7</button></span>'; });
             html += '<button class="add-tag-btn" onclick="addClass(' + si + ')">+ 添加</button></div></div><div class="content-section"><h4>作业 (' + homeworks.length + ')</h4><div class="tag-list">';
-            homeworks.forEach((h, hi) => { html += '<span class="tag">' + esc(h.name) + '<button class="remove-btn" onclick="removeHomework(' + si + ',' + hi + ')">\u00D7</button></span>'; });
-            html += '<button class="add-tag-btn" onclick="addHomework(' + si + ')">+ 添加</button></div></div></div></div>';
+            homeworks.forEach((h, hi) => {
+                const lessons = h.lessons || [];
+                let lessonHtml = '<span class="tag">' + esc(h.name) + '<button class="remove-btn" onclick="removeHomework(' + si + ',' + hi + ')">\u00D7</button></span>';
+                lessons.forEach(lesson => {
+                    const encodedLessonName = encodeURIComponent(lesson.name).replace(/'/g, '%27');
+                    lessonHtml += '<button class="btn btn-secondary btn-small" onclick="openLessonEditor(' + si + ',' + hi + ',decodeURIComponent(\'' + encodedLessonName + '\'))">课时: ' + esc(lesson.name) + '</button>';
+                });                lessonHtml += '<button class="add-tag-btn" onclick="addLesson(' + si + ',' + hi + ')">+ 课时</button>';
+                html += lessonHtml;
+            });
+            html += '<button class="add-tag-btn" onclick="addHomework(' + si + ')">+ 添加作业</button></div></div></div></div>';
         });
         document.getElementById('subjectList').innerHTML = html || '<div class="empty-state"><p>暂无科目，请添加</p></div>';
     }
@@ -472,39 +745,58 @@
     async function addSubject() {
         const name = document.getElementById('newSubjectName').value.trim();
         if (!name) return alert('请输入科目名称');
-        const r = await api('POST', '/admin/subjects', { name });
-        if (r.success) { document.getElementById('newSubjectName').value = ''; loadConfig(); }
-        else alert(r.message || '添加失败');
+        if ((currentConfig.subjects || []).some(subject => subject.name === name)) return alert('科目已存在');
+        currentConfig.subjects.push({ name, classes: [], homeworks: [] });
+        if (await saveConfig()) { document.getElementById('newSubjectName').value = ''; renderSubjects(); updateFileFilters(); updateSubFilters(); }
     }
 
     async function deleteSubject(si) {
         if (!confirm('确定删除科目「' + currentConfig.subjects[si].name + '」？')) return;
-        const r = await api('DELETE', '/admin/subjects/' + si, null);
-        if (r.success) loadConfig(); else alert(r.message || '删除失败');
+        currentConfig.subjects.splice(si, 1);
+        if (await saveConfig()) { renderSubjects(); updateFileFilters(); updateSubFilters(); }
+        else loadConfig();
     }
 
     async function addClass(si) {
         const name = prompt('输入班级名称：');
         if (!name || !name.trim()) return;
-        const r = await api('POST', '/admin/subjects/' + si + '/classes', { name: name.trim() });
-        if (r.success) loadConfig(); else alert(r.message || '添加失败');
+        const subject = currentConfig.subjects[si];
+        if ((subject.classes || []).includes(name.trim())) return alert('班级已存在');
+        subject.classes = subject.classes || [];
+        subject.classes.push(name.trim());
+        if (await saveConfig()) { renderSubjects(); updateFileFilters(); updateSubFilters(); }
     }
 
     async function removeClass(si, ci) {
-        const r = await api('DELETE', '/admin/subjects/' + si + '/classes/' + ci, null);
-        if (r.success) loadConfig(); else alert(r.message || '删除失败');
+        currentConfig.subjects[si].classes.splice(ci, 1);
+        if (await saveConfig()) { renderSubjects(); updateFileFilters(); updateSubFilters(); }
+        else loadConfig();
     }
 
     async function addHomework(si) {
         const name = prompt('输入作业名称：');
         if (!name || !name.trim()) return;
-        const r = await api('POST', '/admin/subjects/' + si + '/homeworks', { name: name.trim() });
-        if (r.success) loadConfig(); else alert(r.message || '添加失败');
+        const subject = currentConfig.subjects[si];
+        subject.homeworks = subject.homeworks || [];
+        if (subject.homeworks.some(homework => homework.name === name.trim())) return alert('作业已存在');
+        subject.homeworks.push({ name: name.trim() });
+        if (await saveConfig()) { renderSubjects(); updateFileFilters(); updateSubFilters(); }
     }
 
+    async function addLesson(si, hi) {
+        const name = prompt('输入课时名称：');
+        if (!name || !name.trim()) return;
+        const homework = currentConfig.subjects[si].homeworks[hi];
+        homework.lessons = homework.lessons || [];
+        if (homework.lessons.some(lesson => lesson.name === name.trim())) return alert('课时已存在');
+        homework.lessons.push({ name: name.trim(), description: '' });
+        if (await saveConfig()) renderSubjects();
+        else loadConfig();
+    }
     async function removeHomework(si, hi) {
-        const r = await api('DELETE', '/admin/subjects/' + si + '/homeworks/' + hi, null);
-        if (r.success) loadConfig(); else alert(r.message || '删除失败');
+        currentConfig.subjects[si].homeworks.splice(hi, 1);
+        if (await saveConfig()) { renderSubjects(); updateFileFilters(); updateSubFilters(); }
+        else loadConfig();
     }
 
     // ========== 模板管理 ==========
@@ -539,12 +831,12 @@
     async function loadTemplateList(si, hi) {
         const sub = currentConfig.subjects[si];
         const hw = sub.homeworks[hi];
-        const r = await api('GET', '/admin/templates?subject=' + encodeURIComponent(sub.name) + '&homework=' + encodeURIComponent(hw.name));
+        const r = await api('GET', '/admin/template/list?subject=' + encodeURIComponent(sub.name));
         let html = '';
         if (r.success && r.data && r.data.length) {
             html += '<div class="template-list">';
             r.data.forEach(t => {
-                html += '<div class="template-item"><span class="template-item-name">\uD83D\uDCC4 ' + esc(t) + '</span><button class="remove-btn" onclick="deleteTemplate(\'' + esc(sub.name) + '\',\'' + esc(hw.name) + '\',\'' + esc(t) + '\')">\uD83D\uDDD1</button></div>';
+                html += '<div class="template-item"><span class="template-item-name">' + icon('file') + ' ' + esc(t) + '</span><button class="remove-btn" onclick="deleteTemplate(\'' + esc(t).replace(/'/g, "\\'") + '\')">' + icon('trash') + '</button></div>';
             });
             html += '</div>';
         } else {
@@ -562,7 +854,7 @@
         formData.append('file', fileInput.files[0]);
         formData.append('subject', sub.name);
         formData.append('homework', hw.name);
-        const res = await fetch('/api/v1/admin/templates/upload', {
+        const res = await fetch('/api/v1/admin/template/upload', {
             method: 'POST',
             headers: { 'X-Admin-Token': adminToken },
             body: formData
@@ -572,9 +864,9 @@
         else alert(r.message || '上传失败');
     }
 
-    async function deleteTemplate(subject, homework, filename) {
-        if (!confirm('确定删除模板「' + filename + '」？')) return;
-        const r = await api('POST', '/admin/templates/delete', { subject, homework, filename });
+    async function deleteTemplate(path) {
+        if (!confirm('确定删除模板「' + path + '」？')) return;
+        const r = await api('POST', '/admin/template/delete', { path });
         if (r.success) loadTemplateList(uploadState.subjectIdx, uploadState.homeworkIdx);
         else alert(r.message || '删除失败');
     }
@@ -618,10 +910,11 @@
         const r = await api('GET', url);
         const tbody = document.getElementById('fileTableBody');
         const empty = document.getElementById('fileEmptyState');
-        if (r.success && r.data && r.data.length) {
+        const files = r.success && r.data && r.data.files ? r.data.files : [];
+        if (files.length) {
             empty.classList.add('hidden');
             document.getElementById('fileTableContainer').classList.remove('hidden');
-            tbody.innerHTML = r.data.map(f => '<tr><td class="file-name">' + esc(f.name) + '</td><td>' + formatSize(f.size) + '</td><td>' + f.modified + '</td><td style="color:rgba(255,255,255,0.4);font-size:11px">' + esc(f.path) + '</td><td><button class="btn btn-danger btn-small" onclick="deleteFile(\'' + esc(f.path) + '\')">删除</button></td></tr>').join('');
+            tbody.innerHTML = files.map(f => '<tr><td class="file-name">' + esc(f.name) + '</td><td>' + formatSize(f.size) + '</td><td>' + f.modified + '</td><td style="color:rgba(255,255,255,0.4);font-size:11px">' + esc(f.path) + '</td><td><button class="btn btn-danger btn-small" onclick="deleteFile(\'' + esc(f.path) + '\')">删除</button></td></tr>').join('');
         } else {
             document.getElementById('fileTableContainer').classList.add('hidden');
             empty.classList.remove('hidden');
@@ -675,15 +968,166 @@
             html += '</div></div>';
             html += '<div class="content-section"><h4>未提交 (' + d.not_submitted.length + ')</h4><div class="tag-list">';
             d.not_submitted.forEach(s => { html += '<span class="tag" style="border-color:rgba(255,107,107,0.3)">' + esc(s) + '</span>'; });
-            if (!d.not_submitted.length) html += '<span style="color:rgba(255,255,255,0.4);font-size:13px">全部已提交 🎉</span>';
+            if (!d.not_submitted.length) html += '<span style="color:rgba(255,255,255,0.4);font-size:13px">全部已提交</span>';
             html += '</div></div></div>';
+            html += '<div class="content-section" style="margin-top:16px"><h4>作业评审</h4><div id="reviewList" style="font-size:13px"></div></div>';
             container.innerHTML = html;
+            loadReviewList(subject, cls, homework);
         } else {
             container.innerHTML = '';
             empty.classList.remove('hidden');
         }
     }
 
+    async function loadReviewList(subject, cls, homework) {
+        const list = document.getElementById('reviewList');
+        if (!list) return;
+        const r = await api('GET', '/admin/students');
+        if (!r.success) { list.innerHTML = '加载失败'; return; }
+        const students = (r.data || []).filter(function(s){ return s.class === cls; });
+        let html = '';
+        students.forEach(function(stu){
+            html += '<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.05)">' +
+              '<span style="flex:1">' + esc(stu.name) + ' (' + esc(stu.student_id) + ')</span>' +
+              '<select id="rs_' + esc(stu.student_id) + '" style="padding:4px 6px;border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);margin-right:6px;font-size:12px">' +
+              '<option value="">未评审</option><option value="passed">通过</option><option value="rejected">退回</option></select>' +
+              '<input id="rc_' + esc(stu.student_id) + '" placeholder="批注" style="padding:4px 6px;border-radius:4px;background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);width:100px;margin-right:6px;font-size:12px">' +
+              '<button class="btn btn-primary btn-small" onclick="doReview(\'' + esc(stu.student_id) + '\',\'' + esc(subject) + '\',\'' + esc(homework) + '\')">评审</button>' +
+              '</div>';
+        });
+        list.innerHTML = html || '暂无学生';
+    }
+
+    async function doReview(studentId, subject, homework) {
+        const status = document.getElementById('rs_' + studentId).value;
+        const comment = document.getElementById('rc_' + studentId).value;
+        if (!status) { alert('请选择评审结果'); return; }
+        const r = await api('POST', '/admin/review', { student_id: studentId, subject: subject, homework: homework, status: status, comment: comment });
+        if (r.success) { alert('评审完成'); loadSubmissions(); }
+        else alert(r.message || '评审失败');
+    }
+
+    // ========== 学生名单管理 ==========
+    function parseStudentImport(text) {
+        const content = text.trim();
+        if (!content) return [];
+        if (content.startsWith('[') || content.startsWith('{')) {
+            const parsed = JSON.parse(content);
+            const items = Array.isArray(parsed) ? parsed : parsed.students;
+            if (!Array.isArray(items)) throw new Error('JSON 中未找到 students 数组');
+            return items.map(item => ({
+                student_id: String(item.student_id || item.id || '').trim(),
+                name: String(item.name || item.student_name || '').trim(),
+                class: String(item.class || item.class_name || '').trim(),
+                ...(item.password ? { password: String(item.password) } : {})
+            }));
+        }
+        const lines = content.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const first = lines[0].split(/[,\t]/).map(value => value.trim().toLowerCase());
+        const hasHeader = first.includes('student_id') || first.includes('学号') || first.includes('id');
+        const start = hasHeader ? 1 : 0;
+        return lines.slice(start).map(line => {
+            const columns = line.split(/[,\t]/).map(value => value.trim());
+            return { student_id: columns[0] || '', name: columns[1] || '', class: columns[2] || '', ...(columns[3] ? { password: columns[3] } : {}) };
+        });
+    }
+
+    async function loadStudents() {
+        const r = await api('GET', '/admin/students');
+        const body = document.getElementById('studentTableBody');
+        const empty = document.getElementById('studentEmptyState');
+        if (!r.success) return;
+        const students = Array.isArray(r.data) ? r.data : [];
+        if (!students.length) {
+            body.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+        body.innerHTML = students.map(student => {
+            const id = esc(student.student_id);
+            const encodedId = encodeURIComponent(student.student_id);
+            const status = student.force_password_change ? '<span class="status-badge">待修改密码</span>' : '<span class="status-badge ready">已设置</span>';
+            return '<tr><td>' + id + '</td><td>' + esc(student.name) + '</td><td>' + esc(student.class) + '</td><td>' + status + '</td><td><div class="student-actions"><button class="btn btn-secondary btn-small" onclick="resetStudentPassword(\'' + encodedId + '\')">重置密码</button><button class="btn btn-danger btn-small" onclick="deleteStudent(\'' + encodedId + '\')">删除</button></div></td></tr>';
+        }).join('');
+    }
+
+    async function downloadStudentTemplate() {
+        try {
+            const response = await fetch('/api/v1/admin/students/template', { headers: { 'X-Admin-Token': adminToken } });
+            if (!response.ok) throw new Error('模板下载失败');
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'student-list-template.xlsx';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch (error) {
+            alert(error.message || '模板下载失败');
+        }
+    }
+
+    async function importStudentXlsx(input) {
+        const message = document.getElementById('studentXlsxMsg');
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!file.name.toLowerCase().endsWith('.xlsx')) {
+            showMsg(message, '请选择 .xlsx 文件', 'error');
+            input.value = '';
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const response = await fetch('/api/v1/admin/students/import-xlsx', {
+                method: 'POST',
+                headers: { 'X-Admin-Token': adminToken },
+                body: formData
+            });
+            const result = await response.json();
+            if (!result.success) throw new Error(result.message || 'XLSX 导入失败');
+            showMsg(message, result.message || 'XLSX 名单导入成功', 'success');
+            await loadStudents();
+            await loadConfig();
+        } catch (error) {
+            showMsg(message, error.message || 'XLSX 导入失败', 'error');
+        } finally {
+            input.value = '';
+        }
+    }
+    async function importStudents() {
+        const message = document.getElementById('studentImportMsg');
+        try {
+            const students = parseStudentImport(document.getElementById('studentImportText').value);
+            if (!students.length) throw new Error('请输入名单内容');
+            if (students.some(student => !student.student_id || !student.name || !student.class)) throw new Error('每行必须包含学号、姓名和班级');
+            const r = await api('POST', '/admin/students/import', { students });
+            if (!r.success) { showMsg(message, r.message || '导入失败', 'error'); return; }
+            showMsg(message, r.message || '名单导入成功', 'success');
+            document.getElementById('studentImportText').value = '';
+            await loadStudents();
+            await loadConfig();
+        } catch (error) {
+            showMsg(message, error.message || '名单格式错误', 'error');
+        }
+    }
+
+    async function resetStudentPassword(studentId) {
+        if (!confirm('确定将该学生密码重置为 000000 吗？')) return;
+        const r = await api('POST', '/admin/students/' + studentId + '/reset');
+        if (r.success) { alert('密码已重置为 000000'); loadStudents(); }
+        else alert(r.message || '重置失败');
+    }
+
+    async function deleteStudent(studentId) {
+        if (!confirm('确定删除该学生吗？删除后该账号将无法登录。')) return;
+        const r = await api('DELETE', '/admin/students/' + studentId);
+        if (r.success) loadStudents();
+        else alert(r.message || '删除失败');
+    }
     // ========== 设置 - 密码修改 ==========
     async function changePassword() {
         const oldPwd = document.getElementById('oldPassword').value;
@@ -727,9 +1171,146 @@
         document.getElementById('modal').classList.add('active');
     }
 
-    function closeModal() { document.getElementById('modal').classList.remove('active'); modalCallback = null; }
+    function closeModal() { document.getElementById('modal').classList.remove('active'); modalCallback = null; document.getElementById('modalConfirmBtn').classList.remove('hidden'); document.getElementById('lessonSaveBtn').classList.add('hidden'); }
     function confirmModal() { if (modalCallback) modalCallback(); closeModal(); }
 
+    // ========== 课时编辑 ==========
+    let lessonEditorState = { subject: '', homework: '', lesson: '' };
+
+    function openLessonEditor(si, hi, lessonName) {
+        const subject = currentConfig.subjects[si];
+        const homework = subject.homeworks[hi];
+        const lesson = (homework.lessons || []).find(item => item.name === lessonName) || {};
+        lessonEditorState = { subject: subject.name, homework: homework.name, lesson: lessonName, description: lesson.description || '' };
+        document.getElementById('modalTitle').textContent = '编辑课时 - ' + lessonName;
+        document.getElementById('modalBody').innerHTML = `<div class="form-group"><label>课时简介（相关介绍）</label><textarea id="lessonDescription" rows="3" placeholder="本节课简介，将显示在学生端课时列表和课时内容上方。">${esc(lessonEditorState.description)}</textarea></div><div class="form-group"><label>Markdown 内容</label><textarea id="lessonContent" rows="18" placeholder="# 课时标题
+
+支持文字、图片、视频和附件链接。"></textarea></div><div class="form-group"><label>上传课时媒体</label><input type="file" id="lessonMediaFile" accept="image/*,video/*,.pdf,.doc,.docx,.zip,.xlsx,.pptx"><button class="btn btn-secondary btn-small" type="button" onclick="uploadLessonMedia()" style="margin-top:8px">上传并插入链接</button></div><p class="student-import-help">图片、视频和附件可上传后自动插入 Markdown。视频也可使用 @[视频](媒体地址)。</p>`;
+        document.getElementById('modalConfirmBtn').classList.add('hidden');
+        document.getElementById('lessonSaveBtn').classList.remove('hidden');
+        document.getElementById('modal').classList.add('active');
+        loadLessonContent();
+    }
+
+    async function loadLessonContent() {
+        const state = lessonEditorState;
+        const r = await api('GET', '/admin/lesson?subject=' + encodeURIComponent(state.subject) + '&homework=' + encodeURIComponent(state.homework) + '&lesson=' + encodeURIComponent(state.lesson));
+        if (r.success && r.data) document.getElementById('lessonContent').value = r.data.content || '';
+    }
+
+    async function uploadLessonMedia() {
+        const fileInput = document.getElementById('lessonMediaFile');
+        if (!fileInput.files.length) return alert('请选择媒体文件');
+        const formData = new FormData();
+        formData.append('subject', lessonEditorState.subject);
+        formData.append('homework', lessonEditorState.homework);
+        formData.append('lesson', lessonEditorState.lesson);
+        formData.append('file', fileInput.files[0]);
+        const response = await fetch('/api/v1/admin/lesson/media', { method: 'POST', headers: { 'X-Admin-Token': adminToken }, body: formData });
+        const result = await response.json();
+        if (!result.success) return alert(result.message || '媒体上传失败');
+        const url = result.data && result.data.url;
+        const textarea = document.getElementById('lessonContent');
+        const fileName = fileInput.files[0].name;
+        const isVideo = fileInput.files[0].type.startsWith('video/');
+        const isImage = fileInput.files[0].type.startsWith('image/');
+        const markdown = isVideo ? `@[视频](${url})` : isImage ? `![${fileName}](${url})` : `[下载${fileName}](${url})`;
+        textarea.value += (textarea.value ? '\n\n' : '') + markdown;
+        fileInput.value = '';
+    }
+    async function saveLessonContent() {
+        const content = document.getElementById('lessonContent').value;
+        const description = document.getElementById('lessonDescription').value;
+        const r = await api('POST', '/admin/lesson', { ...lessonEditorState, content, description });
+        if (r.success) { alert('课时内容已保存'); closeModal(); loadConfig(); }
+        else alert(r.message || '保存课时失败');
+    }
+
+    async function importSubjects() {
+        const message = document.getElementById('subjectImportMsg');
+        try {
+            const content = document.getElementById('subjectImportText').value.trim();
+            if (!content) throw new Error('请输入导入内容');
+            let subjects;
+            if (content.startsWith('[') || content.startsWith('{')) {
+                const parsed = JSON.parse(content);
+                subjects = Array.isArray(parsed) ? parsed : parsed.subjects;
+            } else {
+                const lines = content.split(/\r?\n/).filter(line => line.trim());
+                const first = lines[0].split(/[,\t]/).map(value => value.trim().toLowerCase());
+                const hasHeader = first.includes('subject') || first.includes('科目');
+                subjects = lines.slice(hasHeader ? 1 : 0).map(line => {
+                    const columns = line.split(/[,\t]/).map(value => value.trim());
+                    return { subject: columns[0] || '', class: columns[1] || '', homework: columns[2] || '', description: columns[3] || '' };
+                });
+            }
+            if (!Array.isArray(subjects) || !subjects.length) throw new Error('没有可导入的科目');
+            const r = await api('POST', '/admin/subjects/import', { subjects });
+            if (!r.success) throw new Error(r.message || '导入失败');
+            showMsg(message, r.message || '科目导入成功', 'success');
+            document.getElementById('subjectImportText').value = '';
+            await loadConfig();
+        } catch (error) {
+            showMsg(message, error.message || '格式错误', 'error');
+        }
+    }
+    // ========== 课程元数据编辑 ==========
+    function editCourseMeta(si) {
+        const sub = currentConfig.subjects[si];
+        const desc = sub.description || '';
+        const cover = sub.cover_image || '';
+        const major = sub.major || '';
+        const body = '<div class="form-group"><label>课程简介</label><textarea id="metaDesc" rows="3" style="width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2)">' + esc(desc) + '</textarea></div>' +
+          '<div class="form-group"><label>封面图片URL</label><input id="metaCover" value="' + esc(cover) + '" placeholder="/lesson-media/.../cover.jpg" style="width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2)"></div>' +
+          '<div class="form-group"><label>专业</label><input id="metaMajor" value="' + esc(major) + '" placeholder="计算机应用" style="width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.2)"></div>';
+        openModal('编辑课程信息 - ' + sub.name, body, async function(){
+            const desc = document.getElementById('metaDesc').value.trim();
+            const cover = document.getElementById('metaCover').value.trim();
+            const major = document.getElementById('metaMajor').value.trim();
+            const r = await api('POST', '/admin/course-meta/' + encodeURIComponent(sub.name), { description: desc || null, cover_image: cover || null, major: major || null });
+            if (r.success) { closeModal(); await loadConfig(); renderSubjects(); }
+            else alert(r.message || '保存失败');
+        });
+    }
+    // ========== 当前课程设置 ==========
+    function initCurrentCourseSelects() {
+      if (!currentConfig) return;
+      const subSel = document.getElementById('currentSubject');
+      subSel.innerHTML = '<option value="">选择科目</option>';
+      for (const subj of Object.keys(currentConfig.subjects || {})) {
+        const opt = document.createElement('option');
+        opt.value = subj;
+        opt.textContent = subj;
+        subSel.appendChild(opt);
+      }
+      if (currentConfig.current_course) {
+        subSel.value = currentConfig.current_course.subject;
+        onCurrentSubjectChange();
+        document.getElementById('currentClass').value = currentConfig.current_course.class;
+      }
+    }
+    function onCurrentSubjectChange() {
+      const subj = document.getElementById('currentSubject').value;
+      const clsSel = document.getElementById('currentClass');
+      clsSel.innerHTML = '<option value="">选择班级</option>';
+      if (subj && currentConfig && currentConfig.subjects[subj]) {
+        for (const cls of currentConfig.subjects[subj].classes || []) {
+          const opt = document.createElement('option');
+          opt.value = cls;
+          opt.textContent = cls;
+          clsSel.appendChild(opt);
+        }
+      }
+    }
+    async function saveCurrentCourse() {
+      const subject = document.getElementById('currentSubject').value;
+      const cls = document.getElementById('currentClass').value;
+      if (!subject || !cls) { alert('请选择科目和班级'); return; }
+      const r = await api('POST', '/admin/current-course', { subject, class: cls });
+      const msg = document.getElementById('currentCourseMsg');
+      if (r.success) { showMsg(msg, '当前课程设置成功', 'success'); await loadConfig(); }
+      else showMsg(msg, r.message || '设置失败', 'error');
+    }
     // ========== 工具 ==========
     function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
     </script>

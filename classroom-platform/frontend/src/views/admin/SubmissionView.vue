@@ -2,16 +2,22 @@
 /**
  * 作业提交记录：教师端查看学生提交、预览文件并标记审阅状态。
  *
- * 列表支持按课程 / 课时筛选，以及「仅看重复提交」；
+ * 列表支持按课程 / 课时 / 审阅标签筛选，以及「仅看重复提交」；
  * 详情弹窗复用 SubmissionPreview 组件，按文件类型分流预览。
  * 提交时间与来源 IP 均由服务端记录，客户端无法伪造。
+ *
+ * 这里是「按记录逐条翻」的视角；需要整班批量批改时走课时批改页，
+ * 两个入口共用同一套审阅字段，互不冲突。
  */
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   api,
+  REVIEW_LABEL_META,
+  reviewLabelText,
   type Course,
   type Lesson,
+  type ReviewLabel,
   type Submission,
   type SubmissionDetail,
   type SubmissionStatus,
@@ -36,6 +42,8 @@ const lessonsLoading = ref(false)
 const courseId = ref<FilterId>('')
 const lessonId = ref<FilterId>('')
 const duplicateOnly = ref(false)
+/** 按审阅标签筛选；空串表示不限 */
+const reviewLabel = ref<ReviewLabel | 'unreviewed' | ''>('')
 
 const rows = ref<Submission[]>([])
 const total = ref(0)
@@ -47,10 +55,16 @@ const detailLoading = ref(false)
 const detail = ref<SubmissionDetail | null>(null)
 /** 正在提交的审阅状态，用于两个按钮各自独立 loading */
 const reviewingStatus = ref<SubmissionStatus | null>(null)
+/** 正在切换的标签，避免连点造成状态错乱 */
+const labelingId = ref<number | null>(null)
 
 /** 空态文案随筛选条件变化，便于教师判断是「没有数据」还是「筛过头了」 */
 const emptyText = computed(() => {
-  const filtered = courseId.value !== '' || lessonId.value !== '' || duplicateOnly.value
+  const filtered =
+    courseId.value !== '' ||
+    lessonId.value !== '' ||
+    duplicateOnly.value ||
+    reviewLabel.value !== ''
   return filtered ? '当前筛选条件下没有提交记录，试试放宽条件' : '还没有学生提交作业'
 })
 
@@ -99,6 +113,7 @@ async function load() {
       courseId: toQueryId(courseId.value),
       lessonId: toQueryId(lessonId.value),
       duplicateOnly: duplicateOnly.value,
+      reviewLabel: reviewLabel.value === '' ? undefined : reviewLabel.value,
     })
     rows.value = result.items
     total.value = result.total
@@ -114,6 +129,7 @@ async function resetFilters() {
   courseId.value = ''
   lessonId.value = ''
   duplicateOnly.value = false
+  reviewLabel.value = ''
   lessons.value = []
   await load()
 }
@@ -123,6 +139,41 @@ function statusTagType(status: SubmissionStatus): 'success' | 'warning' | 'info'
   if (status === 'reviewed') return 'success'
   if (status === 'flagged') return 'warning'
   return 'info'
+}
+
+/** 审阅标签配色 */
+function labelTagType(label: string): 'success' | 'primary' | 'danger' | 'info' {
+  const found = REVIEW_LABEL_META.find((item) => item.value === label)
+  return (found?.type as 'success' | 'primary' | 'danger' | 'info') ?? 'info'
+}
+
+/** 分数显示：未打分为「—」 */
+function scoreText(score: number | null): string {
+  if (score === null || score === undefined) return '—'
+  return Number.isInteger(score) ? String(score) : score.toFixed(1)
+}
+
+/** 列表里直接打标签：再点一次同一标签视为取消 */
+async function labelRow(row: Submission, label: ReviewLabel) {
+  const next: ReviewLabel = row.review_label === label ? '' : label
+  labelingId.value = row.id
+  try {
+    const updated = await api.reviewSubmission(row.id, { label: next })
+    // 原地更新行，避免整表重载导致滚动位置丢失
+    Object.assign(row, {
+      review_label: updated.review_label,
+      review_score: updated.review_score,
+      review_comment: updated.review_comment,
+      reviewed_at: updated.reviewed_at,
+      status: updated.status,
+    })
+    if (detail.value?.id === row.id) detail.value = updated
+    ElMessage.success(next === '' ? '已取消标签' : `已标记为「${reviewLabelText(next)}」`)
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : '标签保存失败')
+  } finally {
+    labelingId.value = null
+  }
 }
 
 /** 打开详情弹窗并按需拉取完整详情（含文件列表） */
@@ -146,13 +197,38 @@ async function review(status: SubmissionStatus) {
 
   reviewingStatus.value = status
   try {
-    detail.value = await api.reviewSubmission(detail.value.id, status)
+    detail.value = await api.reviewSubmission(detail.value.id, { status })
     ElMessage.success(status === 'flagged' ? '已标记为问题' : '已标记为已查看')
     await load()
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : '标记失败')
   } finally {
     reviewingStatus.value = null
+  }
+}
+
+/** 详情弹窗里打标签 */
+async function labelDetail(label: ReviewLabel) {
+  if (!detail.value) return
+  const next: ReviewLabel = detail.value.review_label === label ? '' : label
+  labelingId.value = detail.value.id
+  try {
+    detail.value = await api.reviewSubmission(detail.value.id, { label: next })
+    const row = rows.value.find((item) => item.id === detail.value?.id)
+    if (row) {
+      Object.assign(row, {
+        review_label: detail.value.review_label,
+        review_score: detail.value.review_score,
+        review_comment: detail.value.review_comment,
+        reviewed_at: detail.value.reviewed_at,
+        status: detail.value.status,
+      })
+    }
+    ElMessage.success(next === '' ? '已取消标签' : `已标记为「${reviewLabelText(next)}」`)
+  } catch (err) {
+    ElMessage.error(err instanceof Error ? err.message : '标签保存失败')
+  } finally {
+    labelingId.value = null
   }
 }
 </script>
@@ -200,6 +276,25 @@ async function review(status: SubmissionStatus) {
       </div>
 
       <div class="filter-bar__item">
+        <span class="filter-bar__label">审阅标签</span>
+        <el-select
+          v-model="reviewLabel"
+          placeholder="全部"
+          clearable
+          style="width: 140px"
+          @change="load"
+        >
+          <el-option label="待批改" value="unreviewed" />
+          <el-option
+            v-for="meta in REVIEW_LABEL_META"
+            :key="meta.value"
+            :label="meta.text"
+            :value="meta.value"
+          />
+        </el-select>
+      </div>
+
+      <div class="filter-bar__item">
         <span class="filter-bar__label">仅看重复提交</span>
         <el-switch v-model="duplicateOnly" @change="load" />
       </div>
@@ -215,6 +310,12 @@ async function review(status: SubmissionStatus) {
         <el-table-column prop="id" label="ID" width="70" />
 
         <el-table-column prop="student_name" label="学生姓名" width="110" show-overflow-tooltip />
+
+        <el-table-column label="学号" width="110">
+          <template #default="{ row }">
+            <span class="mono">{{ row.student_no || '—' }}</span>
+          </template>
+        </el-table-column>
 
         <el-table-column label="课程" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.course_title || '—' }}</template>
@@ -245,6 +346,33 @@ async function review(status: SubmissionStatus) {
             <el-tag size="small" :type="statusTagType(row.status)">
               {{ submissionStatusText(row.status) }}
             </el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="分数" width="80">
+          <template #default="{ row }">
+            <span :class="{ 'score-strong': row.review_score !== null }">
+              {{ scoreText(row.review_score) }}
+            </span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="标签" min-width="230">
+          <template #default="{ row }">
+            <div class="tag-row">
+              <el-tag
+                v-for="meta in REVIEW_LABEL_META"
+                :key="meta.value"
+                size="small"
+                :type="row.review_label === meta.value ? labelTagType(meta.value) : 'info'"
+                :effect="row.review_label === meta.value ? 'dark' : 'plain'"
+                class="tag-row__btn"
+                :class="{ 'tag-row__btn--busy': labelingId === row.id }"
+                @click="labelRow(row, meta.value)"
+              >
+                {{ meta.text }}
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
 
@@ -279,7 +407,12 @@ async function review(status: SubmissionStatus) {
           <div class="detail__meta">
             <div class="detail__row">
               <span class="detail__label">学生姓名</span>
-              <span class="detail__value">{{ detail.student_name }}</span>
+              <span class="detail__value">
+                {{ detail.student_name }}
+                <span v-if="detail.student_no" class="mono detail__no">
+                  {{ detail.student_no }}
+                </span>
+              </span>
             </div>
 
             <div class="detail__row">
@@ -311,6 +444,36 @@ async function review(status: SubmissionStatus) {
                   {{ submissionStatusText(detail.status) }}
                 </el-tag>
               </span>
+            </div>
+
+            <div class="detail__row detail__row--wide">
+              <span class="detail__label">审阅标签</span>
+              <span class="detail__value">
+                <span class="tag-row">
+                  <el-tag
+                    v-for="meta in REVIEW_LABEL_META"
+                    :key="meta.value"
+                    size="small"
+                    :type="detail.review_label === meta.value ? labelTagType(meta.value) : 'info'"
+                    :effect="detail.review_label === meta.value ? 'dark' : 'plain'"
+                    class="tag-row__btn"
+                    @click="labelDetail(meta.value)"
+                  >
+                    {{ meta.text }}
+                  </el-tag>
+                </span>
+                <span v-if="detail.reviewed_at" class="detail__value--small detail__reviewed">
+                  批改于 {{ formatTime(detail.reviewed_at) }}
+                  <template v-if="detail.review_score !== null">
+                    · 分数 {{ scoreText(detail.review_score) }}
+                  </template>
+                </span>
+              </span>
+            </div>
+
+            <div v-if="detail.review_comment" class="detail__row detail__row--wide">
+              <span class="detail__label">教师评语</span>
+              <span class="detail__value">{{ detail.review_comment }}</span>
             </div>
 
             <div class="detail__row detail__row--wide">
@@ -390,6 +553,42 @@ async function review(status: SubmissionStatus) {
 
 .muted {
   color: var(--text-sub);
+}
+
+/* 行内标签按钮：列表里直接打标签，不必开弹窗 */
+.tag-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tag-row__btn {
+  cursor: pointer;
+  user-select: none;
+}
+
+.tag-row__btn:hover {
+  opacity: 0.82;
+}
+
+/* 请求进行中时压暗，提示已在保存 */
+.tag-row__btn--busy {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.score-strong {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail__no {
+  margin-left: 8px;
+  color: var(--text-sub);
+}
+
+.detail__reviewed {
+  margin-left: 10px;
 }
 
 /* 详情弹窗 */

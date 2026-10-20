@@ -1,975 +1,1571 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CUMS - 文件上传系统</title>
-    <style>
-        /* ========== 基础样式 ========== */
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f0f2f5;
-            min-height: 100vh;
-            color: #333;
-        }
-
-        /* ========== 头部 ========== */
-        .header {
-            background: #fff;
-            padding: 16px 24px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .header h1 {
-            font-size: 18px;
-            font-weight: 500;
-            color: #1a1a1a;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            font-size: 14px;
-            color: #666;
-        }
-
-        /* ========== 按钮 ========== */
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: #1890ff;
-            color: #fff;
-        }
-
-        .btn-primary:hover {
-            background: #40a9ff;
-        }
-
-        .btn-link {
-            background: none;
-            color: #666;
-            padding: 8px;
-        }
-
-        .btn-link:hover {
-            color: #1890ff;
-        }
-
-        .btn-logout {
-            color: #ff4d4f;
-        }
-
-        /* ========== 主内容 ========== */
-        .main {
-            max-width: 480px;
-            margin: 40px auto;
-            padding: 0 16px;
-        }
-
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            padding: 32px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-
-        .card-title {
-            font-size: 16px;
-            font-weight: 500;
-            margin-bottom: 24px;
-            text-align: center;
-        }
-
-        /* ========== 欢迎页 ========== */
-        .welcome {
-            text-align: center;
-            padding: 40px 0;
-        }
-
-        .welcome p {
-            color: #999;
-            margin-bottom: 24px;
-        }
-
-        /* ========== 表单 ========== */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
-            color: #333;
-        }
-
-        .form-group select,
-        .form-group input[type="text"] {
-            width: 100%;
-            padding: 10px 12px;
-            border: 1px solid #d9d9d9;
-            border-radius: 6px;
-            font-size: 14px;
-            transition: border-color 0.2s;
-        }
-
-        .form-group select:focus,
-        .form-group input:focus {
-            outline: none;
-            border-color: #1890ff;
-        }
-
-        .form-group input[type="file"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px dashed #d9d9d9;
-            border-radius: 6px;
-            background: #fafafa;
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 12px;
-            background: #1890ff;
-            color: #fff;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .submit-btn:hover {
-            background: #40a9ff;
-        }
-
-        .submit-btn:disabled {
-            background: #d9d9d9;
-            cursor: not-allowed;
-        }
-
-        /* ========== 消息提示 ========== */
-        .message {
-            padding: 12px 16px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            display: none;
-        }
-
-        .message.success {
-            display: block;
-            background: #f6ffed;
-            border: 1px solid #b7eb8f;
-            color: #52c41a;
-        }
-
-        .message.error {
-            display: block;
-            background: #fff2f0;
-            border: 1px solid #ffccc7;
-            color: #ff4d4f;
-        }
-
-        /* ========== 模态框 ========== */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: #fff;
-            border-radius: 12px;
-            padding: 24px;
-            width: 360px;
-            max-width: 90%;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-header h3 {
-            font-size: 16px;
-            font-weight: 500;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            line-height: 1;
-        }
-
-        .modal-close:hover {
-            color: #333;
-        }
-
-        /* ========== 班级标签 ========== */
-        .class-tag {
-            display: inline-block;
-            padding: 4px 12px;
-            background: #e6f7ff;
-            border: 1px solid #91d5ff;
-            border-radius: 4px;
-            color: #1890ff;
-            font-size: 12px;
-            margin-bottom: 16px;
-        }
-
-        /* ========== 页脚 ========== */
-        .footer {
-            text-align: center;
-            padding: 20px;
-            color: #999;
-            font-size: 12px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .footer-about {
-            color: #1890ff;
-            cursor: pointer;
-            transition: color 0.2s;
-        }
-
-        .footer-about:hover {
-            color: #40a9ff;
-            text-decoration: underline;
-        }
-
-        .footer-divider {
-            color: #d9d9d9;
-        }
-
-        /* ========== 关于弹窗 ========== */
-        .about-popup {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-
-        .about-popup.active {
-            display: flex;
-        }
-
-        .about-card {
-            background: #fff;
-            border-radius: 16px;
-            padding: 28px;
-            width: 340px;
-            max-width: 90%;
-            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-            animation: popIn 0.25s ease-out;
-        }
-
-        @keyframes popIn {
-            from {
-                opacity: 0;
-                transform: scale(0.9) translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: scale(1) translateY(0);
-            }
-        }
-
-        .about-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .about-header h3 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1a1a1a;
-        }
-
-        .about-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            line-height: 1;
-            transition: color 0.2s;
-        }
-
-        .about-close:hover {
-            color: #333;
-        }
-
-        .about-logo {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-
-        .about-logo-icon {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #1890ff, #36cfc9);
-            border-radius: 16px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            color: #fff;
-            margin-bottom: 12px;
-        }
-
-        .about-logo h4 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1a1a1a;
-        }
-
-        .about-version {
-            display: inline-block;
-            padding: 4px 10px;
-            background: #f0f5ff;
-            color: #1890ff;
-            border-radius: 12px;
-            font-size: 12px;
-            margin-top: 8px;
-        }
-
-        .about-desc {
-            text-align: center;
-            color: #666;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 20px;
-        }
-
-        .about-github {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px 16px;
-            background: #f6f8fa;
-            border: 1px solid #e1e4e8;
-            border-radius: 8px;
-            color: #24292f;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-
-        .about-github:hover {
-            background: #f3f4f6;
-            border-color: #d0d7de;
-        }
-
-        .about-github svg {
-            width: 20px;
-            height: 20px;
-        }
-
-        /* ========== 加载动画 ========== */
-        .loading {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid #fff;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* ========== 隐藏 ========== */
-        .hidden { display: none !important; }
-
-        /* ========== 作业信息区域 ========== */
-        .homework-info {
-            background: #f0f7ff;
-            border: 1px solid #91d5ff;
-            border-radius: 8px;
-            padding: 16px;
-            margin-top: -8px;
-        }
-
-        .homework-description {
-            color: #1890ff;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 12px;
-        }
-
-        .homework-description:empty {
-            display: none;
-        }
-
-        .homework-description + .homework-actions:empty {
-            margin-top: 0;
-        }
-
-        .homework-actions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .btn-template {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            background: #fff;
-            border: 1px solid #1890ff;
-            border-radius: 6px;
-            color: #1890ff;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-
-        .btn-template:hover {
-            background: #1890ff;
-            color: #fff;
-        }
-
-        .btn-template .icon {
-            font-size: 14px;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>CUMS 课程中心</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f5;min-height:100vh;color:#333}
+a{color:#1890ff;text-decoration:none}
+a:hover{color:#40a9ff}
+.navbar{background:#fff;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 4px rgba(0,0,0,.08);position:sticky;top:0;z-index:100}
+.nav-left{display:flex;align-items:center;gap:24px}
+.nav-brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:600;color:#1a1a1a;cursor:pointer}
+.nav-brand svg{width:26px;height:26px;display:block}
+.nav-links{display:flex;gap:4px}
+.nav-links a{padding:8px 16px;border-radius:6px;font-size:14px;color:#555;cursor:pointer;transition:all .15s}
+.nav-links a:hover,.nav-links a.active{background:#e6f7ff;color:#1890ff}
+.nav-right{display:flex;align-items:center;gap:12px}
+.btn-login{padding:6px 20px;border:1px solid #1890ff;border-radius:6px;font-size:14px;color:#1890ff;background:#fff;cursor:pointer;transition:all .15s}
+.btn-login:hover{background:#1890ff;color:#fff}
+.user-menu{position:relative;cursor:pointer}
+.user-menu .trigger{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;font-size:14px;color:#555}
+.user-menu .trigger:hover{background:#f0f0f0}
+.user-dropdown{display:none;position:absolute;right:0;top:100%;margin-top:6px;background:#fff;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.12);min-width:200px;overflow:hidden;z-index:200}
+.user-dropdown.show{display:block}
+.user-dropdown .dd-header{padding:12px 16px;border-bottom:1px solid #f0f0f0;font-size:14px;color:#333}
+.user-dropdown .dd-header .name{font-weight:600}
+.user-dropdown .dd-header .class{color:#999;font-size:12px}
+.user-dropdown .dd-current{padding:10px 16px;border-bottom:1px solid #f0f0f0;font-size:13px}
+.user-dropdown .dd-current .label{color:#999}
+.user-dropdown .dd-item{display:flex;align-items:center;gap:8px;padding:10px 16px;font-size:14px;color:#555;cursor:pointer;transition:background .1s;border:none;background:none;width:100%;text-align:left}
+.user-dropdown .dd-item:hover{background:#f5f5f5}
+.main{max-width:1100px;margin:0 auto;padding:24px 16px}
+.view{display:none}
+.view.active{display:block}
+.current-banner{background:#fff;border-radius:12px;padding:24px;margin-bottom:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;gap:24px}
+.current-banner .banner-left{flex:7;min-width:0;position:relative}
+.current-banner .banner-right{flex:3;min-width:0}
+.current-banner .banner-label{font-size:12px;color:#999;margin-bottom:12px}
+/* 轮播容器 16:9 */
+.current-banner .banner-carousel{position:relative;width:100%;aspect-ratio:16/9;background:#f0f2f5;border-radius:10px;overflow:hidden}
+.current-banner .banner-carousel .slide{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;transition:opacity .8s ease;cursor:pointer;background-size:cover;background-position:center;display:flex;align-items:flex-end;padding:20px;color:#fff}
+.current-banner .banner-carousel .slide.active{opacity:1}
+.current-banner .banner-carousel .slide .slide-overlay{background:linear-gradient(transparent,rgba(0,0,0,.6));position:absolute;bottom:0;left:0;right:0;padding:20px}
+.current-banner .banner-carousel .slide .slide-title{font-size:18px;font-weight:600}
+.current-banner .banner-carousel .slide .slide-meta{font-size:13px;opacity:.8;margin-top:4px}
+.current-banner .banner-carousel .dots{position:absolute;bottom:12px;right:16px;display:flex;gap:6px;z-index:5}
+.current-banner .banner-carousel .dots .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4);cursor:pointer;transition:all .3s;border:none;padding:0}
+.current-banner .banner-carousel .dots .dot.active{background:#fff;transform:scale(1.2)}
+.current-banner .banner-card{background:#f5f7fa;border-radius:10px;padding:14px;display:flex;flex-direction:column;height:100%;min-height:240px;position:relative;justify-content:space-between}
+.current-banner .banner-badge{position:absolute;top:12px;right:12px;background:#ff4d4f;color:#fff;font-size:11px;padding:2px 10px;border-radius:12px;font-weight:500;z-index:2}
+.current-banner .banner-card-cover{width:100%;aspect-ratio:16/9;border-radius:6px;background:linear-gradient(135deg,#1890ff,#36cfc9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;margin-bottom:8px;overflow:hidden;flex-shrink:0}
+.current-banner .banner-card-cover img{width:100%;height:100%;object-fit:cover}
+.current-banner .banner-card-title{font-size:15px;font-weight:600;color:#1a1a1a;margin-top:2px}
+.current-banner .banner-card-desc{font-size:12px;color:#888;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3;flex-shrink:0;min-height:0}
+.current-banner .banner-card-meta{font-size:12px;color:#666;margin-top:2px}
+.current-banner .banner-card-progress{font-size:12px;color:#999;margin-top:2px}
+.current-banner .banner-status{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:2px 10px;border-radius:4px;margin-top:4px}
+.current-banner .banner-card .btn-group{display:flex;gap:8px;margin-top:6px;width:100%}
+.current-banner .banner-card .btn-group .btn{flex:1;text-align:center;padding:6px 0;font-size:13px;border-radius:6px}
+.current-banner .banner-status.green{background:#f6ffed;color:#52c41a}
+.current-banner .banner-status.red{background:#fff2f0;color:#ff4d4f}
+.current-banner .banner-status.blue{background:#e6f7ff;color:#1890ff}
+.current-banner .banner-card .btn-group{display:flex;gap:8px;margin-top:12px}
+.current-banner .banner-card .btn-group .btn{flex:1;text-align:center}
+.current-banner .banner-card .btn-group .btn-submit{background:#52c41a;color:#fff}
+.current-banner .banner-card .btn-group .btn-submit:hover{background:#73d13d}
+.btn{padding:8px 18px;border:none;border-radius:6px;font-size:14px;cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn svg{width:14px;height:14px}
+.btn-primary{background:#1890ff;color:#fff}
+.btn-primary:hover{background:#40a9ff}
+.btn-outline{background:#fff;border:1px solid #1890ff;color:#1890ff}
+.btn-outline:hover{background:#e6f7ff}
+.btn-success{background:#52c41a;color:#fff}
+.btn-success:hover{background:#73d13d}
+.btn-sm{padding:5px 12px;font-size:12px}
+.section-title{font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid #f0f0f0}
+.filter-row{display:flex;gap:12px;margin-bottom:16px}
+.filter-row select{padding:6px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;color:#555;background:#fff}
+.course-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.course-card{background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;transition:box-shadow .15s}
+.course-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1)}
+.course-card .card-cover{height:120px;background:linear-gradient(135deg,#1890ff,#36cfc9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;overflow:hidden}
+.course-card .card-cover img{width:100%;height:100%;object-fit:cover}
+.course-card .card-body{padding:16px}
+.course-card .card-title{font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:4px}
+.course-card .card-major{font-size:12px;color:#999;margin-bottom:6px}
+.course-card .card-meta{font-size:12px;color:#999}
+.course-header{display:flex;gap:24px;margin-bottom:24px}
+.course-header .ch-left{flex:7;background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.course-header .ch-right{flex:3;background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.ch-right .cover-img{width:100%;min-height:120px;border-radius:8px;background:linear-gradient(135deg,#1890ff,#36cfc9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;margin-bottom:12px;overflow:hidden}
+.ch-right .cover-img img{width:100%;height:100%;object-fit:cover}
+.ch-right .course-name{font-size:18px;font-weight:600;margin-bottom:4px}
+.ch-right .course-major{font-size:12px;color:#999;margin-bottom:8px}
+.ch-right .course-desc{font-size:13px;color:#666;line-height:1.6}
+.progress-bar{height:8px;background:#f0f0f0;border-radius:4px;margin:12px 0;overflow:hidden}
+.progress-bar .fill{height:100%;background:#1890ff;border-radius:4px;transition:width .3s}
+.progress-info{display:flex;align-items:center;gap:10px;font-size:13px;color:#666;margin-bottom:10px}
+.progress-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lesson-list{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden}
+.lesson-item{display:flex;align-items:center;padding:16px 24px;border-bottom:1px solid #f5f5f5;cursor:pointer;transition:background .1s}
+.lesson-item:hover{background:#fafafa}
+.lesson-item:last-child{border-bottom:none}
+.lesson-item .li-icon{flex-shrink:0;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-right:12px}
+.lesson-item .li-icon svg{width:16px;height:16px}
+.lesson-item .li-icon.green{background:#f6ffed;color:#52c41a}
+.lesson-item .li-icon.red{background:#fff2f0;color:#ff4d4f}
+.lesson-item .li-icon.blue{background:#e6f7ff;color:#1890ff}
+.lesson-item .li-icon.gray{background:#f5f5f5;color:#bbb}
+.lesson-item .li-info{flex:1;min-width:0}
+.lesson-item .li-name{font-size:15px;font-weight:500;color:#1a1a1a}
+.lesson-item .li-desc{font-size:12px;color:#999;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lesson-item .li-tag{flex-shrink:0;font-size:12px;padding:3px 10px;border-radius:4px;margin:0 12px}
+.lesson-item .li-tag.green{background:#f6ffed;color:#52c41a}
+.lesson-item .li-tag.red{background:#fff2f0;color:#ff4d4f}
+.lesson-item .li-tag.blue{background:#e6f7ff;color:#1890ff}
+.lesson-item .li-arrow{color:#bbb;flex-shrink:0}
+.lesson-detail{display:flex;gap:24px;align-items:flex-start}
+.lesson-detail .ld-main{flex:7;background:#fff;border-radius:12px;padding:32px;box-shadow:0 1px 4px rgba(0,0,0,.06);min-width:0}
+.lesson-detail .ld-side{flex:3;position:sticky;top:72px;background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.ld-main .ld-title{font-size:20px;font-weight:600;margin-bottom:12px}
+.ld-main .ld-intro{padding:12px 16px;background:#f0f7ff;border-left:3px solid #1890ff;border-radius:6px;color:#555;font-size:13px;line-height:1.7;margin-bottom:20px}
+.ld-main .ld-content{line-height:1.8;color:#333;overflow-wrap:anywhere}
+.ld-main .ld-content h1,.ld-main .ld-content h2,.ld-main .ld-content h3{margin:16px 0 8px}
+.ld-main .ld-content img{max-width:100%;height:auto;border-radius:6px}
+.ld-main .ld-content video{max-width:100%;border-radius:6px}
+.ld-main .ld-content pre{background:#f5f5f5;padding:12px;border-radius:6px;overflow-x:auto}
+.ld-main .ld-content code{background:#f5f5f5;padding:2px 6px;border-radius:3px;font-size:13px}
+.toc-title{font-size:14px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.toc-list{list-style:none;max-height:360px;overflow:hidden}
+.toc-list.expanded{max-height:none}
+.toc-list li{padding:8px 10px;border-radius:6px;font-size:13px;color:#555;cursor:pointer;transition:background .1s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toc-list li:hover{background:#f5f5f5}
+.toc-list li.current{color:#ff4d4f;font-weight:600;background:#fff2f0}
+.toc-toggle{display:flex;align-items:center;justify-content:center;gap:4px;padding:8px;font-size:12px;color:#1890ff;cursor:pointer;margin-top:4px}
+.toc-toggle:hover{color:#40a9ff}
+.side-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px;border-radius:6px;font-size:14px;cursor:pointer;margin-top:12px;transition:all .15s;border:none}
+.side-btn-download{background:#f5f5f5;color:#555}
+.side-btn-download:hover{background:#e8e8e8}
+.side-btn-download svg{width:14px;height:14px}
+.side-btn-submit{background:#52c41a;color:#fff}
+.side-btn-submit:hover{background:#73d13d}
+.side-btn-submit svg{width:14px;height:14px}
+.modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:300;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;padding:32px;width:380px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,.15);position:relative}
+.modal-title{font-size:18px;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.modal-title svg{width:20px;height:20px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;margin-bottom:6px;font-size:14px;color:#555}
+.form-group input,.form-group select{width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;transition:border-color .15s}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:#1890ff;box-shadow:0 0 0 2px rgba(24,144,255,.15)}
+.modal-hint{margin-top:16px;font-size:12px;color:#999;display:flex;align-items:center;gap:4px}
+.modal-close{position:absolute;top:16px;right:16px;width:28px;height:28px;border:none;background:none;cursor:pointer;font-size:18px;color:#999;display:flex;align-items:center;justify-content:center;border-radius:50%}
+.modal-close:hover{background:#f5f5f5}
+.attach-modal{width:480px;max-width:95vw}
+.attach-list{max-height:400px;overflow-y:auto}
+.attach-item{display:flex;align-items:center;padding:12px 0;border-bottom:1px solid #f5f5f5}
+.attach-item:last-child{border-bottom:none}
+.attach-item .ai-name{flex:1;font-size:14px;color:#333;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attach-item .ai-size{font-size:12px;color:#999;margin:0 12px;flex-shrink:0}
+.attach-item .ai-actions{display:flex;gap:6px;flex-shrink:0}
+.attach-item .ai-actions .btn svg{width:14px;height:14px}
+.attach-download-all{margin-top:16px;text-align:center}
+.attach-download-all .btn svg{width:14px;height:14px}
+.my-course-card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px}
+.my-course-card .mcc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.my-course-card .mcc-name{font-size:18px;font-weight:600}
+.status-group{margin-top:12px}
+.status-group .sg-title{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:500;margin-bottom:8px;cursor:pointer}
+.status-group .sg-title.green{color:#52c41a}
+.status-group .sg-title.red{color:#ff4d4f}
+.status-group .sg-title.blue{color:#1890ff}
+.status-group .sg-body{padding-left:20px;font-size:13px;color:#666}
+.status-group .sg-body .sg-item{padding:6px 0;display:flex;align-items:center;justify-content:space-between}
+.footer{text-align:center;padding:20px;color:#bbb;font-size:12px}
+@media(max-width:768px){
+  .course-grid{grid-template-columns:repeat(2,1fr)}
+  .course-header{flex-direction:column}
+  .lesson-detail{flex-direction:column}
+  .lesson-detail .ld-side{position:static;width:100%}
+  .navbar{padding:0 12px}
+  .current-banner{flex-wrap:wrap}
+  .ld-side-fab{display:flex}
+}
+@media(max-width:480px){.course-grid{grid-template-columns:1fr}}
+.ld-side-fab{display:none;position:fixed;right:16px;bottom:80px;width:44px;height:44px;border-radius:50%;background:#1890ff;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.2);z-index:150;align-items:center;justify-content:center;cursor:pointer;border:none}
+.ld-side-fab:hover{background:#40a9ff}
+.ld-side-panel{display:none;position:fixed;top:0;right:0;width:300px;max-width:80vw;height:100%;background:#fff;z-index:250;box-shadow:-4px 0 20px rgba(0,0,0,.15);overflow-y:auto;padding:20px}
+.ld-side-panel.show{display:block}
+.ld-side-panel .panel-close{float:right;width:28px;height:28px;border:none;background:none;font-size:18px;cursor:pointer;color:#999;border-radius:50%}
+.ld-side-panel .panel-close:hover{background:#f5f5f5}
+.course-pagination{display:flex;justify-content:center;gap:8px;margin-top:20px;align-items:center;flex-wrap:wrap}
+.course-pagination .page-btn{padding:6px 14px;border:1px solid #d9d9d9;border-radius:8px;background:#fff;color:#555;font-size:13px;cursor:pointer;transition:all .2s;min-width:36px;text-align:center}
+.course-pagination .page-btn:hover:not(:disabled){border-color:#1890ff;color:#1890ff}
+.course-pagination .page-btn.active{background:#1890ff;border-color:#1890ff;color:#fff}
+.course-pagination .page-btn:disabled{opacity:.4;cursor:not-allowed}
+.course-pagination .page-info{font-size:13px;color:#999;margin-left:8px}
+</style>
 </head>
 <body>
-    <!-- 头部 -->
-    <header class="header">
-        <h1>CUMS - 文件上传系统</h1>
-        <div class="user-info" id="userInfo">
-            <button class="btn btn-primary" onclick="showLogin()">登录</button>
+<svg style="display:none" aria-hidden="true">
+  <symbol id="icon-book" viewBox="0 0 24 24"><path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8C6.9 2 6 2.9 6 4v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12z" fill="currentColor"/></symbol>
+  <symbol id="icon-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" fill="currentColor"/></symbol>
+  <symbol id="icon-check" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" fill="currentColor"/></symbol>
+  <symbol id="icon-alert" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/></symbol>
+  <symbol id="icon-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="currentColor"/></symbol>
+  <symbol id="icon-user" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/></symbol>
+  <symbol id="icon-lock" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z" fill="currentColor"/></symbol>
+  <symbol id="icon-info" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor"/></symbol>
+  <symbol id="icon-key" viewBox="0 0 24 24"><path d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z" fill="currentColor"/></symbol>
+  <symbol id="icon-list" viewBox="0 0 24 24"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" fill="currentColor"/></symbol>
+  <symbol id="icon-download" viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" fill="currentColor"/></symbol>
+  <symbol id="icon-send" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" fill="currentColor"/></symbol>
+  <symbol id="icon-logout" viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z" fill="currentColor"/></symbol>
+  <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4zm2 2H5V5h14v14zm0-16H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" fill="currentColor"/></symbol>
+  <symbol id="icon-paperclip" viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z" fill="currentColor"/></symbol>
+  <symbol id="icon-archive" viewBox="0 0 24 24"><path d="M20.54 5.23l-1.39-1.68C18.88 3.21 18.47 3 18 3H6c-.47 0-.88.21-1.16.55L3.46 5.23C3.17 5.57 3 6.02 3 6.5V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6.5c0-.48-.17-.93-.46-1.27zM12 17.5L6.5 12H10v-2h4v2h3.5L12 17.5zM5.12 5l.81-1h12l.94 1H5.12z" fill="currentColor"/></symbol>
+  <symbol id="icon-eye" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" fill="currentColor"/></symbol>
+  <symbol id="icon-chevron-down" viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor"/></symbol>
+  <symbol id="icon-chevron-up" viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6 1.41 1.41z" fill="currentColor"/></symbol>
+  <symbol id="icon-tag" viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z" fill="currentColor"/></symbol>
+  <symbol id="icon-upload" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z" fill="currentColor"/></symbol>
+</svg>
+
+<nav class="navbar" id="navbar">
+  <div class="nav-left">
+    <div class="nav-brand" onclick="showView('home')">
+      <svg viewBox="0 0 256 256" aria-hidden="true"><path fill="#7c8bf8" d="M128 40L172 88L146 88L146 122L110 122L110 88L84 88ZM46 118L210 118L210 210Q178 220 128 220Q78 220 46 210Z"/></svg>
+      <span>CUMS 课程中心</span>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="nav-links" id="navLinks">
+      <a class="active" onclick="showView('home')" data-view="home">全部课程</a>
+      <a onclick="showView('mycourses')" data-view="mycourses" style="display:none">我的课程</a>
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="showLogin()">登录</button>
+    <div class="user-menu" id="userMenu" style="display:none">
+      <div class="trigger" onclick="toggleUserMenu()">
+        <svg><use href="#icon-user"/></svg>
+        <span id="userNameDisplay">用户</span>
+        <svg style="width:12px;height:12px"><use href="#icon-chevron-down"/></svg>
+      </div>
+      <div class="user-dropdown" id="userDropdown">
+        <div class="dd-header">
+          <div class="name" id="ddName"></div>
+          <div class="class" id="ddClass"></div>
         </div>
-    </header>
-
-    <!-- 主内容 -->
-    <main class="main">
-        <!-- 欢迎页（未登录） -->
-        <div class="card" id="welcomeCard">
-            <div class="welcome">
-                <p>请先登录后上传作业</p>
-                <button class="btn btn-primary" onclick="showLogin()">登录</button>
-            </div>
+        <div class="dd-current" id="ddCurrent" style="display:none"></div>
+        <button class="dd-item" onclick="showChangePassword()"><svg><use href="#icon-key"/></svg>修改密码</button>
+        <button class="dd-item" onclick="logout()"><svg><use href="#icon-logout"/></svg>退出登录</button>
+      </div>
+    </div>
+  </div>
+</nav>
+<div class="main">
+  <div class="current-banner" id="currentBanner" style="display:none">
+    <div class="banner-left" id="bannerLeft">
+      <div class="banner-label">当前进行中</div>
+      <div class="banner-carousel" id="bannerCarousel">
+        <!-- 其他课程卡片轮播 -->
+      </div>
+    </div>
+    <div class="banner-right" id="bannerRight">
+      <div class="banner-card">
+        <div class="banner-card-cover" id="bannerCardCover"><span>课程封面</span></div>
+        <div class="banner-card-title" id="bannerCardTitle"></div>
+        <div class="banner-card-desc" id="bannerCardDesc"></div>
+        <div class="banner-card-meta" id="bannerCardMeta"></div>
+        <div class="banner-card-progress" id="bannerCardProgress"></div>
+        <span class="banner-status" id="bannerStatus" style="display:none"></span>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-sm" id="bannerEnter" onclick="goCurrentCourse()" style="flex:1">进入课程</button>
+          <button class="btn btn-submit btn-sm" id="bannerSubmitBtn" onclick="goSubmitForCurrent()" style="flex:1;display:none">提交作业</button>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- 上传表单（已登录） -->
-        <div class="card hidden" id="uploadCard">
-            <div class="class-tag" id="classTag"></div>
-            <h2 class="card-title">作业上传</h2>
-            <div class="message" id="message"></div>
-            <form id="uploadForm" onsubmit="handleUpload(event)">
-                <div class="form-group">
-                    <label>科目</label>
-                    <select id="subjectSelect" onchange="onSubjectChange()" required>
-                        <option value="">请选择科目</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>作业</label>
-                    <select id="homeworkSelect" onchange="onHomeworkChange()" required>
-                        <option value="">请选择作业</option>
-                    </select>
-                </div>
-                <div class="form-group" id="homeworkInfoGroup" style="display: none;">
-                    <div class="homework-info">
-                        <div class="homework-description" id="homeworkDescription"></div>
-                        <div class="homework-actions" id="homeworkActions"></div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label>文件</label>
-                    <input type="file" id="fileInput" required>
-                </div>
-                <button type="submit" class="submit-btn" id="submitBtn">上传文件</button>
-            </form>
+  <div class="view active" id="view-home">
+    <div class="section-title">全部课程</div>
+    <div class="filter-row">
+      <select id="filterMajor" onchange="renderCourses()"><option>全部专业</option></select>
+      <select id="filterClass" onchange="renderCourses()"><option>全部班级</option></select>
+    </div>
+    <div class="course-grid" id="courseGrid"></div>
+    <div id="coursePagination"></div>
+  </div>
+
+  <div class="view" id="view-course">
+    <div class="course-header">
+      <div class="ch-left" id="courseProgress" style="display:flex;flex-direction:column;justify-content:flex-end;min-height:200px">
+        <div style="flex:1"></div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <svg style="width:18px;height:18px;color:#1890ff"><use href="#icon-chart"/></svg>
+            <span style="font-weight:600">我的学习进度</span>
+            <span style="font-size:12px;color:#999" id="cpClass"></span>
+          </div>
+          <div class="progress-bar"><div class="fill" id="cpBar" style="width:0%"></div></div>
+          <div class="progress-info" id="cpInfo"></div>
+          <div class="progress-actions" id="cpActions"></div>
         </div>
+      </div>
+      <div class="ch-right" id="courseInfo">
+        <div class="cover-img" id="ciCover"><span>课程封面</span></div>
+        <div class="course-name" id="ciName"></div>
+        <div class="course-major" id="ciMajor"></div>
+        <div class="course-desc" id="ciDesc"></div>
+      </div>
+    </div>
+    <div class="section-title">全部课时</div>
+    <div class="lesson-list" id="courseLessonList"></div>
+  </div>
 
-    </main>
-
-    <!-- 页脚 -->
-    <footer class="footer">
-        <span id="footerVersion">...</span>
-        <span class="footer-divider">·</span>
-        <span class="footer-about" onclick="showAboutPopup()">关于</span>
-    </footer>
-
-    <!-- 关于弹窗 -->
-    <div class="about-popup" id="aboutPopup">
-        <div class="about-card">
-            <div class="about-header">
-                <h3>关于</h3>
-                <button class="about-close" onclick="hideAboutPopup()">&times;</button>
-            </div>
-            <div class="about-logo">
-                <div class="about-logo-icon">📁</div>
-                <h4>CUMS</h4>
-                <span class="about-version" id="aboutVersion">...</span>
-            </div>
-            <div class="about-desc">
-                简洁的局域网文件上传系统<br>
-                专为机房作业收集场景设计
-            </div>
-            <a href="https://github.com/OXY20/cums" target="_blank" class="about-github">
-                <svg viewBox="0 0 16 16" fill="currentColor">
-                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-                </svg>
-                GitHub 仓库
-            </a>
+  <div class="view" id="view-lesson">
+    <div class="lesson-detail">
+      <div class="ld-main">
+        <div class="ld-title" id="ldTitle"></div>
+        <div class="ld-intro" id="ldIntro" style="display:none"></div>
+        <div class="ld-content" id="ldContent"></div>
+      </div>
+      <div class="ld-side" id="ldSide">
+        <div class="toc-title"><svg style="width:16px;height:16px"><use href="#icon-list"/></svg>课时目录</div>
+        <ul class="toc-list" id="tocList"></ul>
+        <div class="toc-toggle" id="tocToggle" style="display:none" onclick="toggleToc()">
+          <svg style="width:12px;height:12px"><use href="#icon-chevron-down"/></svg>
+          <span id="tocToggleText">展开更多</span>
         </div>
+        <button class="side-btn side-btn-download" onclick="showAttachments()">
+          <svg><use href="#icon-download"/></svg>下载附件
+        </button>
+        <button class="side-btn side-btn-submit" id="ldSubmitBtn" onclick="goSubmit(currentSubject, currentHomework, currentLesson)">
+          <svg><use href="#icon-send"/></svg>提交作业
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="view" id="view-mycourses">
+    <div id="myCoursesList"></div>
+  </div>
+
+  <div class="view" id="view-submit">
+    <div style="background:#fff;border-radius:12px;padding:24px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:16px">
+      <div style="font-size:18px;font-weight:600;margin-bottom:16px">作业提交</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
+        <select id="subSubject" onchange="onSubSubjectChange()" style="padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px">
+          <option>选择课程</option>
+        </select>
+        <select id="subHomework" onchange="onSubHomeworkChange()" style="padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px">
+          <option>选择作业</option>
+        </select>
+        <select id="subLesson" style="padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px">
+          <option>选择课时</option>
+        </select>
+      </div>
     </div>
 
-    <!-- 登录模态框 -->
-    <div class="modal" id="loginModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>用户登录</h3>
-                <button class="modal-close" onclick="hideLogin()">&times;</button>
-            </div>
-            <form onsubmit="handleLogin(event)">
-                <div class="form-group">
-                    <label>班级</label>
-                    <select id="loginClass" required>
-                        <option value="">请选择班级</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>学号</label>
-                    <input type="text" id="loginStudentId" placeholder="请输入学号" required>
-                </div>
-                <div class="form-group">
-                    <label>姓名</label>
-                    <input type="text" id="loginStudentName" placeholder="请输入姓名" required>
-                </div>
-                <button type="submit" class="submit-btn">登录</button>
-            </form>
+    <div class="lesson-detail">
+      <div class="ld-main" style="position:relative">
+        <div id="subReview" style="margin-bottom:16px;display:none"></div>
+        <div style="font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:10px">
+          <span>文件预览</span>
+          <button class="btn btn-outline btn-sm" id="subDrawerToggle" onclick="toggleSubDrawer()" style="display:none">
+            <svg style="width:14px;height:14px"><use href="#icon-list"/></svg>已上传文件
+          </button>
         </div>
+        <div id="subDrawer" style="display:none;border:1px solid #f0f0f0;border-radius:6px;padding:12px;margin-bottom:12px;max-height:200px;overflow-y:auto">
+          <div id="subDrawerList"></div>
+        </div>
+        <div id="subPreview" style="min-height:300px;border:1px solid #f0f0f0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#999;background:#fafafa">
+          请选择文件后在此处预览
+        </div>
+        <div style="margin-top:16px">
+          <label class="btn btn-outline" style="cursor:pointer">
+            <svg style="width:14px;height:14px"><use href="#icon-upload"/></svg>选择文件
+            <input type="file" id="subFileInput" style="display:none" onchange="previewFile(this)" accept=".docx,.xlsx,.pptx,.pdf,.zip,.rar,.7z,.jpg,.jpeg,.png,.gif,.mp4,.webm,.txt">
+          </label>
+          <span id="subFileInfo" style="margin-left:10px;font-size:13px;color:#999">未选择文件</span>
+          <button class="btn btn-success" style="margin-left:12px" onclick="doSubmit()">
+            <svg style="width:14px;height:14px"><use href="#icon-send"/></svg>确认提交
+          </button>
+        </div>
+        <div style="font-size:12px;color:#999;margin-top:8px">支持：docx/xlsx/pptx/pdf/zip/rar/jpg/png/mp4，最大32MB</div>
+      </div>
+      <div class="ld-side" id="subInfo">
+        <div style="font-weight:600;font-size:14px;margin-bottom:12px">作业信息</div>
+        <div id="subInfoContent" style="font-size:13px;color:#666">
+          <div>名称：<span id="subInfoName">--</span></div>
+          <div style="margin-top:8px">说明：<span id="subInfoDesc">--</span></div>
+          <div style="margin-top:8px">模板：<span id="subInfoTpl">--</span></div>
+        </div>
+      </div>
     </div>
+  </div>
+</div>
 
-    <script>
-        // ==================== 全局状态 ====================
-        let currentUser = null;  // 当前用户信息
-        let configData = null;   // 配置数据
-        let isLoggedIn = false;  // 登录状态
+<div class="footer">CUMS <span id="footerVersion"></span></div>
 
-        // ==================== 工具函数 ====================
+<div class="modal-overlay" id="loginOverlay">
+  <div class="modal">
+    <button class="modal-close" onclick="hideLogin()">X</button>
+    <div class="modal-title"><svg><use href="#icon-lock"/></svg>学生登录</div>
+    <div class="form-group">
+      <label>姓名</label>
+      <input type="text" id="loginName" placeholder="请输入姓名">
+    </div>
+    <div class="form-group">
+      <label>密码</label>
+      <input type="password" id="loginPassword" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="doLogin()">登 录</button>
+    <div class="modal-hint">
+      <svg><use href="#icon-info"/></svg>
+      默认密码 000000，首次登录后请及时修改
+    </div>
+  </div>
+</div>
 
-        // HTML 转义函数，防止 XSS 攻击
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+<div class="modal-overlay" id="pwdOverlay">
+  <div class="modal">
+    <button class="modal-close" onclick="hideChangePassword()">X</button>
+    <div class="modal-title"><svg><use href="#icon-lock"/></svg>修改密码</div>
+    <div class="form-group">
+      <label>旧密码</label>
+      <input type="password" id="pwdOld" placeholder="请输入旧密码">
+    </div>
+    <div class="form-group">
+      <label>新密码（至少6位）</label>
+      <input type="password" id="pwdNew" placeholder="请输入新密码">
+    </div>
+    <div class="form-group">
+      <label>确认新密码</label>
+      <input type="password" id="pwdConfirm" placeholder="请再次输入新密码">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px" onclick="doChangePassword()">确认修改</button>
+  </div>
+</div>
+
+<div class="modal-overlay" id="attachOverlay">
+  <div class="modal attach-modal">
+    <button class="modal-close" onclick="hideAttachments()">X</button>
+    <div class="modal-title"><svg><use href="#icon-paperclip"/></svg>本课时附件</div>
+    <div class="attach-list" id="attachList"></div>
+    <div class="attach-download-all" id="attachDownloadAll" style="display:none">
+      <button class="btn btn-outline" onclick="downloadAllAttachments()">
+        <svg><use href="#icon-archive"/></svg>一键打包下载全部附件
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+var currentUser = null;
+var configData = null;
+var currentView = 'home';
+var currentSubject = null;
+var currentHomework = null;
+var currentLesson = null;
+var currentAttachments = [];
+var tocExpanded = false;
+
+async function init() {
+  await loadConfig();
+  await loadVersion();
+  loadSavedUser();
+  showView('home');
+}
+init();
+
+
+// ========== 课程分页功能 ==========
+var coursePageSize = 9;
+var courseCurrentPage = 1;
+var filteredCourses = [];
+
+function renderCourses() {
+  if (!configData) return;
+  var majorFilter = document.getElementById('filterMajor').value;
+  var classFilter = document.getElementById('filterClass').value;
+  var allCourses = [];
+  for (var subject in configData.subjects) {
+    var subj = configData.subjects[subject];
+    if (majorFilter !== '全部专业' && subj.major !== majorFilter) continue;
+    if (classFilter !== '全部班级' && (!subj.classes || subj.classes.indexOf(classFilter) === -1)) continue;
+    var totalLessons = 0;
+    subj.homeworks.forEach(function(h){ totalLessons += (h.lessons ? h.lessons.length : 0); });
+    allCourses.push({ subject: subject, major: subj.major || '', totalLessons: totalLessons, cover: subj.cover_image || '' });
+  }
+  filteredCourses = allCourses;
+  courseCurrentPage = 1;
+  renderCoursePage();
+}
+
+function renderCoursePage() {
+  var grid = document.getElementById('courseGrid');
+  if (!grid) return;
+  var total = filteredCourses.length;
+  var totalPages = Math.ceil(total / coursePageSize) || 1;
+  if (courseCurrentPage > totalPages) courseCurrentPage = totalPages;
+  if (courseCurrentPage < 1) courseCurrentPage = 1;
+  var start = (courseCurrentPage - 1) * coursePageSize;
+  var end = Math.min(start + coursePageSize, total);
+  var pageCourses = filteredCourses.slice(start, end);
+  var html = '';
+  if (pageCourses.length === 0) {
+    html = '<div style="grid-column:1/-1;text-align:center;color:#999;padding:40px">暂无课程</div>';
+  } else {
+    for (var i = 0; i < pageCourses.length; i++) {
+      var c = pageCourses[i];
+      html += '<div class="course-card" onclick="openCourse(&apos;' + esc(c.subject) + '&apos;)">';
+      html += '<div class="card-cover">';
+      if (c.cover) html += '<img src="' + c.cover + '" alt="">';
+      else html += '<span>' + c.subject + '</span>';
+      html += '</div><div class="card-body">';
+      html += '<div class="card-title">' + c.subject + '</div>';
+      if (c.major) html += '<div class="card-major">' + c.major + '</div>';
+      html += '<div class="card-meta">共 ' + c.totalLessons + ' 课时</div>';
+      html += '</div></div>';
+    }
+  }
+  grid.innerHTML = html;
+  // 渲染分页
+  var container = document.getElementById('coursePagination');
+  if (!container) {
+    var viewHome = document.getElementById('view-home');
+    if (!viewHome) return;
+    var pDiv = document.createElement('div');
+    pDiv.id = 'coursePagination';
+    viewHome.appendChild(pDiv);
+    container = pDiv;
+  }
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+  var pHtml = '<div class="course-pagination">';
+  pHtml += '<button class="page-btn" onclick="goCoursePage(' + (courseCurrentPage - 1) + ')" ' + (courseCurrentPage <= 1 ? 'disabled' : '') + '>上一页</button>';
+  for (var j = 1; j <= totalPages; j++) {
+    var active = j === courseCurrentPage ? ' active' : '';
+    pHtml += '<button class="page-btn' + active + '" onclick="goCoursePage(' + j + ')">' + j + '</button>';
+  }
+  pHtml += '<button class="page-btn" onclick="goCoursePage(' + (courseCurrentPage + 1) + ')" ' + (courseCurrentPage >= totalPages ? 'disabled' : '') + '>下一页</button>';
+  pHtml += '<span class="page-info">共 ' + filteredCourses.length + ' 门课程</span>';
+  pHtml += '</div>';
+  container.innerHTML = pHtml;
+}
+
+function goCoursePage(page) {
+  var total = filteredCourses.length;
+  var totalPages = Math.ceil(total / coursePageSize) || 1;
+  if (page < 1 || page > totalPages) return;
+  courseCurrentPage = page;
+  renderCoursePage();
+  var grid = document.getElementById('courseGrid');
+  if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function loadConfig() {
+  try {
+    fetch('/api/v1/config')
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.success) {
+          configData = data.data;
+          updateFilters();
+          renderCourses();
         }
+      });
+  } catch(e) { console.error('加载配置失败:', e); }
+}
 
-        // ==================== 初始化 ====================
+function showView(view) {
+  currentView = view;
+  document.querySelectorAll('.view').forEach(function(v){v.classList.remove('active')});
+  var el = document.getElementById('view-' + view);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('.nav-links a').forEach(function(a){a.classList.remove('active')});
+  var navLink = document.querySelector('[data-view="' + view + '"]');
+  if (navLink) navLink.classList.add('active');
+  // 只在首页显示横幅，其他视图隐藏
+  var banner = document.getElementById('currentBanner');
+  if (view === 'home') {
+    banner.style.display = '';
+    updateBanner();
+  } else {
+    banner.style.display = 'none';
+  }
+  if (view === 'home') { renderCourses(); }
+  if (view === 'mycourses') { renderMyCourses(); }
+  if (view === 'submit') { initSubmitPage(); }
+}
 
-        // 页面加载时初始化
-        async function init() {
-            await loadConfig();
-            await loadVersion();
-            loadSavedUser();
+var bannerSlideIndex = 0;
+var bannerSlideTimer = null;
+
+function updateBanner() {
+  var banner = document.getElementById('currentBanner');
+  if (!configData || !configData.current_course) {
+    banner.style.display = 'none';
+    return;
+  }
+  var cc = configData.current_course;
+  banner.style.display = 'flex';
+  
+  // 右侧卡片：当前课程信息
+  var currentSubj = configData.subjects[cc.subject];
+  // 添加进行中标识（通过JS动态创建，确保存在）
+  var card = document.querySelector('.banner-card');
+  if (card && !card.querySelector('.banner-badge')) {
+    var badge = document.createElement('div');
+    badge.className = 'banner-badge';
+    badge.textContent = '进行中';
+    card.appendChild(badge);
+  }
+  document.getElementById('bannerCardTitle').textContent = cc.subject;
+  document.getElementById('bannerCardMeta').textContent = '班级：' + cc.class;
+  // 显示课程简介
+  var descEl = document.getElementById('bannerCardDesc');
+  if (currentSubj && currentSubj.description) {
+    descEl.textContent = currentSubj.description;
+    descEl.style.display = '';
+  } else {
+    descEl.style.display = 'none';
+  }
+  // 显示进度信息
+  var progressEl = document.getElementById('bannerCardProgress');
+  if (currentUser && currentSubj) {
+    var total = 0, completed = 0;
+    if (currentSubj.homeworks) {
+      currentSubj.homeworks.forEach(function(h){ total += (h.lessons ? h.lessons.length : 0); });
+    }
+    if (progressData) {
+      for (var i = 0; i < progressData.length; i++) {
+        if (progressData[i].subject === cc.subject) {
+          completed = progressData[i].completed_lessons;
+          break;
         }
+      }
+    }
+    progressEl.textContent = '进度：' + completed + '/' + total + ' 课时';
+    progressEl.style.display = '';
+  } else {
+    progressEl.style.display = 'none';
+  }
+  
+  var coverEl = document.getElementById('bannerCardCover');
+  if (currentSubj && currentSubj.cover_image) {
+    coverEl.innerHTML = '<img src="' + currentSubj.cover_image + '" alt="">';
+  } else {
+    coverEl.innerHTML = '<span>' + cc.subject + '</span>';
+  }
+  
+  // 左侧轮播：收集所有课程（包含当前课程，用于展示）
+  var allCourses = [];
+  for (var subject in configData.subjects) {
+    var subj = configData.subjects[subject];
+    var totalLessons = 0;
+    subj.homeworks.forEach(function(h){ totalLessons += (h.lessons ? h.lessons.length : 0); });
+    allCourses.push({ 
+      subject: subject, 
+      totalLessons: totalLessons, 
+      major: subj.major || '',
+      cover: subj.cover_image || '',
+      description: subj.description || ''
+    });
+  }
+  var carousel = document.getElementById('bannerCarousel');
+  if (allCourses.length === 0) {
+    carousel.innerHTML = '<div style="color:#999;font-size:13px;padding:20px;text-align:center">暂无课程</div>';
+  } else {
+    var html = '';
+    for (var i = 0; i < allCourses.length; i++) {
+      var c = allCourses[i];
+      var activeClass = (i === 0) ? ' active' : '';
+      var bgStyle = c.cover ? 'background-image:url(' + c.cover + ')' : 'background:linear-gradient(135deg,#1890ff,#36cfc9)';
+      html += '<div class="slide' + activeClass + '" data-index="' + i + '" onclick="openCourse(&apos;' + esc(c.subject) + '&apos;)" style="' + bgStyle + ';background-size:cover;background-position:center">' +
+        '<div class="slide-overlay">' +
+        '<div class="slide-title">' + c.subject + '</div>' +
+        '<div class="slide-meta">' + (c.major || '') + ' · 共' + c.totalLessons + '课时</div>' +
+        '</div></div>';
+    }
+    // 添加导航点
+    var dotsHtml = '<div class="dots">';
+    for (var i = 0; i < allCourses.length; i++) {
+      var activeDot = (i === 0) ? ' active' : '';
+      dotsHtml += '<button class="dot' + activeDot + '" onclick="goToSlide(' + i + ')"></button>';
+    }
+    dotsHtml += '</div>';
+    carousel.innerHTML = html + dotsHtml;
+    bannerSlideIndex = 0;
+    clearInterval(bannerSlideTimer);
+    bannerSlideTimer = setInterval(function() {
+      var total = document.querySelectorAll('.slide').length;
+      if (total > 0) {
+        var next = (bannerSlideIndex + 1) % total;
+        goToSlide(next);
+      }
+    }, 4000);
+  }
+  
+  // 状态标签（已登录时显示）
+  if (currentUser && currentSubj) {
+    var hasHomework = currentSubj.homeworks && currentSubj.homeworks.length > 0;
+    if (hasHomework) {
+      var status = getSubmissionStatus(cc.subject, currentSubj.homeworks[0].name);
+      // 控制提交作业按钮的显示
+  var submitBtn = document.getElementById('bannerSubmitBtn');
+  if (submitBtn) {
+    submitBtn.style.display = currentUser ? '' : 'none';
+  }
+  var statusEl = document.getElementById('bannerStatus');
+      statusEl.style.display = 'inline-flex';
+      statusEl.className = 'banner-status ' + status.color;
+      statusEl.textContent = status.text;
+    } else {
+      document.getElementById('bannerStatus').style.display = 'none';
+    }
+  } else {
+    document.getElementById('bannerStatus').style.display = 'none';
+  }
+}
 
-        // 加载配置
-        async function loadConfig() {
-            try {
-                const res = await fetch('/api/v1/config');
-                const data = await res.json();
-                if (data.success) {
-                    configData = data.data;
-                    initSelects();
-                }
-            } catch (e) {
-                console.error('加载配置失败:', e);
+function goToSlide(index) {
+  var slides = document.querySelectorAll('.slide');
+  var dots = document.querySelectorAll('.dot');
+  if (!slides.length) return;
+  if (index < 0) index = slides.length - 1;
+  if (index >= slides.length) index = 0;
+  slides.forEach(function(s, i) {
+    s.classList.toggle('active', i === index);
+  });
+  dots.forEach(function(d, i) {
+    d.classList.toggle('active', i === index);
+  });
+  bannerSlideIndex = index;
+}
+
+function goCurrentCourse() {
+  if (!configData || !configData.current_course) return;
+  openCourse(configData.current_course.subject);
+}
+
+function goSubmitForCurrent() {
+  if (!configData || !configData.current_course) return;
+  var cc = configData.current_course;
+  if (!currentUser) {
+    showLogin();
+    return;
+  }
+  showView('submit');
+  initSubmitPage();
+  document.getElementById('subSubject').value = cc.subject;
+  onSubSubjectChange();
+  setTimeout(function(){
+    var hwSel = document.getElementById('subHomework');
+    if (hwSel && hwSel.options.length > 1) {
+      hwSel.selectedIndex = 1;
+      onSubHomeworkChange();
+    }
+  }, 200);
+}
+
+function goSubmit(subject, homework, lesson) {
+  if (!currentUser) { showLogin(); return; }
+  showView('submit');
+  initSubmitPage();
+  // 自动选中课程、作业、课时
+  if (subject) {
+    document.getElementById('subSubject').value = subject;
+    onSubSubjectChange();
+    setTimeout(function() {
+      if (homework) {
+        document.getElementById('subHomework').value = homework;
+        onSubHomeworkChange();
+        setTimeout(function() {
+          if (lesson) {
+            var lessonSel = document.getElementById('subLesson');
+            for (var i = 0; i < lessonSel.options.length; i++) {
+              if (lessonSel.options[i].value === lesson) {
+                lessonSel.selectedIndex = i;
+                break;
+              }
             }
+          }
+        }, 100);
+      }
+    }, 200);
+  }
+}
+function goSubmitFor(subject, homework) {
+  if (!currentUser) { showLogin(); return; }
+  showView('submit');
+  initSubmitPage();
+  document.getElementById('subSubject').value = subject;
+  onSubSubjectChange();
+  setTimeout(function(){
+    document.getElementById('subHomework').value = homework;
+    onSubHomeworkChange();
+  }, 200);
+}
+
+var subFiles = [];
+
+function initSubmitPage() {
+  if (!configData) return;
+  var subSel = document.getElementById('subSubject');
+  subSel.innerHTML = '<option value="">选择课程</option>';
+  for (var subject in configData.subjects) {
+    var subj = configData.subjects[subject];
+    // 未登录时显示所有课程，登录后只显示当前班级的课程
+    if (currentUser) {
+      if (!subj.classes || subj.classes.indexOf(currentUser.class) === -1) continue;
+    }
+    var opt = document.createElement('option');
+    opt.value = subject;
+    opt.textContent = subject;
+    subSel.appendChild(opt);
+  }
+  // 恢复之前选中的文件（如果有）
+  if (window._pendingFile) {
+    document.getElementById('subFileInfo').textContent = window._pendingFile.name + ' (' + formatSize(window._pendingFile.size) + ')';
+    // 重新触发预览
+    var preview = document.getElementById('subPreview');
+    var reader = new FileReader();
+    var file = window._pendingFile;
+    if (file.type.startsWith('image/')) {
+      reader.onload = function(e) { preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:400px">'; };
+      reader.readAsDataURL(file);
+    } else if (file.type === 'application/pdf') {
+      reader.onload = function(e) { preview.innerHTML = '<iframe src="' + e.target.result + '" style="width:100%;height:500px;border:none"></iframe>'; };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('video/')) {
+      reader.onload = function(e) { preview.innerHTML = '<video controls style="max-width:100%;max-height:400px"><source src="' + e.target.result + '"></video>'; };
+      reader.readAsDataURL(file);
+    } else {
+      preview.innerHTML = '<div style="text-align:center;color:#999"><div style="font-size:48px;margin-bottom:8px">[FILE]</div><div>' + file.name + '</div><div style="margin-top:8px">' + formatSize(file.size) + '</div></div>';
+    }
+  } else {
+    subFiles = [];
+    document.getElementById('subDrawerList').innerHTML = '';
+    document.getElementById('subDrawerToggle').style.display = 'none';
+    document.getElementById('subDrawer').style.display = 'none';
+    document.getElementById('subPreview').innerHTML = '请选择文件后在此处预览';
+    document.getElementById('subFileInfo').textContent = '未选择文件';
+    document.getElementById('subFileInput').value = '';
+    document.getElementById('subReview').style.display = 'none';
+  }
+}
+
+function onSubSubjectChange() {
+  var subject = document.getElementById('subSubject').value;
+  var hwSel = document.getElementById('subHomework');
+  hwSel.innerHTML = '<option value="">选择作业</option>';
+  if (subject && configData && configData.subjects[subject]) {
+    var subj = configData.subjects[subject];
+    subj.homeworks.forEach(function(hw){
+      var opt = document.createElement('option');
+      opt.value = hw.name;
+      opt.textContent = hw.name;
+      hwSel.appendChild(opt);
+    });
+  }
+  document.getElementById('subLesson').innerHTML = '<option value="">选择课时</option>';
+  updateSubInfo();
+}
+
+function onSubHomeworkChange() {
+  var subject = document.getElementById('subSubject').value;
+  var homework = document.getElementById('subHomework').value;
+  var lSel = document.getElementById('subLesson');
+  lSel.innerHTML = '<option value="">选择课时</option>';
+  if (subject && homework && configData && configData.subjects[subject]) {
+    var subj = configData.subjects[subject];
+    var hw = null;
+    for (var i = 0; i < subj.homeworks.length; i++) {
+      if (subj.homeworks[i].name === homework) { hw = subj.homeworks[i]; break; }
+    }
+    if (hw && hw.lessons) {
+      hw.lessons.forEach(function(l){
+        var opt = document.createElement('option');
+        opt.value = l.name;
+        opt.textContent = l.name;
+        lSel.appendChild(opt);
+      });
+    }
+  }
+  updateSubInfo();
+  loadSubReview();
+}
+
+function updateSubInfo() {
+  var subject = document.getElementById('subSubject').value;
+  var homework = document.getElementById('subHomework').value;
+  if (subject && configData && configData.subjects[subject]) {
+    var subj = configData.subjects[subject];
+    document.getElementById('subInfoName').textContent = homework || '--';
+    var hw = null;
+    for (var i = 0; i < subj.homeworks.length; i++) {
+      if (subj.homeworks[i].name === homework) { hw = subj.homeworks[i]; break; }
+    }
+    document.getElementById('subInfoDesc').textContent = (hw && hw.description) ? hw.description : '--';
+    var tplHtml = '--';
+    if (hw && hw.templates && hw.templates.length > 0) {
+      tplHtml = '';
+      hw.templates.forEach(function(t){
+        tplHtml += '<a href="/api/v1/template?file=' + encodeURIComponent(t) + '" class="btn btn-outline btn-sm" style="margin:2px">下载模板</a> ';
+      });
+    }
+    document.getElementById('subInfoTpl').innerHTML = tplHtml;
+  } else {
+    document.getElementById('subInfoName').textContent = '--';
+    document.getElementById('subInfoDesc').textContent = '--';
+    document.getElementById('subInfoTpl').textContent = '--';
+  }
+}
+
+async function loadSubReview() {
+  var reviewEl = document.getElementById('subReview');
+  reviewEl.style.display = 'none';
+  if (!currentUser || !progressData) return;
+  var subject = document.getElementById('subSubject').value;
+  var homework = document.getElementById('subHomework').value;
+  if (!subject || !homework) return;
+  try {
+    var res = await fetch('/api/v1/student/submissions', { headers: { 'X-Student-Token': currentUser.token } });
+    var data = await res.json();
+    if (!data.success) return;
+    var subs = data.data;
+    for (var i = 0; i < subs.length; i++) {
+      var s = subs[i];
+      if (s.subject === subject && s.homework === homework) {
+        if (s.review_status === 'passed') {
+          reviewEl.style.display = '';
+          reviewEl.innerHTML = '<div style="padding:12px 16px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;font-size:13px">' +
+            '<div style="font-weight:600;color:#52c41a;margin-bottom:4px">[通过] 教师已评审</div>' +
+            '<div style="color:#666">' + (s.review_comment || '作业合格') + '</div>' +
+            '<div style="color:#999;margin-top:4px;font-size:12px">评审时间：' + (s.reviewed_at || '') + '</div></div>';
+        } else if (s.review_status === 'rejected') {
+          reviewEl.style.display = '';
+          reviewEl.innerHTML = '<div style="padding:12px 16px;background:#fff2f0;border:1px solid #ffccc7;border-radius:6px;font-size:13px">' +
+            '<div style="font-weight:600;color:#ff4d4f;margin-bottom:4px">[存在问题] 需要重新提交</div>' +
+            '<div style="color:#666">' + (s.review_comment || '作业不合格，请修改后重新提交') + '</div>' +
+            '<div style="color:#999;margin-top:4px;font-size:12px">评审时间：' + (s.reviewed_at || '') + '</div></div>';
+        } else {
+          reviewEl.style.display = '';
+          reviewEl.innerHTML = '<div style="padding:12px 16px;background:#e6f7ff;border:1px solid #91d5ff;border-radius:6px;font-size:13px">' +
+            '<div style="font-weight:600;color:#1890ff;margin-bottom:4px">[待评审] 作业已提交，等待教师审核</div>' +
+            '<div style="color:#666">' + (s.review_comment || '') + '</div>' +
+            '<div style="color:#999;margin-top:4px;font-size:12px">提交时间：' + (s.submitted_at || '') + '</div></div>';
         }
+        // Show submitted file info
+        subFiles = [s];
+        document.getElementById('subDrawerToggle').style.display = '';
+        renderSubDrawer();
+        break;
+      }
+    }
+  } catch(e) {}
+function renderSubDrawer() {
+  var list = document.getElementById('subDrawerList');
+  if (subFiles.length === 0) {
+    list.innerHTML = '<div style="color:#999;padding:8px 0">暂无已上传文件</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < subFiles.length; i++) {
+    var f = subFiles[i];
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f5f5f5">' +
+      '<span style="font-size:13px;color:#333">' + (f.filename || f.name || '') + '</span>' +
+      '<span style="font-size:12px;color:#999">' + formatSize(f.filesize || f.size || 0) + '</span>' +
+      '</div>';
+  }
+  list.innerHTML = html;
+}
 
-        // 加载版本
-        async function loadVersion() {
-            try {
-                const res = await fetch('/api/v1/version');
-                const data = await res.json();
-                if (data.success) {
-                    document.getElementById('footerVersion').textContent = 'v' + data.version;
-                    document.getElementById('aboutVersion').textContent = 'v' + data.version;
-                }
-            } catch (e) {
-                console.error('加载版本失败:', e);
-            }
-        }
+function formatSize(bytes) {
+  if (bytes === 0 || bytes == null) return '0 B';
+  var units = ['B','KB','MB','GB'];
+  var i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(i > 0 ? 1 : 0) + ' ' + units[i];
+}
 
-        // 加载保存的用户
-        function loadSavedUser() {
-            try {
-                const saved = localStorage.getItem('cums_user');
-                if (saved) {
-                    currentUser = JSON.parse(saved);
-                    isLoggedIn = true;
-                    updateUI();
-                }
-            } catch (e) {
-                console.error('加载用户失败:', e);
-            }
-        }
+function esc(str) {
+  if (str == null) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 
-        // ==================== 下拉框初始化 ====================
+// ========== 课程筛选 ==========
+function updateFilters() {
+  if (!configData) return;
+  var majorSel = document.getElementById('filterMajor');
+  var classSel = document.getElementById('filterClass');
+  var majors = {};
+  var classes = {};
+  for (var subject in configData.subjects) {
+    var subj = configData.subjects[subject];
+    if (subj.major) majors[subj.major] = true;
+    if (subj.classes) subj.classes.forEach(function(c){ classes[c] = true; });
+  }
+  var majorHtml = '<option value="全部专业">全部专业</option>';
+  for (var m in majors) majorHtml += '<option value="' + esc(m) + '">' + esc(m) + '</option>';
+  majorSel.innerHTML = majorHtml;
+  var classHtml = '<option value="全部班级">全部班级</option>';
+  for (var c in classes) classHtml += '<option value="' + esc(c) + '">' + esc(c) + '</option>';
+  classSel.innerHTML = classHtml;
+}
 
-        // 初始化登录班级下拉框
-        function initSelects() {
-            if (!configData || !configData.subjects) return;
+// ========== 课程主页 ==========
+function openCourse(subject) {
+  if (!configData || !configData.subjects[subject]) return;
+  currentSubject = subject;
+  currentHomework = null;
+  currentLesson = null;
+  showView('course');
+  var subj = configData.subjects[subject];
+  // 课程信息
+  document.getElementById('ciName').textContent = subject;
+  document.getElementById('ciMajor').textContent = subj.major || '';
+  document.getElementById('ciDesc').textContent = subj.description || '';
+  var coverEl = document.getElementById('ciCover');
+  if (subj.cover_image) {
+    coverEl.innerHTML = '<img src="' + subj.cover_image + '" alt="">';
+  } else {
+    coverEl.innerHTML = '<span>' + subject + '</span>';
+  }
+  // 班级
+  document.getElementById('cpClass').textContent = '班级：' + ((subj.classes && subj.classes.length) ? subj.classes.join('、') : '全部');
+  // 加载进度
+  loadProgress();
+  // 课时列表
+  renderLessonList();
+}
 
-            // 初始化登录班级下拉框（收集所有班级）
-            const loginClass = document.getElementById('loginClass');
-            const allClasses = new Set();
-            Object.values(configData.subjects).forEach(sub => {
-                sub.classes.forEach(c => allClasses.add(c));
-            });
-            allClasses.forEach(c => {
-                loginClass.add(new Option(c, c));
-            });
-        }
-
-        // 初始化科目下拉框（只显示当前班级有的科目）
-        function initSubjectSelect() {
-            if (!configData || !configData.subjects || !currentUser) return;
-
-            const subjectSelect = document.getElementById('subjectSelect');
-            // 清空现有选项
-            subjectSelect.innerHTML = '<option value="">请选择科目</option>';
-            
-            // 只添加当前班级有的科目
-            Object.keys(configData.subjects).forEach(name => {
-                const subConfig = configData.subjects[name];
-                if (subConfig.classes.includes(currentUser.class)) {
-                    subjectSelect.add(new Option(name, name));
-                }
-            });
-            
-            // 同时清空作业选择
-            document.getElementById('homeworkSelect').innerHTML = '<option value="">请选择作业</option>';
-        }
-
-        // 科目变更时更新作业列表
-        function onSubjectChange() {
-            const subject = document.getElementById('subjectSelect').value;
-            const homeworkSelect = document.getElementById('homeworkSelect');
-
-            // 清空作业列表
-            homeworkSelect.innerHTML = '<option value="">请选择作业</option>';
-
-            // 隐藏作业信息
-            hideHomeworkInfo();
-
-            if (!subject || !configData.subjects[subject]) return;
-
-            const subConfig = configData.subjects[subject];
-
-            // 填充作业选项（支持新格式）
-            subConfig.homeworks.forEach(hw => {
-                const hwName = typeof hw === 'string' ? hw : hw.name;
-                homeworkSelect.add(new Option(hwName, hwName));
-            });
-        }
-
-        // 作业变更时显示作业信息
-        function onHomeworkChange() {
-            const subject = document.getElementById('subjectSelect').value;
-            const homework = document.getElementById('homeworkSelect').value;
-
-            if (!subject || !homework || !configData.subjects[subject]) {
-                hideHomeworkInfo();
-                return;
-            }
-
-            const hwInfo = getHomeworkInfo(subject, homework);
-            if (hwInfo && (hwInfo.description || (hwInfo.templates && hwInfo.templates.length > 0))) {
-                showHomeworkInfo(hwInfo);
-            } else {
-                hideHomeworkInfo();
-            }
-        }
-
-        // 获取作业详细信息
-        function getHomeworkInfo(subject, homeworkName) {
-            const subConfig = configData.subjects[subject];
-            if (!subConfig) return null;
-
-            for (const hw of subConfig.homeworks) {
-                if (typeof hw === 'string') {
-                    if (hw === homeworkName) return { name: hw };
-                } else {
-                    if (hw.name === homeworkName) return hw;
-                }
-            }
-            return null;
-        }
-
-        // 显示作业信息区域
-        function showHomeworkInfo(hwInfo) {
-            const infoGroup = document.getElementById('homeworkInfoGroup');
-            const descEl = document.getElementById('homeworkDescription');
-            const actionsEl = document.getElementById('homeworkActions');
-
-            // 设置描述
-            descEl.textContent = hwInfo.description || '';
-
-            // 生成模板下载按钮
-            actionsEl.innerHTML = '';
-            if (hwInfo.templates && hwInfo.templates.length > 0) {
-                hwInfo.templates.forEach((tpl, index) => {
-                    const fileName = tpl.split('/').pop();
-                    const btn = document.createElement('a');
-                    btn.href = '/api/v1/template?file=' + encodeURIComponent(tpl);
-                    btn.className = 'btn-template';
-                    btn.target = '_blank';
-                    btn.innerHTML = `<span class="icon">📄</span>${hwInfo.templates.length > 1 ? '模板' + (index + 1) + ': ' : ''}${escapeHtml(fileName)}`;
-                    actionsEl.appendChild(btn);
-                });
-            }
-
-            // 显示区域
-            infoGroup.style.display = 'block';
-        }
-
-        // 隐藏作业信息区域
-        function hideHomeworkInfo() {
-            document.getElementById('homeworkInfoGroup').style.display = 'none';
-        }
-
-        // ==================== 页面切换 ====================
-
-        // 显示上传页面
-        function showUpload() {
-            document.getElementById('welcomeCard').classList.add('hidden');
-            
-            if (isLoggedIn) {
-                document.getElementById('uploadCard').classList.remove('hidden');
-            } else {
-                document.getElementById('welcomeCard').classList.remove('hidden');
-            }
-        }
-
-        // 显示关于弹窗
-        function showAboutPopup() {
-            document.getElementById('aboutPopup').classList.add('active');
-        }
-
-        // 隐藏关于弹窗
-        function hideAboutPopup() {
-            document.getElementById('aboutPopup').classList.remove('active');
-        }
-
-        // 显示登录弹窗
-        function showLogin() {
-            document.getElementById('loginModal').classList.add('active');
-        }
-
-        // 隐藏登录弹窗
-        function hideLogin() {
-            document.getElementById('loginModal').classList.remove('active');
-        }
-
-        // ==================== 登录处理 ====================
-
-        // 处理登录
-        async function handleLogin(e) {
-            e.preventDefault();
-            
-            const className = document.getElementById('loginClass').value;
-            const studentId = document.getElementById('loginStudentId').value;
-            const studentName = document.getElementById('loginStudentName').value;
-            
-            try {
-                const res = await fetch('/api/v1/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        class: className,
-                        student_id: studentId,
-                        student_name: studentName
-                    })
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    currentUser = data.data;
-                    isLoggedIn = true;
-                    localStorage.setItem('cums_user', JSON.stringify(currentUser));
-                    
-                    // 清空表单
-                    document.getElementById('loginClass').value = '';
-                    document.getElementById('loginStudentId').value = '';
-                    document.getElementById('loginStudentName').value = '';
-                    
-                    hideLogin();
-                    updateUI();
-                } else {
-                    alert(data.message || '登录失败');
-                }
-            } catch (e) {
-                alert('登录失败，请重试');
-            }
-        }
-
-        // 退出登录
-        function logout() {
-            if (!confirm('确定要退出登录吗？')) return;
-            
-            currentUser = null;
-            isLoggedIn = false;
-            localStorage.removeItem('cums_user');
-            updateUI();
-        }
-
-        // 更新界面
-        function updateUI() {
-            const userInfo = document.getElementById('userInfo');
-            const classTag = document.getElementById('classTag');
-
-            if (isLoggedIn && currentUser) {
-                // 更新头部（使用 escapeHtml 防止 XSS）
-                userInfo.innerHTML = `
-                    <span>${escapeHtml(currentUser.class)} - ${escapeHtml(currentUser.student_id)} · ${escapeHtml(currentUser.student_name)}</span>
-                    <button class="btn btn-link btn-logout" onclick="logout()">退出</button>
-                `;
-
-                // 更新班级标签
-                classTag.textContent = currentUser.class;
-                
-                // 初始化科目下拉框（只显示当前班级有的科目）
-                initSubjectSelect();
-                
-                // 显示上传表单
-                document.getElementById('welcomeCard').classList.add('hidden');
-                document.getElementById('uploadCard').classList.remove('hidden');
-            } else {
-                // 恢复头部
-                userInfo.innerHTML = `
-                    <button class="btn btn-primary" onclick="showLogin()">登录</button>
-                `;
-                
-                // 显示欢迎页
-                document.getElementById('uploadCard').classList.add('hidden');
-                document.getElementById('welcomeCard').classList.remove('hidden');
-            }
-        }
-
-        // ==================== 上传处理 ====================
-
-        // 处理上传
-        async function handleUpload(e) {
-            e.preventDefault();
-            
-            const fileInput = document.getElementById('fileInput');
-            const submitBtn = document.getElementById('submitBtn');
-            const message = document.getElementById('message');
-            
-            if (!fileInput.files[0]) {
-                message.textContent = '请选择要上传的文件';
-                message.className = 'message error';
-                return;
-            }
-            
-            // 构建表单数据
-            const formData = new FormData();
-            formData.append('class', currentUser.class);
-            formData.append('student_id', currentUser.student_id);
-            formData.append('student_name', currentUser.student_name);
-            formData.append('subject', document.getElementById('subjectSelect').value);
-            formData.append('homework', document.getElementById('homeworkSelect').value);
-            formData.append('file', fileInput.files[0]);
-            
-            // 禁用按钮
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="loading"></span>上传中...';
-            message.className = 'message';
-            
-            try {
-                const res = await fetch('/api/v1/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-                
-                if (data.success) {
-                    message.textContent = '上传成功: ' + data.filename;
-                    message.className = 'message success';
-                    document.getElementById('uploadForm').reset();
-                } else {
-                    message.textContent = data.message || '上传失败';
-                    message.className = 'message error';
-                }
-            } catch (e) {
-                message.textContent = '上传失败，请重试';
-                message.className = 'message error';
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = '上传文件';
-            }
-        }
-
-        // ==================== 事件绑定 ====================
-
-        // 点击模态框背景关闭
-        document.getElementById('loginModal').addEventListener('click', function(e) {
-            if (e.target === this) hideLogin();
+function renderLessonList() {
+  var listEl = document.getElementById('courseLessonList');
+  if (!listEl) return;
+  var subj = configData.subjects[currentSubject];
+  if (!subj) { listEl.innerHTML = ''; return; }
+  var html = '';
+  var idx = 0;
+  var progMap = {};
+  if (progressData) {
+    for (var p = 0; p < progressData.length; p++) {
+      if (progressData[p].subject === currentSubject) {
+        var statuses = progressData[p].lesson_statuses || [];
+        statuses.forEach(function(ls){
+          progMap[ls.homework_name + '||' + ls.lesson_name] = ls.status;
         });
+      }
+    }
+  }
+  for (var h = 0; h < subj.homeworks.length; h++) {
+    var hw = subj.homeworks[h];
+    if (!hw.lessons) continue;
+    for (var l = 0; l < hw.lessons.length; l++) {
+      var lesson = hw.lessons[l];
+      var status = progMap[hw.name + '||' + lesson.name] || 'none';
+      var iconClass = 'gray', iconSvg = 'icon-play', tagHtml = '';
+      if (status === 'completed') { iconClass = 'green'; iconSvg = 'icon-check'; tagHtml = '<span class="li-tag green">已通过</span>'; }
+      else if (status === 'rejected') { iconClass = 'red'; iconSvg = 'icon-alert'; tagHtml = '<span class="li-tag red">需修改</span>'; }
+      else if (status === 'pending') { iconClass = 'blue'; iconSvg = 'icon-dot'; tagHtml = '<span class="li-tag blue">待评审</span>'; }
+      html += '<div class="lesson-item" onclick="openLesson(' + idx + ')">' +
+        '<div class="li-icon ' + iconClass + '"><svg><use href="#' + iconSvg + '"/></svg></div>' +
+        '<div class="li-info"><div class="li-name">' + esc(lesson.name) + '</div>' +
+        (lesson.description ? '<div class="li-desc">' + esc(lesson.description) + '</div>' : '') + '</div>' +
+        tagHtml +
+        '<div class="li-arrow"><svg style="width:16px;height:16px"><use href="#icon-chevron-right"/></svg></div>' +
+        '</div>';
+      idx++;
+    }
+  }
+  if (idx === 0) html = '<div style="text-align:center;color:#999;padding:40px">暂无课时</div>';
+  listEl.innerHTML = html;
+}
 
-        // 点击关于弹窗背景关闭
-        document.getElementById('aboutPopup').addEventListener('click', function(e) {
-            if (e.target === this) hideAboutPopup();
-        });
+var lessonListIndex = [];
 
-        // 初始化
-        init();
-    </script>
+function openLesson(idx) {
+  var subj = configData.subjects[currentSubject];
+  var lessons = [];
+  subj.homeworks.forEach(function(hw){ if (hw.lessons) hw.lessons.forEach(function(l){ lessons.push({hw: hw.name, lesson: l.name}); }); });
+  if (idx < 0 || idx >= lessons.length) return;
+  var target = lessons[idx];
+  currentHomework = target.hw;
+  currentLesson = target.lesson;
+  showView('lesson');
+  loadLessonContent();
+}
+
+async function loadLessonContent() {
+  if (!currentSubject || !currentHomework || !currentLesson) return;
+  document.getElementById('ldTitle').textContent = currentLesson;
+  document.getElementById('ldContent').innerHTML = '<div style="color:#999;text-align:center;padding:40px">加载中...</div>';
+  var introEl = document.getElementById('ldIntro');
+  introEl.style.display = 'none';
+  try {
+    // 优先公开接口（无需登录）
+    var url = '/api/v1/lesson/public?subject=' + encodeURIComponent(currentSubject) + '&homework=' + encodeURIComponent(currentHomework) + '&lesson=' + encodeURIComponent(currentLesson);
+    var res = await fetch(url);
+    var data = await res.json();
+    if (data.success) {
+      document.getElementById('ldTitle').textContent = currentLesson;
+      if (data.data.description) {
+        introEl.textContent = data.data.description;
+        introEl.style.display = '';
+      }
+      document.getElementById('ldContent').innerHTML = renderMarkdown(data.data.content || '');
+    } else {
+      document.getElementById('ldContent').innerHTML = '<div style="color:#999;text-align:center;padding:40px">课时内容为空</div>';
+    }
+  } catch(e) {
+    document.getElementById('ldContent').innerHTML = '<div style="color:#999;text-align:center;padding:40px">加载失败</div>';
+  }
+  // 加载附件
+  loadAttachments();
+  // 更新目录
+  renderToc();
+  // 显示提交按钮
+  var submitBtn = document.getElementById('ldSubmitBtn');
+  if (submitBtn) submitBtn.style.display = currentUser ? '' : 'none';
+}
+
+function renderToc() {
+  var subj = configData.subjects[currentSubject];
+  var tocEl = document.getElementById('tocList');
+  if (!tocEl || !subj) return;
+  var html = '';
+  var idx = 0;
+  subj.homeworks.forEach(function(hw){
+    if (!hw.lessons) return;
+    hw.lessons.forEach(function(l){
+      var cur = (l.name === currentLesson) ? ' current' : '';
+      html += '<li class="' + cur + '" onclick="openLesson(' + idx + ')">' + esc(l.name) + '</li>';
+      idx++;
+    });
+  });
+  tocEl.innerHTML = html;
+  var toggle = document.getElementById('tocToggle');
+  if (toggle && idx > 8) {
+    toggle.style.display = '';
+    tocEl.classList.remove('expanded');
+    document.getElementById('tocToggleText').textContent = '展开更多';
+  } else if (toggle) {
+    toggle.style.display = 'none';
+    tocEl.classList.add('expanded');
+  }
+}
+
+function toggleToc() {
+  var tocEl = document.getElementById('tocList');
+  if (!tocEl) return;
+  var expanded = tocEl.classList.toggle('expanded');
+  document.getElementById('tocToggleText').textContent = expanded ? '收起' : '展开更多';
+}
+
+// ========== Markdown 渲染（简化版，支持标题/段落/列表/图片/代码/表格/链接） ==========
+function renderMarkdown(md) {
+  if (!md) return '';
+  // 先转义，再处理
+  var html = esc(md);
+  // 代码块
+  html = html.replace(/\`\`\`([\s\S]*?)\`\`\`/g, function(m, code){
+    return '<pre><code>' + code + '</code></pre>';
+  });
+  html = html.replace(/\`([^\`\n]+)\`/g, '<code>$1</code>');
+  // 标题
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // 粗体/斜体
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // 链接（安全协议）
+  html = html.replace(/\[([^\]]+)\]\(([^\s)]+)\)/g, function(m, text, url){
+    if (!safeMarkdownUrl(url)) return m;
+    return '<a href="' + url + '" target="_blank" rel="noopener">' + text + '</a>';
+  });
+  // 图片
+  html = html.replace(/!\[([^\]]*)\]\(([^\s)]+)\)/g, function(m, alt, url){
+    if (!safeMarkdownUrl(url)) return m;
+    return '<img src="' + url + '" alt="' + alt + '" loading="lazy">';
+  });
+  // 无序列表
+  html = html.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, function(m){ return '<ul>' + m.trim() + '</ul>'; });
+  // 有序列表（简化）
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // 段落（未包裹的文本）
+  html = html.replace(/\n{2,}/g, '</p><p>');
+  html = html.replace(/^([^<].*)$/gm, '<p>$1</p>');
+  // 表格（简化处理）
+  return html;
+}
+
+function safeMarkdownUrl(url) {
+  if (!url) return false;
+  var lower = url.trim().toLowerCase();
+  return /^(https?:|\/|#|\.)/.test(lower) && !/^javascript:/i.test(lower);
+}
+
+// ========== 登录 ==========
+function showLogin() {
+  document.getElementById('loginOverlay').classList.add('show');
+  setTimeout(function(){ document.getElementById('loginName').focus(); }, 50);
+}
+function hideLogin() {
+  document.getElementById('loginOverlay').classList.remove('show');
+}
+async function doLogin() {
+  var name = document.getElementById('loginName').value.trim();
+  var password = document.getElementById('loginPassword').value;
+  if (!name || !password) { alert('请输入姓名和密码'); return; }
+  try {
+    var res = await fetch('/api/v1/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, password: password })
+    });
+    var data = await res.json();
+    if (!data.success) {
+      alert(data.message || '登录失败');
+      return;
+    }
+    currentUser = {
+      token: data.data.token,
+      student_id: data.data.student_id,
+      student_name: data.data.student_name,
+      class: data.data.class,
+      force_password_change: data.data.force_password_change
+    };
+    // 记住登录
+    try { localStorage.setItem('cums_user', JSON.stringify(currentUser)); } catch(e) {}
+    hideLogin();
+    updateUI();
+    await loadProgress();
+    updateBanner();
+    if (currentUser.force_password_change) {
+      alert('首次登录，请修改初始密码');
+      showChangePassword();
+    }
+  } catch(e) {
+    alert('网络错误，请重试');
+  }
+}
+
+// ========== 用户菜单 ==========
+function toggleUserMenu() {
+  var dd = document.getElementById('userDropdown');
+  dd.classList.toggle('show');
+}
+function updateUI() {
+  var btnLogin = document.getElementById('btnLogin');
+  var userMenu = document.getElementById('userMenu');
+  var myCoursesNav = document.querySelector('[data-view="mycourses"]');
+  if (currentUser) {
+    btnLogin.style.display = 'none';
+    userMenu.style.display = '';
+    document.getElementById('userNameDisplay').textContent = currentUser.student_name;
+    document.getElementById('ddName').textContent = currentUser.student_name;
+    document.getElementById('ddClass').textContent = currentUser.student_id + ' · ' + currentUser.class;
+    if (myCoursesNav) myCoursesNav.style.display = '';
+    // 显示当前课程提交按钮
+    var submitBtn = document.getElementById('bannerSubmitBtn');
+    if (submitBtn) submitBtn.style.display = '';
+  } else {
+    btnLogin.style.display = '';
+    userMenu.style.display = 'none';
+    if (myCoursesNav) myCoursesNav.style.display = 'none';
+  }
+}
+
+// ========== 密码修改 ==========
+function showChangePassword() {
+  document.getElementById('pwdOverlay').classList.add('show');
+  document.getElementById('pwdOld').value = '';
+  document.getElementById('pwdNew').value = '';
+  document.getElementById('pwdConfirm').value = '';
+}
+function hideChangePassword() {
+  document.getElementById('pwdOverlay').classList.remove('show');
+}
+async function doChangePassword() {
+  if (!currentUser) return;
+  var oldPwd = document.getElementById('pwdOld').value;
+  var newPwd = document.getElementById('pwdNew').value;
+  var confirmPwd = document.getElementById('pwdConfirm').value;
+  if (!oldPwd || !newPwd) { alert('请填写完整'); return; }
+  if (newPwd.length < 6) { alert('新密码至少6位'); return; }
+  if (newPwd !== confirmPwd) { alert('两次密码不一致'); return; }
+  try {
+    var res = await fetch('/api/v1/student/password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Student-Token': currentUser.token },
+      body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+    });
+    var data = await res.json();
+    if (!data.success) { alert(data.message || '修改失败'); return; }
+    currentUser.force_password_change = false;
+    try { localStorage.setItem('cums_user', JSON.stringify(currentUser)); } catch(e) {}
+    hideChangePassword();
+    alert('密码修改成功');
+  } catch(e) {
+    alert('网络错误，请重试');
+  }
+}
+
+// ========== 退出登录 ==========
+function logout() {
+  currentUser = null;
+  try { localStorage.removeItem('cums_user'); } catch(e) {}
+  updateUI();
+  updateBanner();
+  showView('home');
+  alert('已退出登录');
+}
+
+// ========== 版本 ==========
+async function loadVersion() {
+  try {
+    var res = await fetch('/api/v1/version');
+    var data = await res.json();
+    if (data.success) {
+      document.getElementById('footerVersion').textContent = 'v' + data.version;
+    }
+  } catch(e) {}
+}
+
+// ========== 记住登录 ==========
+function loadSavedUser() {
+  try {
+    var saved = localStorage.getItem('cums_user');
+    if (saved) {
+      currentUser = JSON.parse(saved);
+      updateUI();
+      loadProgress();
+      updateBanner();
+    }
+  } catch(e) {}
+}
+
+// ========== 进度 ==========
+var progressData = null;
+async function loadProgress() {
+  progressData = null;
+  if (!currentUser) return;
+  try {
+    var res = await fetch('/api/v1/student/progress', { headers: { 'X-Student-Token': currentUser.token } });
+    var data = await res.json();
+    if (data.success) {
+      progressData = data.data;
+      updateProgressUI();
+      updateBanner();
+    }
+  } catch(e) {}
+}
+
+function updateProgressUI() {
+  if (!currentSubject || !progressData) return;
+  var prog = null;
+  for (var i = 0; i < progressData.length; i++) {
+    if (progressData[i].subject === currentSubject) { prog = progressData[i]; break; }
+  }
+  var total = prog ? prog.total_lessons : 0;
+  var completed = prog ? prog.completed_lessons : 0;
+  var issues = prog ? prog.has_issues : 0;
+  var pending = total - completed - issues;
+  var pct = total > 0 ? Math.round(completed / total * 100) : 0;
+  document.getElementById('cpBar').style.width = pct + '%';
+  document.getElementById('cpInfo').textContent = '已完成 ' + completed + '/' + total + ' 课时';
+  var actionsHtml = '';
+  if (total > 0) {
+    actionsHtml = '<span style="color:#52c41a">通过 ' + completed + '</span>' +
+      '<span style="color:#1890ff">待评审 ' + pending + '</span>' +
+      '<span style="color:#ff4d4f">需修改 ' + issues + '</span>';
+  }
+  document.getElementById('cpActions').innerHTML = actionsHtml;
+  renderLessonList();
+}
+
+// ========== 提交状态 ==========
+function getSubmissionStatus(subject, homework) {
+  if (!progressData) return { color: 'blue', text: '待提交' };
+  for (var i = 0; i < progressData.length; i++) {
+    if (progressData[i].subject === subject) {
+      var statuses = progressData[i].lesson_statuses || [];
+      var any = false, allPassed = true, hasPending = false, hasRejected = false;
+      for (var j = 0; j < statuses.length; j++) {
+        if (statuses[j].homework_name === homework) {
+          any = true;
+          if (statuses[j].status === 'completed') { /* 通过 */ }
+          else if (statuses[j].status === 'pending') { hasPending = true; allPassed = false; }
+          else if (statuses[j].status === 'rejected') { hasRejected = true; allPassed = false; }
+        }
+      }
+      if (!any) return { color: 'blue', text: '待提交' };
+      if (hasRejected) return { color: 'red', text: '需修改' };
+      if (hasPending) return { color: 'blue', text: '待评审' };
+      return { color: 'green', text: '已完成' };
+    }
+  }
+  return { color: 'blue', text: '待提交' };
+}
+
+// ========== 我的课程 ==========
+function renderMyCourses() {
+  var container = document.getElementById('myCoursesList');
+  if (!container) return;
+  if (!currentUser) {
+    container.innerHTML = '<div style="background:#fff;border-radius:12px;padding:40px;text-align:center;color:#999">请先登录后查看我的课程进度</div>';
+    return;
+  }
+  var html = '';
+  for (var subject in configData.subjects) {
+    var subj = configData.subjects[subject];
+    if (!subj.classes || subj.classes.indexOf(currentUser.class) === -1) continue;
+    var prog = null;
+    if (progressData) {
+      for (var i = 0; i < progressData.length; i++) {
+        if (progressData[i].subject === subject) { prog = progressData[i]; break; }
+      }
+    }
+    var total = prog ? prog.total_lessons : 0;
+    var completed = prog ? prog.completed_lessons : 0;
+    var issues = prog ? prog.has_issues : 0;
+    var pending = total - completed - issues;
+    html += '<div class="my-course-card">' +
+      '<div class="mcc-header"><div class="mcc-name">' + esc(subject) + '</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="openCourse(\'' + esc(subject) + '\')">进入课程</button></div>' +
+      '<div style="font-size:12px;color:#999">' + (subj.major || '') + ' · 共' + total + '课时</div>' +
+      '<div class="progress-bar"><div class="fill" style="width:' + (total > 0 ? Math.round(completed/total*100) : 0) + '%"></div></div>' +
+      '<div style="font-size:13px;color:#666;margin-top:8px">已完成 ' + completed + '/' + total + ' 课时</div>' +
+      '<div style="font-size:12px;color:#999;margin-top:4px">通过 ' + completed + ' · 待评审 ' + pending + ' · 需修改 ' + issues + '</div>' +
+      '</div>';
+  }
+  if (html === '') html = '<div style="background:#fff;border-radius:12px;padding:40px;text-align:center;color:#999">当前班级暂无课程</div>';
+  container.innerHTML = html;
+}
+
+// ========== 附件 ==========
+var currentAttachments = [];
+async function loadAttachments() {
+  currentAttachments = [];
+  if (!currentSubject || !currentHomework || !currentLesson) return;
+  try {
+    var url = '/api/v1/lesson/media/list?subject=' + encodeURIComponent(currentSubject) + '&homework=' + encodeURIComponent(currentHomework) + '&lesson=' + encodeURIComponent(currentLesson);
+    var res = await fetch(url);
+    var data = await res.json();
+    if (data.success && data.data.files) {
+      currentAttachments = data.data.files;
+    }
+  } catch(e) {}
+}
+
+function showAttachments() {
+  var listEl = document.getElementById('attachList');
+  var downloadAll = document.getElementById('attachDownloadAll');
+  if (currentAttachments.length === 0) {
+    listEl.innerHTML = '<div style="color:#999;text-align:center;padding:20px">本课时暂无附件</div>';
+    downloadAll.style.display = 'none';
+  } else {
+    var html = '';
+    for (var i = 0; i < currentAttachments.length; i++) {
+      var a = currentAttachments[i];
+      html += '<div class="attach-item">' +
+        '<span class="ai-name">' + esc(a.name) + '</span>' +
+        '<span class="ai-size">' + formatSize(a.size) + '</span>' +
+        '<span class="ai-actions"><a class="btn btn-outline btn-sm" href="' + esc(a.url) + '" target="_blank" rel="noopener">下载</a></span>' +
+        '</div>';
+    }
+    listEl.innerHTML = html;
+    downloadAll.style.display = '';
+  }
+  document.getElementById('attachOverlay').classList.add('show');
+}
+function hideAttachments() {
+  document.getElementById('attachOverlay').classList.remove('show');
+}
+function downloadAllAttachments() {
+  if (currentAttachments.length === 0) return;
+  // 逐个打开下载链接
+  for (var i = 0; i < currentAttachments.length; i++) {
+    window.open(currentAttachments[i].url, '_blank');
+  }
+}
+
+// ========== 已上传文件抽屉 ==========
+function toggleSubDrawer() {
+  var drawer = document.getElementById('subDrawer');
+  if (drawer) drawer.style.display = (drawer.style.display === 'none') ? '' : 'none';
+}
+
+// ========== 文件预览 ==========
+function previewFile(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  window._pendingFile = file;
+  document.getElementById('subFileInfo').textContent = file.name + ' (' + formatSize(file.size) + ')';
+  var preview = document.getElementById('subPreview');
+  if (file.type.startsWith('image/')) {
+    var reader = new FileReader();
+    reader.onload = function(e) { preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:400px">'; };
+    reader.readAsDataURL(file);
+  } else if (file.type === 'application/pdf') {
+    var reader2 = new FileReader();
+    reader2.onload = function(e) { preview.innerHTML = '<iframe src="' + e.target.result + '" style="width:100%;height:500px;border:none"></iframe>'; };
+    reader2.readAsDataURL(file);
+  } else if (file.type.startsWith('video/')) {
+    var reader3 = new FileReader();
+    reader3.onload = function(e) { preview.innerHTML = '<video controls style="max-width:100%;max-height:400px"><source src="' + e.target.result + '"></video>'; };
+    reader3.readAsDataURL(file);
+  } else {
+    preview.innerHTML = '<div style="text-align:center;color:#999"><div style="font-size:48px;margin-bottom:8px">[FILE]</div><div>' + esc(file.name) + '</div><div style="margin-top:8px">' + formatSize(file.size) + '</div></div>';
+  }
+}
+
+// ========== 提交作业 ==========
+async function doSubmit() {
+  if (!currentUser) { showLogin(); return; }
+  var subject = document.getElementById('subSubject').value;
+  var homework = document.getElementById('subHomework').value;
+  var fileInput = document.getElementById('subFileInput');
+  if (!subject || !homework) { alert('请选择课程和作业'); return; }
+  if (!fileInput.files || fileInput.files.length === 0) { alert('请选择要上传的文件'); return; }
+  if (currentUser.force_password_change) { alert('请先修改初始密码后再提交作业'); showChangePassword(); return; }
+  var file = fileInput.files[0];
+  var formData = new FormData();
+  formData.append('subject', subject);
+  formData.append('homework', homework);
+  formData.append('file', file);
+  var btn = document.querySelector('#view-submit .btn-success');
+  if (btn) { btn.disabled = true; btn.textContent = '上传中...'; }
+  try {
+    var res = await fetch('/api/v1/upload', {
+      method: 'POST',
+      headers: { 'X-Student-Token': currentUser.token },
+      body: formData
+    });
+    var data = await res.json();
+    if (!data.success) {
+      alert(data.message || '上传失败');
+      return;
+    }
+    alert('提交成功！等待教师评审');
+    window._pendingFile = null;
+    document.getElementById('subFileInput').value = '';
+    document.getElementById('subFileInfo').textContent = '未选择文件';
+    document.getElementById('subPreview').innerHTML = '请选择文件后在此处预览';
+    await loadProgress();
+    loadSubReview();
+  } catch(e) {
+    alert('网络错误，上传失败');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '确认提交'; }
+  }
+}
+
+// 初始化登录
+document.addEventListener('click', function(e) {
+  var dd = document.getElementById('userDropdown');
+  if (dd && dd.classList.contains('show') && !e.target.closest('.user-menu')) {
+    dd.classList.remove('show');
+  }
+});
+</script>
 </body>
 </html>

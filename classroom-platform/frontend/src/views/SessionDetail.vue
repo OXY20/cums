@@ -16,7 +16,7 @@ import {
   type LessonBlock,
   type LessonResource,
 } from '@/api'
-import { formatBytes, sessionStatusText } from '@/utils/format'
+import { formatBytes, formatTime, sessionStatusText } from '@/utils/format'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -113,7 +113,7 @@ function statusText(status: string) {
       </h1>
       <p class="page-subtitle">
         班级：{{ view.class_name }} ｜ 教师：{{ view.teacher_name }} ｜ 开始时间：{{
-          view.session.started_at
+          formatTime(view.session.started_at)
         }}
       </p>
 

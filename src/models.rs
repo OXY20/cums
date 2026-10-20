@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// 当前进行中课程配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CurrentCourseConfig {
+    pub subject: String,
+    pub class: String,
+}
+
 /// 系统配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -8,7 +15,25 @@ pub struct Config {
     pub server_addr: String,
     pub admin_enabled: bool,
     pub admin_password: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_course: Option<CurrentCourseConfig>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub students: HashMap<String, StudentConfig>,
     pub subjects: HashMap<String, SubjectConfig>,
+}
+
+/// 学生名单中的用户信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StudentConfig {
+    pub name: String,
+    pub class: String,
+    pub password_hash: String,
+    #[serde(default = "default_force_password_change")]
+    pub force_password_change: bool,
+}
+
+fn default_force_password_change() -> bool {
+    true
 }
 
 /// 科目配置
@@ -18,6 +43,14 @@ pub struct SubjectConfig {
     /// 支持字符串数组或对象数组（使用 serde 自定义反序列化）
     #[serde(deserialize_with = "deserialize_homeworks")]
     pub homeworks: Vec<HomeworkConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover_image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub major: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
 }
 
 /// 作业配置
@@ -28,6 +61,17 @@ pub struct HomeworkConfig {
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub templates: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lessons: Vec<LessonConfig>,
+}
+
+/// 课程课时元数据，正文保存在 lessons 目录下的 Markdown 文件中
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LessonConfig {
+    pub name: String,
+    /// 课时简介（本节课的相关介绍），在学生端课时列表与课时内容上方展示
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
 }
 
 /// 自定义反序列化：支持字符串数组和对象数组混合格式
@@ -59,6 +103,7 @@ where
                             name: s,
                             description: None,
                             templates: None,
+                            lessons: Vec::new(),
                         });
                     }
                     serde_json::Value::Object(_) => {
@@ -78,12 +123,150 @@ where
     deserializer.deserialize_seq(HomeworksVisitor)
 }
 
-/// 登录请求
+/// 登录请求（支持姓名或学号登录）
 #[derive(Debug, Deserialize)]
 pub struct LoginRequest {
+    pub name: String,
+    pub password: String,
+}
+
+/// 学生密码修改请求
+#[derive(Debug, Deserialize)]
+pub struct StudentPasswordChangeRequest {
+    pub old_password: String,
+    pub new_password: String,
+}
+
+/// 名单导入项
+#[derive(Debug, Deserialize)]
+pub struct StudentImportItem {
+    pub student_id: String,
+    pub name: String,
     pub class: String,
+    #[serde(default)]
+    pub password: Option<String>,
+}
+
+/// 名单 JSON 导入请求
+#[derive(Debug, Deserialize)]
+pub struct StudentImportRequest {
+    pub students: Vec<StudentImportItem>,
+}
+
+/// 名单管理响应项（不含密码哈希）
+#[derive(Debug, Serialize)]
+pub struct StudentAdminItem {
+    pub student_id: String,
+    pub name: String,
+    pub class: String,
+    pub force_password_change: bool,
+}
+
+/// 科目表格导入项
+#[derive(Debug, Deserialize)]
+pub struct SubjectImportItem {
+    pub subject: String,
+    #[serde(default)]
+    pub class: Option<String>,
+    #[serde(default)]
+    pub homework: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+}
+
+/// 科目表格导入请求
+#[derive(Debug, Deserialize)]
+pub struct SubjectImportRequest {
+    pub subjects: Vec<SubjectImportItem>,
+}
+
+/// 课时 Markdown 保存请求
+#[derive(Debug, Deserialize)]
+pub struct LessonSaveRequest {
+    pub subject: String,
+    pub homework: String,
+    pub lesson: String,
+    pub content: String,
+    /// 课时简介（相关介绍），可留空
+    #[serde(default)]
+    pub description: Option<String>,
+}
+/// 课程列表响应项
+#[derive(Debug, Serialize)]
+pub struct CourseInfo {
+    pub subject: String,
+    pub description: Option<String>,
+    pub cover_image: Option<String>,
+    pub major: Option<String>,
+    pub status: Option<String>,
+    pub total_lessons: usize,
+}
+
+/// 课时公开查询参数
+#[derive(Debug, Deserialize)]
+pub struct LessonPublicQuery {
+    pub subject: String,
+    pub homework: String,
+    pub lesson: String,
+}
+
+/// 提交记录（存储在 uploads 目录的 JSON 索引文件中）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubmissionRecord {
     pub student_id: String,
     pub student_name: String,
+    pub class: String,
+    pub subject: String,
+    pub homework: String,
+    pub filename: String,
+    pub filepath: String,
+    pub filesize: u64,
+    pub submitted_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_status: Option<String>, // null=未评审, "passed"=通过, "rejected"=存在问题
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub review_comment: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reviewed_at: Option<String>,
+}
+
+/// 学生进度信息
+#[derive(Debug, Serialize)]
+pub struct StudentProgress {
+    pub subject: String,
+    pub total_lessons: usize,
+    pub completed_lessons: usize,
+    pub has_issues: usize,
+    pub lesson_statuses: Vec<LessonStatusInfo>,
+}
+
+/// 课时作业状态
+#[derive(Debug, Serialize)]
+pub struct LessonStatusInfo {
+    pub homework_name: String,
+    pub lesson_name: String,
+    pub status: String, // "completed" | "rejected" | "pending"
+    pub submitted_at: Option<String>,
+    pub review_comment: Option<String>,
+}
+
+/// 管理员评审请求
+#[derive(Debug, Deserialize)]
+pub struct ReviewRequest {
+    pub subject: String,
+    pub homework: String,
+    pub student_id: String,
+    pub status: String, // "passed" | "rejected"
+    #[serde(default)]
+    pub comment: Option<String>,
+}
+
+/// 课程元数据更新请求
+#[derive(Debug, Deserialize)]
+pub struct CourseMetaRequest {
+    pub description: Option<String>,
+    pub cover_image: Option<String>,
+    pub major: Option<String>,
 }
 
 /// 通用 API 响应
@@ -227,8 +410,8 @@ pub struct SubmissionStatus {
     pub homework_name: String,
     pub subject: String,
     pub class: String,
-    pub submitted: Vec<String>,      // 已提交的文件名（含学号姓名）
-    pub not_submitted: Vec<String>,  // 未提交提示
+    pub submitted: Vec<String>,     // 已提交的文件名（含学号姓名）
+    pub not_submitted: Vec<String>, // 未提交提示
 }
 
 /// 密码修改请求

@@ -65,8 +65,8 @@ async function uploadCover(course: Course, options: { file: File }) {
   coverProgress.value = 0
 
   try {
-    const updated = await api.uploadCourseCover(course.id, file, (percent) => {
-      coverProgress.value = percent
+    const updated = await api.uploadCourseCover(course.id, file, (info) => {
+      coverProgress.value = info.percent
     })
     // 直接更新列表中的该条记录，避免整表刷新导致滚动位置跳动
     const index = courses.value.findIndex((c) => c.id === course.id)

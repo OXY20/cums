@@ -90,7 +90,8 @@ async function main() {
   console.log('\n[3] 提交前状态查询')
   const status0 = await json(`/api/student/submissions/status?lesson_id=${lessonId}&class_id=${classId}`)
   check('查询课时提交状态', status0.status === 200, JSON.stringify(status0.body))
-  check('初始无提交', status0.body?.total === 0, `total=${status0.body?.total}`)
+  check('初始本班无提交', status0.body?.class_total === 0, `class_total=${status0.body?.class_total}`)
+  check('初始本设备无提交', status0.body?.device === null, JSON.stringify(status0.body?.device))
 
   // ---- 第一次提交：多文件 ----
   console.log('\n[4] 学生提交作业（3 个文件：图片 / 视频 / 文档）')
@@ -118,8 +119,9 @@ async function main() {
   // ---- 提交后状态查询 ----
   console.log('\n[5] 提交后状态查询')
   const status1 = await json(`/api/student/submissions/status?lesson_id=${lessonId}&class_id=${classId}`)
-  check('统计到 1 条提交', status1.body?.total === 1, `total=${status1.body?.total}`)
-  check('返回最早提交人', status1.body?.first_submission?.student_name === '张三', `${status1.body?.first_submission?.student_name}`)
+  check('本班统计到 1 条提交', status1.body?.class_total === 1, `class_total=${status1.body?.class_total}`)
+  check('本设备（同 IP、无 device_id）也被识别', status1.body?.device !== null, JSON.stringify(status1.body?.device)?.slice(0, 80))
+  check('本设备提交人为张三', status1.body?.device?.latest?.student_name === '张三', `${status1.body?.device?.latest?.student_name}`)
 
   // ---- 第二次提交：同班同课时 → 重复标记 ----
   console.log('\n[6] 同班同学再次提交（应触发重复提醒）')
@@ -133,9 +135,15 @@ async function main() {
   check('重复提交仍然保存成功', submit2.status === 200, JSON.stringify(submit2.body).slice(0, 200))
   const sub2 = submit2.body?.submission
   check('被标记为重复', sub2?.duplicate_flag === 1, `flag=${sub2?.duplicate_flag}`)
-  check('记录被重复的提交 ID', sub2?.duplicate_of === sub1?.id, `duplicate_of=${sub2?.duplicate_of}`)
-  check('返回重复警告文案', typeof submit2.body?.duplicate_warning === 'string' && submit2.body.duplicate_warning.includes('张三'), `${submit2.body?.duplicate_warning}`)
-  check('返回重复提交人姓名', sub2?.duplicate_of_name === '张三', `${sub2?.duplicate_of_name}`)
+  check('记录了被重复的提交 ID', typeof sub2?.duplicate_of === 'number', `duplicate_of=${sub2?.duplicate_of}`)
+  // 提示语改为中性表述：不指名道姓、不给时间，避免暴露其他同学信息
+  check(
+    '重复警告为中性文案',
+    typeof submit2.body?.duplicate_warning === 'string' &&
+      submit2.body.duplicate_warning.includes('重复') &&
+      !submit2.body.duplicate_warning.includes('张三'),
+    `${submit2.body?.duplicate_warning}`,
+  )
 
   // ---- 参数校验 ----
   console.log('\n[7] 参数校验')

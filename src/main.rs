@@ -46,10 +46,7 @@ async fn main() -> std::io::Result<()> {
         app_config.server_addr.clone()
     };
 
-    let port: u16 = addr
-        .trim_start_matches(':')
-        .parse()
-        .unwrap_or(3000);
+    let port: u16 = addr.trim_start_matches(':').parse().unwrap_or(3000);
 
     // 智能端口检测
     let final_port = if utils::is_port_available(port) {
@@ -94,6 +91,8 @@ async fn main() -> std::io::Result<()> {
     println!("════════════════════════════════════════════════════════════");
     println!();
 
+    let lesson_media_dir = state.base_dir.join("lesson_media");
+    let uploads_dir = state.base_dir.join("uploads");
     let state_data = web::Data::from(state);
     HttpServer::new(move || {
         App::new()
@@ -101,30 +100,113 @@ async fn main() -> std::io::Result<()> {
             // 静态页面
             .route("/", web::get().to(handlers::index_page))
             .route("/admin", web::get().to(handlers::admin_page))
+            .route("/favicon.svg", web::get().to(handlers::favicon))
             // API 路由
             .route("/api/v1/login", web::post().to(handlers::login))
+            .route(
+                "/api/v1/student/password",
+                web::post().to(handlers::student_change_password),
+            )
             .route("/api/v1/config", web::get().to(handlers::get_config))
+            .route("/api/v1/courses", web::get().to(handlers::courses))
+            .route("/api/v1/current-course", web::get().to(handlers::current_course))
+            .route("/api/v1/lesson/public", web::get().to(handlers::lesson_public))
+            .route("/api/v1/lesson/media/list", web::get().to(handlers::lesson_media_list))
+            .route("/api/v1/lesson", web::get().to(handlers::lesson_content))
             .route("/api/v1/upload", web::post().to(handlers::upload))
+            .route("/api/v1/student/progress", web::get().to(handlers::student_progress))
+            .route("/api/v1/student/submissions", web::get().to(handlers::student_submissions))
             .route("/api/v1/version", web::get().to(handlers::version))
             .route("/api/v1/changelog", web::get().to(handlers::changelog))
-            .route("/api/v1/template", web::get().to(handlers::template_download))
+            .route(
+                "/api/v1/template",
+                web::get().to(handlers::template_download),
+            )
             // 管理员 API
             .route("/api/v1/admin/login", web::post().to(handlers::admin_login))
-            .route("/api/v1/admin/config", web::route().to(handlers::admin_config))
-            .route("/api/v1/admin/template/upload", web::post().to(handlers::template_upload))
-            .route("/api/v1/admin/template/delete", web::post().to(handlers::template_delete))
-            // 管理员 API v2
-            .route("/api/v1/admin/files", web::get().to(handlers::admin_file_list))
-            .route("/api/v1/admin/files/delete", web::post().to(handlers::admin_file_delete))
-            .route("/api/v1/admin/stats", web::get().to(handlers::admin_stats))
-            .route("/api/v1/admin/submissions", web::get().to(handlers::admin_submissions))
-            .route("/api/v1/admin/password", web::post().to(handlers::admin_change_password))
-            .route("/api/v1/admin/logs", web::get().to(handlers::admin_logs))
-            // 静态文件服务（uploads 目录）
-            .service(
-                actix_files::Files::new("/uploads", "./uploads")
-                    .show_files_listing()
+            .route(
+                "/api/v1/admin/config",
+                web::route().to(handlers::admin_config),
             )
+            .route(
+                "/api/v1/admin/students",
+                web::get().to(handlers::admin_students),
+            )
+            .route(
+                "/api/v1/admin/students/template",
+                web::get().to(handlers::admin_students_template),
+            )
+            .route(
+                "/api/v1/admin/students/import-xlsx",
+                web::post().to(handlers::admin_students_import_xlsx),
+            )
+            .route(
+                "/api/v1/admin/students/import",
+                web::post().to(handlers::admin_students_import),
+            )
+            .route(
+                "/api/v1/admin/subjects/import",
+                web::post().to(handlers::admin_subjects_import),
+            )
+            .route(
+                "/api/v1/admin/lesson",
+                web::get().to(handlers::admin_lesson_content),
+            )
+            .route(
+                "/api/v1/admin/lesson",
+                web::post().to(handlers::admin_lesson_save),
+            )
+            .route(
+                "/api/v1/admin/lesson/media",
+                web::post().to(handlers::admin_lesson_media_upload),
+            )
+            .route(
+                "/api/v1/admin/students/{student_id}/reset",
+                web::post().to(handlers::admin_student_reset_password),
+            )
+            .route(
+                "/api/v1/admin/students/{student_id}",
+                web::delete().to(handlers::admin_student_delete),
+            )
+            .route(
+                "/api/v1/admin/template/list",
+                web::get().to(handlers::template_list),
+            )
+            .route(
+                "/api/v1/admin/template/upload",
+                web::post().to(handlers::template_upload),
+            )
+            .route(
+                "/api/v1/admin/template/delete",
+                web::post().to(handlers::template_delete),
+            )
+            // 管理员 API v2
+            .route(
+                "/api/v1/admin/files",
+                web::get().to(handlers::admin_file_list),
+            )
+            .route(
+                "/api/v1/admin/files/delete",
+                web::post().to(handlers::admin_file_delete),
+            )
+            .route("/api/v1/admin/stats", web::get().to(handlers::admin_stats))
+            .route(
+                "/api/v1/admin/submissions",
+                web::get().to(handlers::admin_submissions),
+            )
+            .route(
+                "/api/v1/admin/password",
+                web::post().to(handlers::admin_change_password),
+            )
+            .route("/api/v1/admin/logs", web::get().to(handlers::admin_logs))
+            .route("/api/v1/admin/current-course", web::post().to(handlers::admin_current_course))
+            .route("/api/v1/admin/course-meta/{subject}", web::post().to(handlers::admin_course_meta))
+            .route("/api/v1/admin/review", web::post().to(handlers::admin_review))
+            .service(
+                actix_files::Files::new("/lesson-media", lesson_media_dir.clone())
+                    .use_last_modified(true),
+            ) // 静态文件服务（uploads 目录）
+            .service(actix_files::Files::new("/uploads", uploads_dir.clone()).show_files_listing())
     })
     .bind(&bind_addr)?
     .run()

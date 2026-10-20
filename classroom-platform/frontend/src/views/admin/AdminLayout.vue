@@ -13,6 +13,7 @@ const router = useRouter()
 const navItems = [
   { path: '/admin/console', label: '课堂控制台', icon: 'console' },
   { path: '/admin/courses', label: '课程管理', icon: 'course' },
+  { path: '/admin/roster', label: '学生名单', icon: 'roster' },
   { path: '/admin/resources', label: '资源库', icon: 'resource' },
   { path: '/admin/submissions', label: '作业提交', icon: 'submission' },
   { path: '/admin/system', label: '系统状态', icon: 'system' },

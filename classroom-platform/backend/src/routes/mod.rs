@@ -11,6 +11,7 @@ pub mod lessons;
 pub mod meta;
 pub mod resources;
 pub mod sessions;
+pub mod students;
 pub mod submissions;
 
 use crate::auth::{verify_token, Claims, Role};
@@ -32,6 +33,7 @@ pub fn api_router() -> Router<AppState> {
         .merge(sessions::routes())
         .merge(resources::routes())
         .merge(submissions::routes())
+        .merge(students::routes())
         .merge(files::routes())
         .merge(events::routes())
         .merge(meta::routes())

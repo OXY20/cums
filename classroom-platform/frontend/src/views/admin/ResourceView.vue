@@ -80,8 +80,8 @@ async function handleFile(file: File) {
       sha256,
     })
 
-    const result = await api.uploadResource(registered.resource_id, file, (percent) => {
-      progress.value = percent
+    const result = await api.uploadResource(registered.resource_id, file, (info) => {
+      progress.value = info.percent
     })
 
     ElMessage.success(`上传完成：${result.name}`)

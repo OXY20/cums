@@ -1,5 +1,13 @@
 use std::path::Path;
 
+/// 计算密码 SHA-256 摘要。
+pub fn hash_password(password: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let digest = Sha256::digest(password.as_bytes());
+    format!("sha256:{digest:x}")
+}
+
 /// 允许上传的文件扩展名白名单
 pub fn is_allowed_file_type(ext: &str) -> bool {
     let ext = ext.to_lowercase();
@@ -18,9 +26,40 @@ pub fn is_allowed_file_type(ext: &str) -> bool {
         | ".c" | ".cpp" | ".h" | ".java" | ".py"
         | ".js" | ".html" | ".css" | ".json" | ".xml"
         | ".md" | ".go" | ".rs" | ".ts"
+        // 音视频类
+        | ".mp4" | ".webm" | ".mov" | ".mp3" | ".wav" | ".m4a" | ".ogg"
     )
 }
 
+/// 课程内容允许的媒体和附件类型，排除脚本文件。
+pub fn is_allowed_lesson_media_type(ext: &str) -> bool {
+    matches!(
+        ext.to_lowercase().as_str(),
+        ".jpg"
+            | ".jpeg"
+            | ".png"
+            | ".gif"
+            | ".bmp"
+            | ".webp"
+            | ".mp4"
+            | ".webm"
+            | ".mov"
+            | ".mp3"
+            | ".wav"
+            | ".m4a"
+            | ".ogg"
+            | ".pdf"
+            | ".doc"
+            | ".docx"
+            | ".xls"
+            | ".xlsx"
+            | ".ppt"
+            | ".pptx"
+            | ".zip"
+            | ".rar"
+            | ".7z"
+    )
+}
 /// 过滤文件名中的危险字符，防止路径遍历攻击
 /// 只允许字母、数字、下划线、连字符和中文字符
 pub fn sanitize_filename(name: &str) -> String {
