@@ -1,0 +1,193 @@
+{
+  "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+  "projectName": "课堂文件管理",
+  "originalIdea": "按照《CUMS 界面重新设计需求说明》重新设计并绘制第一版界面原型。CUMS 是课堂文件上传管理系统/课程中心，包含两个界面：学生端课程中心（面向访客和学生，含首页全部课程、课程主页、课时详情、我的课程、作业提交、登录/改密弹窗）和管理端后台（面向管理员，含登录页、仪表盘、科目管理、名单管理、文件管理、提交情况、设置、操作日志）。用户要求按照这份需求文档自主创建第一版画码原型。",
+  "status": "draft",
+  "revision": 6,
+  "createdAt": 1787660722751,
+  "updatedAt": 1787660883092,
+  "boardName": null,
+  "deferredStyleNote": null,
+  "answers": {
+    "target-platform": {
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ],
+      "confirmed": true
+    },
+    "core-user": {
+      "questionId": "core-user",
+      "values": [
+        "consumer"
+      ],
+      "confirmed": true
+    },
+    "core-goal": {
+      "questionId": "core-goal",
+      "values": [
+        "other"
+      ],
+      "otherText": "都需要的",
+      "normalizedText": "按用户描述处理：都需要的",
+      "confirmed": true
+    },
+    "core-flow": {
+      "questionId": "core-flow",
+      "values": [
+        "browse-result"
+      ],
+      "confirmed": true
+    },
+    "core-modules": {
+      "questionId": "core-modules",
+      "values": [
+        "home",
+        "create-edit",
+        "detail",
+        "settings",
+        "profile"
+      ],
+      "confirmed": true
+    }
+  },
+  "currentQuestion": {
+    "id": "core-pages",
+    "kind": "choice",
+    "text": "首轮原型要画哪些核心页面？请选择 3–5 个。",
+    "selectionMode": "multiple",
+    "options": [
+      {
+        "id": "home",
+        "label": "首页 / 总览"
+      },
+      {
+        "id": "core-action",
+        "label": "核心操作页"
+      },
+      {
+        "id": "result",
+        "label": "结果页"
+      },
+      {
+        "id": "detail",
+        "label": "详情页"
+      },
+      {
+        "id": "profile",
+        "label": "个人中心"
+      },
+      {
+        "id": "other",
+        "label": "其他"
+      }
+    ],
+    "allowOther": true,
+    "minSelections": 3,
+    "maxSelections": 5
+  },
+  "pendingInterpretation": null,
+  "brief": null,
+  "history": [
+    {
+      "revision": 1,
+      "action": "start",
+      "at": 1787660722751
+    },
+    {
+      "revision": 1,
+      "action": "answer",
+      "at": 1787660740281,
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ]
+    },
+    {
+      "revision": 2,
+      "action": "answer",
+      "at": 1787660758507,
+      "questionId": "core-user",
+      "values": [
+        "consumer"
+      ]
+    },
+    {
+      "revision": 3,
+      "action": "answer-other",
+      "at": 1787660807677,
+      "questionId": "core-goal",
+      "values": [
+        "other"
+      ],
+      "otherText": "都需要的"
+    },
+    {
+      "revision": 4,
+      "action": "answer",
+      "at": 1787660830350,
+      "questionId": "core-flow",
+      "values": [
+        "browse-result"
+      ]
+    },
+    {
+      "revision": 5,
+      "action": "answer",
+      "at": 1787660883090,
+      "questionId": "core-modules",
+      "values": [
+        "home",
+        "create-edit",
+        "detail",
+        "settings",
+        "profile"
+      ]
+    }
+  ],
+  "lastRequestKey": "{\"action\":\"answer\",\"sessionId\":\"project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a\",\"revision\":5,\"questionId\":\"core-modules\",\"values\":[\"home\",\"create-edit\",\"detail\",\"settings\",\"profile\"],\"otherText\":null,\"projectName\":null}",
+  "lastResponse": {
+    "status": "question",
+    "sessionId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectName": "课堂文件管理",
+    "projectFile": "draw2code/.projects/project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a.json",
+    "revision": 6,
+    "question": {
+      "id": "core-pages",
+      "kind": "choice",
+      "text": "首轮原型要画哪些核心页面？请选择 3–5 个。",
+      "selectionMode": "multiple",
+      "options": [
+        {
+          "id": "home",
+          "label": "首页 / 总览"
+        },
+        {
+          "id": "core-action",
+          "label": "核心操作页"
+        },
+        {
+          "id": "result",
+          "label": "结果页"
+        },
+        {
+          "id": "detail",
+          "label": "详情页"
+        },
+        {
+          "id": "profile",
+          "label": "个人中心"
+        },
+        {
+          "id": "other",
+          "label": "其他"
+        }
+      ],
+      "allowOther": true,
+      "minSelections": 3,
+      "maxSelections": 5
+    }
+  }
+}
+

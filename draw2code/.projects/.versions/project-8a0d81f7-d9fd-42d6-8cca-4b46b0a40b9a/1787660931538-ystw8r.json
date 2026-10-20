@@ -1,0 +1,490 @@
+{
+  "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+  "projectName": "课堂文件管理",
+  "originalIdea": "按照《CUMS 界面重新设计需求说明》重新设计并绘制第一版界面原型。CUMS 是课堂文件上传管理系统/课程中心，包含两个界面：学生端课程中心（面向访客和学生，含首页全部课程、课程主页、课时详情、我的课程、作业提交、登录/改密弹窗）和管理端后台（面向管理员，含登录页、仪表盘、科目管理、名单管理、文件管理、提交情况、设置、操作日志）。用户要求按照这份需求文档自主创建第一版画码原型。",
+  "status": "ready",
+  "revision": 7,
+  "createdAt": 1787660722751,
+  "updatedAt": 1787660907115,
+  "boardName": null,
+  "deferredStyleNote": null,
+  "answers": {
+    "target-platform": {
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ],
+      "confirmed": true
+    },
+    "core-user": {
+      "questionId": "core-user",
+      "values": [
+        "consumer"
+      ],
+      "confirmed": true
+    },
+    "core-goal": {
+      "questionId": "core-goal",
+      "values": [
+        "other"
+      ],
+      "otherText": "都需要的",
+      "normalizedText": "按用户描述处理：都需要的",
+      "confirmed": true
+    },
+    "core-flow": {
+      "questionId": "core-flow",
+      "values": [
+        "browse-result"
+      ],
+      "confirmed": true
+    },
+    "core-modules": {
+      "questionId": "core-modules",
+      "values": [
+        "home",
+        "create-edit",
+        "detail",
+        "settings",
+        "profile"
+      ],
+      "confirmed": true
+    },
+    "core-pages": {
+      "questionId": "core-pages",
+      "values": [
+        "home",
+        "core-action",
+        "result",
+        "detail",
+        "profile"
+      ],
+      "confirmed": true
+    }
+  },
+  "currentQuestion": null,
+  "pendingInterpretation": null,
+  "brief": {
+    "originalIdea": "按照《CUMS 界面重新设计需求说明》重新设计并绘制第一版界面原型。CUMS 是课堂文件上传管理系统/课程中心，包含两个界面：学生端课程中心（面向访客和学生，含首页全部课程、课程主页、课时详情、我的课程、作业提交、登录/改密弹窗）和管理端后台（面向管理员，含登录页、仪表盘、科目管理、名单管理、文件管理、提交情况、设置、操作日志）。用户要求按照这份需求文档自主创建第一版画码原型。",
+    "targetPlatform": "Web",
+    "users": [
+      "普通消费者"
+    ],
+    "goal": "都需要的",
+    "coreFlow": {
+      "labels": [
+        "进入首页 → 浏览内容 → 查看结果"
+      ],
+      "userText": null
+    },
+    "modules": [
+      "首页 / 总览",
+      "创建与编辑",
+      "详情页",
+      "设置",
+      "个人中心"
+    ],
+    "moduleIds": [
+      "home",
+      "create-edit",
+      "detail",
+      "settings",
+      "profile"
+    ],
+    "pages": [
+      "首页 / 总览",
+      "核心操作页",
+      "结果页",
+      "详情页",
+      "个人中心"
+    ],
+    "pageIds": [
+      "home",
+      "core-action",
+      "result",
+      "detail",
+      "profile"
+    ],
+    "components": [
+      {
+        "type": "home",
+        "label": "首页总览卡片"
+      },
+      {
+        "type": "create-edit",
+        "label": "创建 / 编辑表单"
+      },
+      {
+        "type": "detail",
+        "label": "详情卡片"
+      },
+      {
+        "type": "settings",
+        "label": "设置列表"
+      },
+      {
+        "type": "profile",
+        "label": "用户资料卡"
+      },
+      {
+        "type": "navigation",
+        "label": "页面导航与主流程箭头"
+      }
+    ],
+    "mockDataPolicy": {
+      "rule": "列表、聊天、图表、详情和状态组件必须展示真实示例内容，不能使用空白方框、Lorem ipsum、用户A或无含义占位符代替",
+      "minimumRecordsPerRepeatedComponent": 3,
+      "visibility": "mock 数据必须使用首次渲染即可见的独立 text 元素；列表行需同时体现对象、状态和关键上下文",
+      "updateContract": "完整页面 frame 设置 customData.role=prototype-page 和 customData.mockDataMin；每条示例内容的 text 设置 customData.role=mock-data"
+    },
+    "pageMockData": [
+      {
+        "pageId": "home",
+        "page": "首页 / 总览",
+        "minimumRecords": 3,
+        "requiredContent": [
+          "当前状态或摘要",
+          "至少 3 条具有真实语义的内容记录",
+          "清晰的首要操作"
+        ],
+        "examples": [
+          "今日新增 6 条",
+          "待处理 3 条",
+          "最近更新于 10:30"
+        ]
+      },
+      {
+        "pageId": "core-action",
+        "page": "核心操作页",
+        "minimumRecords": 3,
+        "requiredContent": [
+          "当前操作对象",
+          "至少 3 个已填写的关键字段或步骤状态",
+          "提交与取消操作"
+        ],
+        "examples": [
+          "当前对象：示例记录",
+          "步骤 2 / 3",
+          "已填写 4 项"
+        ]
+      },
+      {
+        "pageId": "result",
+        "page": "结果页",
+        "minimumRecords": 3,
+        "requiredContent": [
+          "结果标题与摘要",
+          "至少 3 条结果记录或指标",
+          "继续操作或返回入口"
+        ],
+        "examples": [
+          "共找到 12 条结果",
+          "推荐结果 A · 匹配度 92%",
+          "推荐结果 B · 匹配度 87%"
+        ]
+      },
+      {
+        "pageId": "detail",
+        "page": "详情页",
+        "minimumRecords": 3,
+        "requiredContent": [
+          "对象名称与当前状态",
+          "至少 3 项关键属性或记录",
+          "主要操作与返回入口"
+        ],
+        "examples": [
+          "示例对象 · 进行中",
+          "创建于 6 月 21 日",
+          "负责人：林小满"
+        ]
+      },
+      {
+        "pageId": "profile",
+        "page": "个人中心",
+        "minimumRecords": 3,
+        "requiredContent": [
+          "用户名称与身份信息",
+          "至少 3 项统计或个人资料",
+          "设置或退出操作"
+        ],
+        "examples": [
+          "林小满",
+          "已完成 28 项",
+          "连续使用 7 天"
+        ]
+      }
+    ],
+    "interactions": [
+      "页面之间用 Arrow 表达核心成功路径",
+      "首轮只验证默认成功路径"
+    ],
+    "assumptions": [
+      "首轮原型限制为 3–5 个核心页面",
+      "首轮只绘制默认成功路径，不展开加载、空状态和错误状态",
+      "每个重复内容组件至少填充 3 条可读 mock 数据；低保真降低视觉精度，但不省略理解产品所需的信息",
+      "原型使用语义化低保真，不处理品牌色、字体和视觉风格；可用克制的语义色区分类别、状态和主要操作",
+      "视觉风格和前端技术实现延迟到 draw2code_generate 阶段"
+    ],
+    "pendingDecisions": [],
+    "deferredStyleNote": null,
+    "pendingQuestions": [
+      "加载、空状态和错误状态将在后续原型迭代中补充",
+      "登录、个人中心和管理后台不属于首轮核心闭环，除非用户另行确认"
+    ]
+  },
+  "history": [
+    {
+      "revision": 1,
+      "action": "start",
+      "at": 1787660722751
+    },
+    {
+      "revision": 1,
+      "action": "answer",
+      "at": 1787660740281,
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ]
+    },
+    {
+      "revision": 2,
+      "action": "answer",
+      "at": 1787660758507,
+      "questionId": "core-user",
+      "values": [
+        "consumer"
+      ]
+    },
+    {
+      "revision": 3,
+      "action": "answer-other",
+      "at": 1787660807677,
+      "questionId": "core-goal",
+      "values": [
+        "other"
+      ],
+      "otherText": "都需要的"
+    },
+    {
+      "revision": 4,
+      "action": "answer",
+      "at": 1787660830350,
+      "questionId": "core-flow",
+      "values": [
+        "browse-result"
+      ]
+    },
+    {
+      "revision": 5,
+      "action": "answer",
+      "at": 1787660883090,
+      "questionId": "core-modules",
+      "values": [
+        "home",
+        "create-edit",
+        "detail",
+        "settings",
+        "profile"
+      ]
+    },
+    {
+      "revision": 6,
+      "action": "answer",
+      "at": 1787660907112,
+      "questionId": "core-pages",
+      "values": [
+        "home",
+        "core-action",
+        "result",
+        "detail",
+        "profile"
+      ]
+    }
+  ],
+  "lastRequestKey": "{\"action\":\"answer\",\"sessionId\":\"project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a\",\"revision\":6,\"questionId\":\"core-pages\",\"values\":[\"home\",\"core-action\",\"result\",\"detail\",\"profile\"],\"otherText\":null,\"projectName\":null}",
+  "lastResponse": {
+    "status": "ready",
+    "sessionId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectName": "课堂文件管理",
+    "projectFile": "draw2code/.projects/project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a.json",
+    "revision": 7,
+    "brief": {
+      "originalIdea": "按照《CUMS 界面重新设计需求说明》重新设计并绘制第一版界面原型。CUMS 是课堂文件上传管理系统/课程中心，包含两个界面：学生端课程中心（面向访客和学生，含首页全部课程、课程主页、课时详情、我的课程、作业提交、登录/改密弹窗）和管理端后台（面向管理员，含登录页、仪表盘、科目管理、名单管理、文件管理、提交情况、设置、操作日志）。用户要求按照这份需求文档自主创建第一版画码原型。",
+      "targetPlatform": "Web",
+      "users": [
+        "普通消费者"
+      ],
+      "goal": "都需要的",
+      "coreFlow": {
+        "labels": [
+          "进入首页 → 浏览内容 → 查看结果"
+        ],
+        "userText": null
+      },
+      "modules": [
+        "首页 / 总览",
+        "创建与编辑",
+        "详情页",
+        "设置",
+        "个人中心"
+      ],
+      "moduleIds": [
+        "home",
+        "create-edit",
+        "detail",
+        "settings",
+        "profile"
+      ],
+      "pages": [
+        "首页 / 总览",
+        "核心操作页",
+        "结果页",
+        "详情页",
+        "个人中心"
+      ],
+      "pageIds": [
+        "home",
+        "core-action",
+        "result",
+        "detail",
+        "profile"
+      ],
+      "components": [
+        {
+          "type": "home",
+          "label": "首页总览卡片"
+        },
+        {
+          "type": "create-edit",
+          "label": "创建 / 编辑表单"
+        },
+        {
+          "type": "detail",
+          "label": "详情卡片"
+        },
+        {
+          "type": "settings",
+          "label": "设置列表"
+        },
+        {
+          "type": "profile",
+          "label": "用户资料卡"
+        },
+        {
+          "type": "navigation",
+          "label": "页面导航与主流程箭头"
+        }
+      ],
+      "mockDataPolicy": {
+        "rule": "列表、聊天、图表、详情和状态组件必须展示真实示例内容，不能使用空白方框、Lorem ipsum、用户A或无含义占位符代替",
+        "minimumRecordsPerRepeatedComponent": 3,
+        "visibility": "mock 数据必须使用首次渲染即可见的独立 text 元素；列表行需同时体现对象、状态和关键上下文",
+        "updateContract": "完整页面 frame 设置 customData.role=prototype-page 和 customData.mockDataMin；每条示例内容的 text 设置 customData.role=mock-data"
+      },
+      "pageMockData": [
+        {
+          "pageId": "home",
+          "page": "首页 / 总览",
+          "minimumRecords": 3,
+          "requiredContent": [
+            "当前状态或摘要",
+            "至少 3 条具有真实语义的内容记录",
+            "清晰的首要操作"
+          ],
+          "examples": [
+            "今日新增 6 条",
+            "待处理 3 条",
+            "最近更新于 10:30"
+          ]
+        },
+        {
+          "pageId": "core-action",
+          "page": "核心操作页",
+          "minimumRecords": 3,
+          "requiredContent": [
+            "当前操作对象",
+            "至少 3 个已填写的关键字段或步骤状态",
+            "提交与取消操作"
+          ],
+          "examples": [
+            "当前对象：示例记录",
+            "步骤 2 / 3",
+            "已填写 4 项"
+          ]
+        },
+        {
+          "pageId": "result",
+          "page": "结果页",
+          "minimumRecords": 3,
+          "requiredContent": [
+            "结果标题与摘要",
+            "至少 3 条结果记录或指标",
+            "继续操作或返回入口"
+          ],
+          "examples": [
+            "共找到 12 条结果",
+            "推荐结果 A · 匹配度 92%",
+            "推荐结果 B · 匹配度 87%"
+          ]
+        },
+        {
+          "pageId": "detail",
+          "page": "详情页",
+          "minimumRecords": 3,
+          "requiredContent": [
+            "对象名称与当前状态",
+            "至少 3 项关键属性或记录",
+            "主要操作与返回入口"
+          ],
+          "examples": [
+            "示例对象 · 进行中",
+            "创建于 6 月 21 日",
+            "负责人：林小满"
+          ]
+        },
+        {
+          "pageId": "profile",
+          "page": "个人中心",
+          "minimumRecords": 3,
+          "requiredContent": [
+            "用户名称与身份信息",
+            "至少 3 项统计或个人资料",
+            "设置或退出操作"
+          ],
+          "examples": [
+            "林小满",
+            "已完成 28 项",
+            "连续使用 7 天"
+          ]
+        }
+      ],
+      "interactions": [
+        "页面之间用 Arrow 表达核心成功路径",
+        "首轮只验证默认成功路径"
+      ],
+      "assumptions": [
+        "首轮原型限制为 3–5 个核心页面",
+        "首轮只绘制默认成功路径，不展开加载、空状态和错误状态",
+        "每个重复内容组件至少填充 3 条可读 mock 数据；低保真降低视觉精度，但不省略理解产品所需的信息",
+        "原型使用语义化低保真，不处理品牌色、字体和视觉风格；可用克制的语义色区分类别、状态和主要操作",
+        "视觉风格和前端技术实现延迟到 draw2code_generate 阶段"
+      ],
+      "pendingDecisions": [],
+      "deferredStyleNote": null,
+      "pendingQuestions": [
+        "加载、空状态和错误状态将在后续原型迭代中补充",
+        "登录、个人中心和管理后台不属于首轮核心闭环，除非用户另行确认"
+      ]
+    },
+    "assumptions": [
+      "首轮原型限制为 3–5 个核心页面",
+      "首轮只绘制默认成功路径，不展开加载、空状态和错误状态",
+      "每个重复内容组件至少填充 3 条可读 mock 数据；低保真降低视觉精度，但不省略理解产品所需的信息",
+      "原型使用语义化低保真，不处理品牌色、字体和视觉风格；可用克制的语义色区分类别、状态和主要操作",
+      "视觉风格和前端技术实现延迟到 draw2code_generate 阶段"
+    ]
+  }
+}
+

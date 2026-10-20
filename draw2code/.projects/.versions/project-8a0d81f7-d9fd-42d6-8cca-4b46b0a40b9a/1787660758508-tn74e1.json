@@ -1,0 +1,114 @@
+{
+  "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+  "projectName": "课堂文件管理",
+  "originalIdea": "按照《CUMS 界面重新设计需求说明》重新设计并绘制第一版界面原型。CUMS 是课堂文件上传管理系统/课程中心，包含两个界面：学生端课程中心（面向访客和学生，含首页全部课程、课程主页、课时详情、我的课程、作业提交、登录/改密弹窗）和管理端后台（面向管理员，含登录页、仪表盘、科目管理、名单管理、文件管理、提交情况、设置、操作日志）。用户要求按照这份需求文档自主创建第一版画码原型。",
+  "status": "draft",
+  "revision": 2,
+  "createdAt": 1787660722751,
+  "updatedAt": 1787660740285,
+  "boardName": null,
+  "deferredStyleNote": null,
+  "answers": {
+    "target-platform": {
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ],
+      "confirmed": true
+    }
+  },
+  "currentQuestion": {
+    "id": "core-user",
+    "kind": "choice",
+    "text": "这个工具主要服务谁？",
+    "selectionMode": "single",
+    "options": [
+      {
+        "id": "consumer",
+        "label": "普通消费者"
+      },
+      {
+        "id": "professional",
+        "label": "专业用户"
+      },
+      {
+        "id": "team-member",
+        "label": "团队成员"
+      },
+      {
+        "id": "administrator",
+        "label": "管理员"
+      },
+      {
+        "id": "unknown",
+        "label": "还没想好"
+      },
+      {
+        "id": "other",
+        "label": "其他"
+      }
+    ],
+    "allowOther": true
+  },
+  "pendingInterpretation": null,
+  "brief": null,
+  "history": [
+    {
+      "revision": 1,
+      "action": "start",
+      "at": 1787660722751
+    },
+    {
+      "revision": 1,
+      "action": "answer",
+      "at": 1787660740281,
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ]
+    }
+  ],
+  "lastRequestKey": "{\"action\":\"answer\",\"sessionId\":\"project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a\",\"revision\":1,\"questionId\":\"target-platform\",\"values\":[\"web\"],\"otherText\":null,\"projectName\":null}",
+  "lastResponse": {
+    "status": "question",
+    "sessionId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectName": "课堂文件管理",
+    "projectFile": "draw2code/.projects/project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a.json",
+    "revision": 2,
+    "question": {
+      "id": "core-user",
+      "kind": "choice",
+      "text": "这个工具主要服务谁？",
+      "selectionMode": "single",
+      "options": [
+        {
+          "id": "consumer",
+          "label": "普通消费者"
+        },
+        {
+          "id": "professional",
+          "label": "专业用户"
+        },
+        {
+          "id": "team-member",
+          "label": "团队成员"
+        },
+        {
+          "id": "administrator",
+          "label": "管理员"
+        },
+        {
+          "id": "unknown",
+          "label": "还没想好"
+        },
+        {
+          "id": "other",
+          "label": "其他"
+        }
+      ],
+      "allowOther": true
+    }
+  }
+}
+

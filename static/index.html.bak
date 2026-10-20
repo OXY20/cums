@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CUMS - 文件上传系统</title>
+    <style>
+        /* ========== 基础样式 ========== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f0f2f5;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        /* ========== 头部 ========== */
+        .header {
+            background: #fff;
+            padding: 16px 24px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 500;
+            color: #1a1a1a;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* ========== 按钮 ========== */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #40a9ff;
+        }
+
+        .btn-link {
+            background: none;
+            color: #666;
+            padding: 8px;
+        }
+
+        .btn-link:hover {
+            color: #1890ff;
+        }
+
+        .btn-logout {
+            color: #ff4d4f;
+        }
+
+        /* ========== 主内容 ========== */
+        .main {
+            max-width: 480px;
+            margin: 40px auto;
+            padding: 0 16px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        /* ========== 欢迎页 ========== */
+        .welcome {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .welcome p {
+            color: #999;
+            margin-bottom: 24px;
+        }
+
+        /* ========== 表单 ========== */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .form-group select,
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        .form-group select:focus,
+        .form-group input:focus {
+            outline: none;
+            border-color: #1890ff;
+        }
+
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px dashed #d9d9d9;
+            border-radius: 6px;
+            background: #fafafa;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 12px;
+            background: #1890ff;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .submit-btn:hover {
+            background: #40a9ff;
+        }
+
+        .submit-btn:disabled {
+            background: #d9d9d9;
+            cursor: not-allowed;
+        }
+
+        /* ========== 消息提示 ========== */
+        .message {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.success {
+            display: block;
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #52c41a;
+        }
+
+        .message.error {
+            display: block;
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #ff4d4f;
+        }
+
+        /* ========== 模态框 ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: #fff;
+            border-radius: 12px;
+            padding: 24px;
+            width: 360px;
+            max-width: 90%;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        /* ========== 班级标签 ========== */
+        .class-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 4px;
+            color: #1890ff;
+            font-size: 12px;
+            margin-bottom: 16px;
+        }
+
+        .lesson-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .lesson-button { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px solid #91d5ff; border-radius: 5px; background: #f0faff; color: #1890ff; cursor: pointer; font-size: 12px; }
+        .lesson-button.active { background: #1890ff; color: #fff; }
+        .lesson-item { border: 1px solid #d9d9d9; border-radius: 8px; padding: 10px 12px; background: #fff; }
+        .lesson-item + .lesson-item { margin-top: 8px; }
+        .lesson-item-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .lesson-item-title { font-size: 14px; font-weight: 500; color: #1a1a1a; }
+        .lesson-item .lesson-button { flex-shrink: 0; }
+        .lesson-item-desc { margin-top: 6px; font-size: 12px; color: #666; line-height: 1.6; }
+        .lesson-item-desc:empty { display: none; }
+        .lesson-intro { margin-top: 14px; padding: 12px 16px; background: #f0f7ff; border-left: 3px solid #1890ff; border-radius: 6px; color: #444; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+        .lesson-intro:empty { display: none; }
+        .lesson-content { margin-top: 14px; padding: 16px; border: 1px solid #e8e8e8; border-radius: 8px; color: #333; line-height: 1.8; overflow-wrap: anywhere; }
+        .lesson-content h1, .lesson-content h2, .lesson-content h3 { margin: 12px 0 8px; }
+        .lesson-content img { max-width: 100%; height: auto; }
+        .lesson-content video { max-width: 100%; }
+        .lesson-content a { color: #1890ff; }        /* ========== 页脚 ========== */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .footer-about {
+            color: #1890ff;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .footer-about:hover {
+            color: #40a9ff;
+            text-decoration: underline;
+        }
+
+        .footer-divider {
+            color: #d9d9d9;
+        }
+
+        /* ========== 关于弹窗 ========== */
+        .about-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .about-popup.active {
+            display: flex;
+        }
+
+        .about-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 28px;
+            width: 340px;
+            max-width: 90%;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+            animation: popIn 0.25s ease-out;
+        }
+
+        @keyframes popIn {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .about-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .about-header h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .about-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+
+        .about-close:hover {
+            color: #333;
+        }
+
+        .about-logo {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .about-logo-icon {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, #1890ff, #36cfc9);
+            border-radius: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+        .ui-icon { width: 1.2em; height: 1.2em; display: inline-block; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.18em; }
+        .about-logo-icon .ui-icon { width: 32px; height: 32px; stroke-width: 1.5; }
+
+        .about-logo h4 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .about-version {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #f0f5ff;
+            color: #1890ff;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .about-desc {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+
+        .about-github {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border: 1px solid #e1e4e8;
+            border-radius: 8px;
+            color: #24292f;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .about-github:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+        }
+
+        .about-github svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* ========== 加载动画 ========== */
+        .loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ========== 隐藏 ========== */
+        .hidden { display: none !important; }
+
+        /* ========== 作业信息区域 ========== */
+        .homework-info {
+            background: #f0f7ff;
+            border: 1px solid #91d5ff;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: -8px;
+        }
+
+        .homework-description {
+            color: #1890ff;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+
+        .homework-description:empty {
+            display: none;
+        }
+
+        .homework-description + .homework-actions:empty {
+            margin-top: 0;
+        }
+
+        .homework-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .btn-template {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: #fff;
+            border: 1px solid #1890ff;
+            border-radius: 6px;
+            color: #1890ff;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .btn-template:hover {
+            background: #1890ff;
+            color: #fff;
+        }
+
+        .btn-template .icon {
+            width: 16px;
+            height: 16px;
+        }
+    </style>
+</head>
+<body>
+    <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">
+        <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h4l2 2H18.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z"></path></symbol>
+        <symbol id="icon-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"></path><path d="M14 3v5h4M9 13h6M9 17h6"></path></symbol>
+    </svg>
+    <!-- 头部 -->
+    <header class="header">
+        <h1>CUMS - 文件上传系统</h1>
+        <div class="user-info" id="userInfo">
+            <button class="btn btn-primary" onclick="showLogin()">登录</button>
+        </div>
+    </header>
+
+    <!-- 主内容 -->
+    <main class="main">
+        <!-- 欢迎页（未登录） -->
+        <div class="card" id="welcomeCard">
+            <div class="welcome">
+                <p>请先登录后上传作业</p>
+                <button class="btn btn-primary" onclick="showLogin()">登录</button>
+            </div>
+        </div>
+
+        <!-- 上传表单（已登录） -->
+        <div class="card hidden" id="uploadCard">
+            <div class="class-tag" id="classTag"></div>
+            <h2 class="card-title">作业上传</h2>
+            <div class="message" id="message"></div>
+            <form id="uploadForm" onsubmit="handleUpload(event)">
+                <div class="form-group">
+                    <label>科目</label>
+                    <select id="subjectSelect" onchange="onSubjectChange()" required>
+                        <option value="">请选择科目</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>作业</label>
+                    <select id="homeworkSelect" onchange="onHomeworkChange()" required>
+                        <option value="">请选择作业</option>
+                    </select>
+                </div>
+                <div class="form-group" id="homeworkInfoGroup" style="display: none;">
+                    <div class="homework-info">
+                        <div class="homework-description" id="homeworkDescription"></div>
+                        <div class="homework-actions" id="homeworkActions"></div><div id="lessonList" style="margin-top:12px"></div><div id="lessonIntro" class="lesson-intro" style="display:none"></div><article id="lessonContentView" class="lesson-content" style="display:none"></article>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>文件</label>
+                    <input type="file" id="fileInput" required>
+                </div>
+                <button type="submit" class="submit-btn" id="submitBtn">上传文件</button>
+            </form>
+        </div>
+
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="footer">
+        <span id="footerVersion">...</span>
+        <span class="footer-divider">·</span>
+        <span class="footer-about" onclick="showAboutPopup()">关于</span>
+    </footer>
+
+    <!-- 关于弹窗 -->
+    <div class="about-popup" id="aboutPopup">
+        <div class="about-card">
+            <div class="about-header">
+                <h3>关于</h3>
+                <button class="about-close" onclick="hideAboutPopup()">&times;</button>
+            </div>
+            <div class="about-logo">
+                <div class="about-logo-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-folder"></use></svg></div>
+                <h4>CUMS</h4>
+                <span class="about-version" id="aboutVersion">...</span>
+            </div>
+            <div class="about-desc">
+                简洁的局域网文件上传系统<br>
+                专为机房作业收集场景设计
+            </div>
+            <a href="https://github.com/OXY20/cums" target="_blank" class="about-github">
+                <svg viewBox="0 0 16 16" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                GitHub 仓库
+            </a>
+        </div>
+    </div>
+
+    <!-- 登录模态框 -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>用户登录</h3>
+                <button class="modal-close" onclick="hideLogin()">&times;</button>
+            </div>
+            <form onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>学号</label>
+                    <input type="text" id="loginStudentId" placeholder="请输入学号" autocomplete="username" required>
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="loginPassword" placeholder="请输入密码" autocomplete="current-password" required>
+                </div>
+                <p style="margin: -4px 0 16px; color: #888; font-size: 12px; line-height: 1.6;">首次登录默认密码为 000000；如果忘记密码，请联系老师重置。</p>
+                <button type="submit" class="submit-btn">登录</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 首次登录修改密码弹窗 -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>首次登录，请修改密码</h3>
+            </div>
+            <p style="margin-bottom: 18px; color: #777; font-size: 13px; line-height: 1.6;">为了保护账号安全，请先设置新密码。新密码至少 6 位。</p>
+            <form onsubmit="handlePasswordChange(event)">
+                <div class="form-group">
+                    <label>当前密码</label>
+                    <input type="password" id="oldStudentPassword" placeholder="请输入当前密码（默认密码为000000）" autocomplete="current-password" required>
+                </div>
+                <div class="form-group">
+                    <label>新密码</label>
+                    <input type="password" id="newStudentPassword" autocomplete="new-password" minlength="6" required>
+                </div>
+                <div class="form-group">
+                    <label>确认新密码</label>
+                    <input type="password" id="confirmStudentPassword" autocomplete="new-password" minlength="6" required>
+                </div>
+                <div class="message" id="passwordMessage"></div>
+                <button type="submit" class="submit-btn">保存新密码</button>
+            </form>
+        </div>
+    </div>
+    <script>
+        // ==================== 全局状态 ====================
+        let currentUser = null;  // 当前用户信息
+        let configData = null;   // 配置数据
+        let isLoggedIn = false;  // 登录状态
+
+        // ==================== 工具函数 ====================
+
+        // HTML 转义函数，防止 XSS 攻击
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ==================== 初始化 ====================
+
+        // 页面加载时初始化
+        async function init() {
+            await loadConfig();
+            await loadVersion();
+            loadSavedUser();
+        }
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/v1/config');
+                const data = await res.json();
+                if (data.success) {
+                    configData = data.data;
+                    initSelects();
+                }
+            } catch (e) {
+                console.error('加载配置失败:', e);
+            }
+        }
+
+        // 加载版本
+        async function loadVersion() {
+            try {
+                const res = await fetch('/api/v1/version');
+                const data = await res.json();
+                if (data.success) {
+                    document.getElementById('footerVersion').textContent = 'v' + data.version;
+                    document.getElementById('aboutVersion').textContent = 'v' + data.version;
+                }
+            } catch (e) {
+                console.error('加载版本失败:', e);
+            }
+        }
+
+        // 加载保存的用户
+        function loadSavedUser() {
+            try {
+                const saved = localStorage.getItem('cums_user');
+                if (!saved) return;
+                const savedUser = JSON.parse(saved);
+                if (!savedUser.token || !savedUser.student_id) {
+                    localStorage.removeItem('cums_user');
+                    return;
+                }
+                currentUser = savedUser;
+                isLoggedIn = true;
+                updateUI();
+                if (currentUser.force_password_change) showPasswordChange();
+            } catch (error) {
+                localStorage.removeItem('cums_user');
+                console.error('加载用户失败:', error);
+            }
+        }
+        // ==================== 下拉框初始化 ====================
+
+        // 初始化页面选择器
+        function initSelects() {
+            if (!configData || !configData.subjects) return;
+        }
+        // 初始化科目下拉框（只显示当前班级有的科目）
+        function initSubjectSelect() {
+            if (!configData || !configData.subjects || !currentUser) return;
+
+            const subjectSelect = document.getElementById('subjectSelect');
+            // 清空现有选项
+            subjectSelect.innerHTML = '<option value="">请选择科目</option>';
+            
+            // 只添加当前班级有的科目
+            Object.keys(configData.subjects).forEach(name => {
+                const subConfig = configData.subjects[name];
+                if (subConfig.classes.includes(currentUser.class)) {
+                    subjectSelect.add(new Option(name, name));
+                }
+            });
+            
+            // 同时清空作业选择
+            document.getElementById('homeworkSelect').innerHTML = '<option value="">请选择作业</option>';
+        }
+
+        // 科目变更时更新作业列表
+        function onSubjectChange() {
+            const subject = document.getElementById('subjectSelect').value;
+            const homeworkSelect = document.getElementById('homeworkSelect');
+
+            // 清空作业列表
+            homeworkSelect.innerHTML = '<option value="">请选择作业</option>';
+
+            // 隐藏作业信息
+            hideHomeworkInfo();
+
+            if (!subject || !configData.subjects[subject]) return;
+
+            const subConfig = configData.subjects[subject];
+
+            // 填充作业选项（支持新格式）
+            subConfig.homeworks.forEach(hw => {
+                const hwName = typeof hw === 'string' ? hw : hw.name;
+                homeworkSelect.add(new Option(hwName, hwName));
+            });
+        }
+
+        // 作业变更时显示作业信息
+        function onHomeworkChange() {
+            const subject = document.getElementById('subjectSelect').value;
+            const homework = document.getElementById('homeworkSelect').value;
+            if (!subject || !homework || !configData.subjects[subject]) {
+                hideHomeworkInfo();
+                return;
+            }
+            const hwInfo = getHomeworkInfo(subject, homework);
+            if (hwInfo && (hwInfo.description || (hwInfo.templates && hwInfo.templates.length > 0) || (hwInfo.lessons && hwInfo.lessons.length > 0))) showHomeworkInfo(hwInfo, subject, homework);
+            else hideHomeworkInfo();
+        }
+
+        function getHomeworkInfo(subject, homeworkName) {
+            const subConfig = configData.subjects[subject];
+            if (!subConfig) return null;
+            for (const hw of subConfig.homeworks) {
+                if (typeof hw === 'string' && hw === homeworkName) return { name: hw, lessons: [] };
+                if (typeof hw !== 'string' && hw.name === homeworkName) return hw;
+            }
+            return null;
+        }
+
+        function showHomeworkInfo(hwInfo, subject, homework) {
+            const infoGroup = document.getElementById('homeworkInfoGroup');
+            const descEl = document.getElementById('homeworkDescription');
+            const actionsEl = document.getElementById('homeworkActions');
+            const lessonList = document.getElementById('lessonList');
+            descEl.textContent = hwInfo.description || '';
+            actionsEl.innerHTML = '';
+            if (hwInfo.templates && hwInfo.templates.length > 0) {
+                hwInfo.templates.forEach((tpl, index) => {
+                    const fileName = tpl.split('/').pop();
+                    const btn = document.createElement('a');
+                    btn.href = '/api/v1/template?file=' + encodeURIComponent(tpl);
+                    btn.className = 'btn-template';
+                    btn.target = '_blank';
+                    btn.innerHTML = `<svg class="icon ui-icon" aria-hidden="true"><use href="#icon-file"></use></svg>${hwInfo.templates.length > 1 ? '模板' + (index + 1) + ': ' : ''}${escapeHtml(fileName)}`;
+                    actionsEl.appendChild(btn);
+                });
+            }
+            lessonList.innerHTML = '';
+            if (hwInfo.lessons && hwInfo.lessons.length) {
+                const title = document.createElement('div');
+                title.textContent = '课程课时';
+                title.style.cssText = 'margin:12px 0 8px;font-size:12px;color:#888;';
+                lessonList.appendChild(title);
+                hwInfo.lessons.forEach(lesson => {
+                    const item = document.createElement('div');
+                    item.className = 'lesson-item';
+                    const head = document.createElement('div');
+                    head.className = 'lesson-item-head';
+                    const nameEl = document.createElement('div');
+                    nameEl.className = 'lesson-item-title';
+                    nameEl.textContent = lesson.name;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'lesson-button';
+                    button.textContent = '查看';
+                    button.onclick = () => loadLessonContent(subject, homework, lesson.name, button, item);
+                    head.appendChild(nameEl);
+                    head.appendChild(button);
+                    item.appendChild(head);
+                    if (lesson.description) {
+                        const descEl = document.createElement('div');
+                        descEl.className = 'lesson-item-desc';
+                        descEl.textContent = lesson.description;
+                        item.appendChild(descEl);
+                    }
+                    lessonList.appendChild(item);
+                });
+            }
+            infoGroup.style.display = 'block';
+        }
+
+        function safeMarkdownUrl(value, allowMailto) {
+            const decoder = document.createElement('textarea');
+            decoder.innerHTML = value || '';
+            const decoded = decoder.value.trim();
+            if (!decoded) return '';
+            try {
+                const parsed = new URL(decoded, window.location.origin);
+                const allowed = parsed.protocol === 'http:' || parsed.protocol === 'https:' || (allowMailto && parsed.protocol === 'mailto:');
+                return allowed ? escapeHtml(parsed.href) : '';
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function renderMarkdown(markdown) {
+            let html = escapeHtml(markdown || '');
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>')
+                .replace(/@\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
+                    const safeUrl = safeMarkdownUrl(url, false);
+                    return safeUrl ? '<video controls preload="metadata" src="' + safeUrl + '"></video>' : '<span>视频链接不可用</span>';
+                })
+                .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+                .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+                .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+                    const safeUrl = safeMarkdownUrl(url, false);
+                    return safeUrl ? '<img alt="' + alt + '" src="' + safeUrl + '">' : '<span>' + (alt || '图片链接不可用') + '</span>';
+                })
+                .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
+                    const safeUrl = safeMarkdownUrl(url, true);
+                    return safeUrl ? '<a href="' + safeUrl + '" target="_blank" rel="noopener">' + label + '</a>' : '<span>' + label + '</span>';
+                })
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n/g, '<br>');
+            return html;
+        }
+        async function loadLessonContent(subject, homework, lesson, button, item) {
+            document.querySelectorAll('.lesson-button').forEach(el => el.classList.remove('active'));
+            button.classList.add('active');
+            const view = document.getElementById('lessonContentView');
+            const intro = document.getElementById('lessonIntro');
+            view.style.display = 'block';
+            view.textContent = '正在加载课时内容...';
+            // 从课时条目中读取简介并展示在内容上方
+            intro.textContent = (item && item.querySelector('.lesson-item-desc')) ? item.querySelector('.lesson-item-desc').textContent : '';
+            intro.style.display = intro.textContent ? 'block' : 'none';
+            try {
+                const res = await fetch('/api/v1/lesson?subject=' + encodeURIComponent(subject) + '&homework=' + encodeURIComponent(homework) + '&lesson=' + encodeURIComponent(lesson), { headers: { 'X-Student-Token': currentUser.token } });
+                const data = await res.json();
+                if (!data.success) { view.textContent = data.message || '课时内容加载失败'; return; }
+                view.innerHTML = renderMarkdown(data.data.content || '暂无内容');
+            } catch (error) {
+                view.textContent = '课时内容加载失败，请重试';
+            }
+        }
+        // 隐藏作业信息区域
+        function hideHomeworkInfo() {
+            document.getElementById('homeworkInfoGroup').style.display = 'none';
+            document.getElementById('lessonContentView').style.display = 'none';
+            const intro = document.getElementById('lessonIntro');
+            if (intro) { intro.style.display = 'none'; intro.textContent = ''; }
+        }
+
+        // ==================== 页面切换 ====================
+
+        // 显示上传页面
+        function showUpload() {
+            document.getElementById('welcomeCard').classList.add('hidden');
+            
+            if (isLoggedIn) {
+                document.getElementById('uploadCard').classList.remove('hidden');
+            } else {
+                document.getElementById('welcomeCard').classList.remove('hidden');
+            }
+        }
+
+        // 显示关于弹窗
+        function showAboutPopup() {
+            document.getElementById('aboutPopup').classList.add('active');
+        }
+
+        // 隐藏关于弹窗
+        function hideAboutPopup() {
+            document.getElementById('aboutPopup').classList.remove('active');
+        }
+
+        // 显示登录弹窗
+        function showLogin() {
+            document.getElementById('loginModal').classList.add('active');
+        }
+
+        // 隐藏登录弹窗
+        function hideLogin() {
+            document.getElementById('loginModal').classList.remove('active');
+        }
+
+        // ==================== 登录处理 ====================
+
+        // 处理登录
+        async function handleLogin(e) {
+            e.preventDefault();
+            const studentId = document.getElementById('loginStudentId').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                const res = await fetch('/api/v1/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    currentUser = data.data;
+                    isLoggedIn = true;
+                    localStorage.setItem('cums_user', JSON.stringify(currentUser));
+                    document.getElementById('loginStudentId').value = '';
+                    document.getElementById('loginPassword').value = '';
+                    hideLogin();
+                    updateUI();
+                    if (currentUser.force_password_change) showPasswordChange();
+                } else {
+                    alert(data.message || '登录失败');
+                }
+            } catch (error) {
+                alert('登录失败，请重试');
+            }
+        }
+
+        function showPasswordChange() {
+            document.getElementById('passwordModal').classList.add('active');
+            document.getElementById('oldStudentPassword').focus();
+        }
+
+        async function handlePasswordChange(e) {
+            e.preventDefault();
+            const oldPassword = document.getElementById('oldStudentPassword').value;
+            const newPassword = document.getElementById('newStudentPassword').value;
+            const confirmPassword = document.getElementById('confirmStudentPassword').value;
+            const message = document.getElementById('passwordMessage');
+            if (newPassword.length < 6) {
+                message.textContent = '新密码至少需要 6 位';
+                message.className = 'message error';
+                return;
+            }
+            if (newPassword !== confirmPassword) {
+                message.textContent = '两次输入的新密码不一致';
+                message.className = 'message error';
+                return;
+            }
+            try {
+                const res = await fetch('/api/v1/student/password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Student-Token': currentUser.token
+                    },
+                    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    message.textContent = data.message || '密码修改失败';
+                    message.className = 'message error';
+                    return;
+                }
+                currentUser.force_password_change = false;
+                localStorage.setItem('cums_user', JSON.stringify(currentUser));
+                document.getElementById('passwordModal').classList.remove('active');
+                document.getElementById('oldStudentPassword').value = '';
+                document.getElementById('newStudentPassword').value = '';
+                document.getElementById('confirmStudentPassword').value = '';
+                message.className = 'message';
+                alert('密码修改成功');
+            } catch (error) {
+                message.textContent = '密码修改失败，请重试';
+                message.className = 'message error';
+            }
+        }
+        // 退出登录
+        function logout() {
+            if (!confirm('确定要退出登录吗？')) return;
+            
+            currentUser = null;
+            isLoggedIn = false;
+            localStorage.removeItem('cums_user');
+            updateUI();
+        }
+
+        // 更新界面
+        function updateUI() {
+            const userInfo = document.getElementById('userInfo');
+            const classTag = document.getElementById('classTag');
+
+            if (isLoggedIn && currentUser) {
+                // 更新头部（使用 escapeHtml 防止 XSS）
+                userInfo.innerHTML = `
+                    <span>${escapeHtml(currentUser.class)} - ${escapeHtml(currentUser.student_id)} · ${escapeHtml(currentUser.student_name || currentUser.name || "")}</span>
+                    <button class="btn btn-link btn-logout" onclick="logout()">退出</button>
+                `;
+
+                // 更新班级标签
+                classTag.textContent = currentUser.class;
+                
+                // 初始化科目下拉框（只显示当前班级有的科目）
+                initSubjectSelect();
+                
+                // 显示上传表单
+                document.getElementById('welcomeCard').classList.add('hidden');
+                document.getElementById('uploadCard').classList.remove('hidden');
+            } else {
+                // 恢复头部
+                userInfo.innerHTML = `
+                    <button class="btn btn-primary" onclick="showLogin()">登录</button>
+                `;
+                
+                // 显示欢迎页
+                document.getElementById('uploadCard').classList.add('hidden');
+                document.getElementById('welcomeCard').classList.remove('hidden');
+            }
+        }
+
+        // ==================== 上传处理 ====================
+
+        // 处理上传
+        async function handleUpload(e) {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const submitBtn = document.getElementById('submitBtn');
+            const message = document.getElementById('message');
+            
+            if (!fileInput.files[0]) {
+                message.textContent = '请选择要上传的文件';
+                message.className = 'message error';
+                return;
+            }
+            
+            // 构建表单数据
+            const formData = new FormData();
+            formData.append('subject', document.getElementById('subjectSelect').value);
+            formData.append('homework', document.getElementById('homeworkSelect').value);
+            formData.append('file', fileInput.files[0]);
+            
+            // 禁用按钮
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="loading"></span>上传中...';
+            message.className = 'message';
+            
+            try {
+                const res = await fetch('/api/v1/upload', {
+                    method: 'POST',
+                    headers: { 'X-Student-Token': currentUser.token },
+                    body: formData
+                });
+                const data = await res.json();
+                
+                if (data.success) {
+                    message.textContent = '上传成功: ' + data.filename;
+                    message.className = 'message success';
+                    document.getElementById('uploadForm').reset();
+                } else {
+                    message.textContent = data.message || '上传失败';
+                    message.className = 'message error';
+                }
+            } catch (e) {
+                message.textContent = '上传失败，请重试';
+                message.className = 'message error';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '上传文件';
+            }
+        }
+
+        // ==================== 事件绑定 ====================
+
+        // 点击模态框背景关闭
+        document.getElementById('loginModal').addEventListener('click', function(e) {
+            if (e.target === this) hideLogin();
+        });
+
+        // 点击关于弹窗背景关闭
+        document.getElementById('aboutPopup').addEventListener('click', function(e) {
+            if (e.target === this) hideAboutPopup();
+        });
+
+        // 初始化
+        init();
+    </script>
+</body>
+</html>

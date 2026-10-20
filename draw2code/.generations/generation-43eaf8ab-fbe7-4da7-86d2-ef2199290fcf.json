@@ -1,0 +1,152 @@
+{
+  "sessionId": "generation-43eaf8ab-fbe7-4da7-86d2-ef2199290fcf",
+  "board": "课堂文件管理",
+  "activeBoard": "课堂文件管理",
+  "status": "question",
+  "revision": 1,
+  "createdAt": 1787701303932,
+  "updatedAt": 1787701303933,
+  "currentQuestion": {
+    "id": "page-scope",
+    "text": "这次要把哪些原型页面生成成可体验的前端 Demo？",
+    "selectionMode": "multiple",
+    "minSelections": 1,
+    "allowOther": false,
+    "options": [
+      {
+        "id": "首页（推荐）",
+        "label": "首页（推荐）",
+        "valueLabel": "首页",
+        "description": "建议纳入本次生成范围；宿主暂不支持自动预勾选，可直接取消或改选",
+        "recommended": true,
+        "reason": "位于当前画板核心流程的前序位置"
+      },
+      {
+        "id": "课程主页（推荐）",
+        "label": "课程主页（推荐）",
+        "valueLabel": "课程主页",
+        "description": "建议纳入本次生成范围；宿主暂不支持自动预勾选，可直接取消或改选",
+        "recommended": true,
+        "reason": "位于当前画板核心流程的前序位置"
+      },
+      {
+        "id": "课时详情（推荐）",
+        "label": "课时详情（推荐）",
+        "valueLabel": "课时详情",
+        "description": "建议纳入本次生成范围；宿主暂不支持自动预勾选，可直接取消或改选",
+        "recommended": true,
+        "reason": "位于当前画板核心流程的前序位置"
+      },
+      {
+        "id": "作业提交",
+        "label": "作业提交",
+        "valueLabel": "作业提交",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "我的课程",
+        "label": "我的课程",
+        "valueLabel": "我的课程",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "登录",
+        "label": "登录",
+        "valueLabel": "登录",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "管理登录",
+        "label": "管理登录",
+        "valueLabel": "管理登录",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "管理仪表盘",
+        "label": "管理仪表盘",
+        "valueLabel": "管理仪表盘",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "科目管理",
+        "label": "科目管理",
+        "valueLabel": "科目管理",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "名单管理",
+        "label": "名单管理",
+        "valueLabel": "名单管理",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "文件管理",
+        "label": "文件管理",
+        "valueLabel": "文件管理",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "提交情况",
+        "label": "提交情况",
+        "valueLabel": "提交情况",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "设置",
+        "label": "设置",
+        "valueLabel": "设置",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "操作日志",
+        "label": "操作日志",
+        "valueLabel": "操作日志",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "修改密码弹窗",
+        "label": "修改密码弹窗",
+        "valueLabel": "修改密码弹窗",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "附件弹窗",
+        "label": "附件弹窗",
+        "valueLabel": "附件弹窗",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "用户菜单",
+        "label": "用户菜单",
+        "valueLabel": "用户菜单",
+        "description": "本次可选页面"
+      },
+      {
+        "id": "已上传文件抽屉",
+        "label": "已上传文件抽屉",
+        "valueLabel": "已上传文件抽屉",
+        "description": "本次可选页面"
+      }
+    ],
+    "recommendedValues": [
+      "首页（推荐）",
+      "课程主页（推荐）",
+      "课时详情（推荐）"
+    ]
+  },
+  "selectedFrames": [],
+  "recommendedFrames": [
+    "首页",
+    "课程主页",
+    "课时详情"
+  ],
+  "visualDirection": null,
+  "inheritedVisualDirection": null,
+  "device": null,
+  "styleNote": null,
+  "blockers": [],
+  "warnings": [],
+  "brief": null,
+  "validation": null,
+  "hadExistingIndex": false
+}

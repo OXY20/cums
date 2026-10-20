@@ -1,0 +1,141 @@
+{
+  "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+  "projectName": "课堂文件管理",
+  "originalIdea": "按照《CUMS 界面重新设计需求说明》重新设计并绘制第一版界面原型。CUMS 是课堂文件上传管理系统/课程中心，包含两个界面：学生端课程中心（面向访客和学生，含首页全部课程、课程主页、课时详情、我的课程、作业提交、登录/改密弹窗）和管理端后台（面向管理员，含登录页、仪表盘、科目管理、名单管理、文件管理、提交情况、设置、操作日志）。用户要求按照这份需求文档自主创建第一版画码原型。",
+  "status": "draft",
+  "revision": 4,
+  "createdAt": 1787660722751,
+  "updatedAt": 1787660807680,
+  "boardName": null,
+  "deferredStyleNote": null,
+  "answers": {
+    "target-platform": {
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ],
+      "confirmed": true
+    },
+    "core-user": {
+      "questionId": "core-user",
+      "values": [
+        "consumer"
+      ],
+      "confirmed": true
+    },
+    "core-goal": {
+      "questionId": "core-goal",
+      "values": [
+        "other"
+      ],
+      "otherText": "都需要的",
+      "normalizedText": "按用户描述处理：都需要的",
+      "confirmed": true
+    }
+  },
+  "currentQuestion": {
+    "id": "core-flow",
+    "kind": "choice",
+    "text": "用户最重要的一条使用流程是什么？",
+    "selectionMode": "single",
+    "options": [
+      {
+        "id": "browse-result",
+        "label": "进入首页 → 浏览内容 → 查看结果"
+      },
+      {
+        "id": "input-result",
+        "label": "输入条件 → 提交 → 查看结果"
+      },
+      {
+        "id": "create-save",
+        "label": "创建内容 → 编辑 → 保存"
+      },
+      {
+        "id": "search-detail",
+        "label": "搜索 / 筛选 → 查看详情 → 完成操作"
+      },
+      {
+        "id": "other",
+        "label": "其他"
+      }
+    ],
+    "allowOther": true
+  },
+  "pendingInterpretation": null,
+  "brief": null,
+  "history": [
+    {
+      "revision": 1,
+      "action": "start",
+      "at": 1787660722751
+    },
+    {
+      "revision": 1,
+      "action": "answer",
+      "at": 1787660740281,
+      "questionId": "target-platform",
+      "values": [
+        "web"
+      ]
+    },
+    {
+      "revision": 2,
+      "action": "answer",
+      "at": 1787660758507,
+      "questionId": "core-user",
+      "values": [
+        "consumer"
+      ]
+    },
+    {
+      "revision": 3,
+      "action": "answer-other",
+      "at": 1787660807677,
+      "questionId": "core-goal",
+      "values": [
+        "other"
+      ],
+      "otherText": "都需要的"
+    }
+  ],
+  "lastRequestKey": "{\"action\":\"answer\",\"sessionId\":\"project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a\",\"revision\":3,\"questionId\":\"core-goal\",\"values\":[\"other\"],\"otherText\":\"都需要的\",\"projectName\":null}",
+  "lastResponse": {
+    "status": "question",
+    "sessionId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectId": "project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a",
+    "projectName": "课堂文件管理",
+    "projectFile": "draw2code/.projects/project-8a0d81f7-d9fd-42d6-8cca-4b46b0a40b9a.json",
+    "revision": 4,
+    "question": {
+      "id": "core-flow",
+      "kind": "choice",
+      "text": "用户最重要的一条使用流程是什么？",
+      "selectionMode": "single",
+      "options": [
+        {
+          "id": "browse-result",
+          "label": "进入首页 → 浏览内容 → 查看结果"
+        },
+        {
+          "id": "input-result",
+          "label": "输入条件 → 提交 → 查看结果"
+        },
+        {
+          "id": "create-save",
+          "label": "创建内容 → 编辑 → 保存"
+        },
+        {
+          "id": "search-detail",
+          "label": "搜索 / 筛选 → 查看详情 → 完成操作"
+        },
+        {
+          "id": "other",
+          "label": "其他"
+        }
+      ],
+      "allowOther": true
+    }
+  }
+}
+
