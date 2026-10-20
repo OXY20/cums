@@ -1,7 +1,8 @@
-﻿on:
+on:
   push:
     tags:
-      - 'v*'  # 推送 v2.0.0 这种 tag 时触发
+      - 'v*'  # 推送 v2.4.0 这种 tag 时触发
+  workflow_dispatch:
 
 # 设置必要的权限
 permissions:
@@ -13,43 +14,61 @@ jobs:
     strategy:
       matrix:
         include:
-          - goos: windows
-            goarch: amd64
-            suffix: .exe
-            platform: windows
-          - goos: linux
-            goarch: amd64
+          - target: x86_64-unknown-linux-gnu
             suffix: ''
             platform: linux
-          - goos: darwin
-            goarch: amd64
-            suffix: ''
-            platform: mac
+          - target: x86_64-unknown-pc-windows-msvc
+            suffix: '.exe'
+            platform: windows
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
         with:
-          go-version: '1.25'
-      - name: 构建并打包
+          targets: ${{ matrix.target }}
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 缓存 Rust 构建
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+
+      - name: 缓存 npm 依赖
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 构建前端
+        working-directory: frontend
         run: |
-          # 设置版本号和日期
+          npm ci
+          npm run build:only
+
+      - name: 构建后端
+        working-directory: backend
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: 打包
+        run: |
           VERSION=${GITHUB_REF#refs/tags/}
           DATE=$(date +%Y%m%d)
 
-          # 编译（使用矩阵变量）
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o build/cums${{ matrix.suffix }}
-
-          # 创建打包目录
           mkdir -p release
+          cp backend/target/${{ matrix.target }}/release/classroom-platform-server release/cums${{ matrix.suffix }}
+          cp -r app/web release/
+          cp app/config/config.toml release/config.toml
+          cp README.md release/
 
-          # 复制文件
-          cp build/cums${{ matrix.suffix }} release/
-          cp -r static release/
-          cp config.json release/
-
-          # 打包成 zip，文件名格式：cums_v2.0.0_20260122_windows.zip
           cd release
           zip -r ../cums_${VERSION}_${DATE}_${{ matrix.platform }}.zip *
+
       - name: 上传到 Release
         uses: softprops/action-gh-release@v1
         with:

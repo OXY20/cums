@@ -1,5 +1,21 @@
-# Rust 编译产物
+# 运行时数据：数据库、资源文件、日志与备份
+data/
+storage/
+backups/
+app/logs/
+app/web/
+
+# 运行时配置：包含 JWT 密钥，不应提交
+app/config/config.toml
+
+# Rust 构建产物
+backend/target/
+backend/.cargo/
 /target/
+
+# Node 构建产物与依赖
+frontend/node_modules/
+frontend/dist/
 
 # 二进制文件
 *.exe
@@ -22,12 +38,23 @@ Thumbs.db
 # 构建产物
 build/
 
-# 临时文件
-cargo_config_temp.toml
+# 临时与调试文件
+*.tmp
+*.log
+*.bak
 
-# 本地配置
-uploads/
-logs/cums.log
-templates/新建文本文档.txt
+# 演示素材：由 scripts/make-fixtures.py 生成，可随时重建
+scripts/fixtures/
 
+# 画板原型与工具缓存
+draw2code/
+.joycode/
 .codeartsdoer
+
+# 本地草稿与备份
+/lessons/
+/lesson_media/
+/uploads/
+/logs/
+/templates/
+cargo_config_temp.toml
