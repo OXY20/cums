@@ -9,6 +9,17 @@
 - [REFACTOR_DESIGN.md](./archive/REFACTOR_DESIGN.md) - 重构设计稿（设计阶段）
 - [PROJECT_REVIEW.md](./archive/PROJECT_REVIEW.md) - 早期项目审查报告（v1.0.3）
 
+### 旧版 CUMS（Actix Web 实现，已归档）
+平台已从 Actix Web 单页实现迁移到 Axum + Vue 3 架构，下列文档描述的是已归档的旧实现，仅供追溯参考。
+
+- [API.md](./archive/legacy-cums/API.md) - 旧版 API 文档
+- [CONFIG.md](./archive/legacy-cums/CONFIG.md) - 旧版 config.json 配置说明
+- [DEVELOPMENT.md](./archive/legacy-cums/DEVELOPMENT.md) - 旧版开发指南
+- [CONTRIBUTING.md](./archive/legacy-cums/CONTRIBUTING.md) - 旧版贡献指南
+- [ISSUES.md](./archive/legacy-cums/ISSUES.md) - 旧版问题清单
+- [README.md](./archive/legacy-cums/README.md) - 旧版功能清单
+- [INDEX.md](./archive/legacy-cums/INDEX.md) - 旧版文档索引
+
 ### 临时/重复入口
 - [README_CENTER.md](./archive/README_CENTER.md) - 文档中心入口（与 INDEX 重复）
 

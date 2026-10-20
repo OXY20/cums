@@ -32,6 +32,14 @@ cums/
     "upload_dir": "uploads",
     "admin_enabled": false,
     "admin_password": "admin123",
+    "students": {
+        "2025001": {
+            "name": "张三",
+            "class": "一班",
+            "password_hash": "sha256:...",
+            "force_password_change": true
+        }
+    },
     "subjects": {
         "数学": {
             "classes": ["一班", "二班", "三班"],
@@ -70,6 +78,7 @@ cums/
 | `upload_dir` | string | 是 | "uploads" | 上传文件存储目录 |
 | `admin_enabled` | bool | 否 | false | 是否启用管理员功能（默认关闭以保证安全） |
 | `admin_password` | string | 否 | "" | 管理员密码（明文存储） |
+| `students` | object | 否 | 空对象 | 后台导入的学生名单；密码保存为 `sha256:` 摘要 |
 | `subjects` | object | 是 | - | 科目配置（核心，见下文） |
 
 ### 管理员配置
@@ -110,6 +119,7 @@ cums/
 | `name` | string | 是 | 作业名称 |
 | `description` | string | 否 | 作业说明文字 |
 | `templates` | array | 否 | 模板文件路径列表 |
+| `lessons` | array | 否 | 课时对象列表；正文保存在 `lessons/` 目录 |
 
 **示例**：
 ```json
@@ -175,6 +185,12 @@ cums/
 ```
 
 > 💡 **提示**: 修改配置后需要**重启程序**才能生效
+
+---
+
+## 课时正文和媒体
+
+课时正文由管理后台保存为 Markdown 文件，路径为 `lessons/{科目}/{作业}/{课时}.md`；图片、视频和附件保存在 `lesson_media/{科目}/{作业}/{课时}/`。
 
 ---
 
@@ -409,6 +425,14 @@ uploads/
     "server_addr": ":3000",
     "admin_enabled": true,
     "admin_password": "admin123",
+    "students": {
+        "2025001": {
+            "name": "张三",
+            "class": "一班",
+            "password_hash": "sha256:...",
+            "force_password_change": true
+        }
+    },
     "subjects": {
         "文字处理": {
             "classes": ["25计应", "25幼托"],

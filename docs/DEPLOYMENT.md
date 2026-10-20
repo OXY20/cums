@@ -1,430 +1,307 @@
-# 部署指南
+# 部署与运维说明
 
-## 部署方式
+## 环境要求
 
-### 方式一：直接运行（开发/测试）
+| 组件 | 版本 | 说明 |
+|------|------|------|
+| Windows | 10 / 11 / Server 2019+ | 方案推荐的部署平台 |
+| Rust | 1.75+ | 仅构建阶段需要；验证环境为 1.97.1 |
+| Node.js | 20+ | 仅构建前端需要；验证环境为 24.19 |
 
-#### 1. 准备环境
+生产环境只需可执行文件与前端产物，无需安装 Rust 或 Node.js。
 
-- 服务器安装 Go 1.18+
-- 或使用预编译的二进制文件
+## 部署目录
 
-#### 2. 上传文件
+方案 6.3 推荐的目录结构：
 
-创建项目目录：
-
-```bash
-mkdir -p cums
-cd cums
+```text
+D:\ClassroomPlatform\
+├─ classroom-platform-server.exe
+├─ app\
+│  ├─ config\config.toml        # 首次启动自动生成
+│  ├─ logs\server.log.YYYY-MM-DD
+│  └─ web\                      # 前端构建产物
+├─ data\classroom.db            # SQLite（含 -wal、-shm）
+├─ storage\
+│  ├─ objects\                  # 已发布的资源文件
+│  ├─ staging\                  # 上传中的临时文件
+│  └─ manifests\                # 资源包清单
+└─ backups\                     # 数据库与配置备份
 ```
 
-上传以下文件：
+程序启动时自动创建上述目录。未设置 `CLASSROOM_ROOT` 时，根目录取可执行文件所在目录。
 
-```
-cums/
-├── cums.exe (Windows) 或 cums (Linux/Mac)
-├── static/
-│   └── index.html
-├── config.json
-└── uploads/
-```
+## 构建步骤
 
-#### 3. 创建配置文件
+### 构建前端
 
-创建 `config.json`：
-
-```json
-{
-    "version": "2.1.0",
-    "server_addr": ":3000",
-    "admin_enabled": false,
-    "admin_password": "",
-    "classes": {
-        "一班": {
-            "subjects": {
-                "数学": [
-                    { "name": "第一章作业" }
-                ]
-            }
-        }
-    }
-}
+```powershell
+cd frontend
+npm install
+npm run build
 ```
 
-#### 4. 运行服务
+产物输出到 `../app/web`。该目录由后端托管，无需额外 Web 服务器。
 
-##### Windows
-```bash
-cums.exe
+### 构建后端
+
+```powershell
+cd backend
+cargo build --release
 ```
 
-##### Linux/Mac
-```bash
-chmod +x cums
-./cums
+产物位于 `backend/target/release/classroom-platform-server.exe`。
+
+### 打包发布
+
+```powershell
+$dest = "D:\ClassroomPlatform"
+New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
+Copy-Item backend\target\release\classroom-platform-server.exe $dest\
+Copy-Item -Recurse app\web $dest\app\web -Force
 ```
 
-#### 5. 访问
+首次启动会生成配置、创建数据库与初始管理员账号。
 
-打开浏览器访问 http://服务器IP:3000
+## 配置
 
----
+配置文件 `app/config/config.toml`：
 
-### 方式二：使用 Docker
+```toml
+[server]
+bind = "0.0.0.0:8080"       # 监听地址；0.0.0.0 表示允许局域网访问
+static_dir = "app/web"      # 前端产物目录；留空则只提供 API
 
-#### 1. 创建 Dockerfile
+[database]
+path = "data/classroom.db"
+max_connections = 16        # SQLite 建议 8-16
+wal = true                  # WAL 提升并发读性能
 
-```dockerfile
-# 构建阶段
-FROM golang:1.20-alpine AS builder
+[storage]
+objects_dir = "storage/objects"
+staging_dir = "storage/staging"
+manifests_dir = "storage/manifests"
+max_file_bytes = 21474836480  # 单文件上限，默认 20 GiB
 
-WORKDIR /app
-COPY . .
+[auth]
+jwt_secret = "..."          # 首次启动随机生成，请妥善保管
+token_ttl_hours = 12
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o cums .
-
-# 运行阶段
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
-COPY --from=builder /app/cums .
-COPY --from=builder /app/static ./static
-COPY --from=builder /app/config.json .
-
-EXPOSE 3000
-
-CMD ["./cums"]
+[limits]
+max_concurrent_downloads = 64
+per_client_rate_kib = 0     # 0 表示不限速
 ```
 
-#### 2. 构建镜像
+修改 `bind` 后需重启服务。
 
-```bash
-docker build -t cums:latest .
+**端口回退。** 若配置端口被占用，程序会依次尝试后续端口，最多 20 次，并在日志中记录实际监听地址。
+
+## 开机自启动
+
+### 方式一：任务计划程序（推荐）
+
+以管理员身份运行：
+
+```powershell
+$action = New-ScheduledTaskAction `
+    -Execute "D:\ClassroomPlatform\classroom-platform-server.exe" `
+    -WorkingDirectory "D:\ClassroomPlatform"
+$trigger = New-ScheduledTaskTrigger -AtStartup
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -RunLevel Highest
+
+Register-ScheduledTask `
+    -TaskName "ClassroomPlatform" `
+    -Action $action -Trigger $trigger -Settings $settings -Principal $principal
 ```
 
-#### 3. 运行容器
+### 方式二：Windows 服务
 
-```bash
-docker run -d \
-  --name cums \
-  -p 3000:3000 \
-  -v $(pwd)/uploads:/root/uploads \
-  -v $(pwd)/config.json:/root/config.json \
-  cums:latest
+可使用 [NSSM](https://nssm.cc/) 等工具将可执行文件注册为服务：
+
+```powershell
+nssm install ClassroomPlatform "D:\ClassroomPlatform\classroom-platform-server.exe"
+nssm set ClassroomPlatform AppDirectory "D:\ClassroomPlatform"
+nssm start ClassroomPlatform
 ```
 
----
+## 日常运维
 
-### 方式三：使用 Systemd（Linux 服务）
+### 查看日志
 
-#### 1. 创建服务文件
+```powershell
+# 最近 50 行
+Get-Content D:\ClassroomPlatform\app\logs\server.log.* | Select-Object -Last 50
 
-创建 `/etc/systemd/system/cums.service`：
-
-```ini
-[Unit]
-Description=CUMS File Upload System
-After=network.target
-
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/cums
-ExecStart=/opt/cums/cums
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
+# 只看错误
+Select-String -Path D:\ClassroomPlatform\app\logs\*.log -Pattern "ERROR|WARN"
 ```
 
-#### 2. 启动服务
+日志按天滚动。可通过环境变量调整级别：
 
-```bash
-systemctl daemon-reload
-systemctl enable cums
-systemctl start cums
+```powershell
+$env:RUST_LOG = "info,classroom_platform_server=debug"
 ```
 
-#### 3. 查看状态
+### 备份
 
-```bash
-systemctl status cums
+**必须同时备份数据库与资源文件**，只备份数据库无法完整恢复平台（方案 12.1 风险 6）。
+
+```powershell
+$date = Get-Date -Format "yyyyMMdd"
+$backup = "E:\ClassroomBackup\$date"     # 建议放在不同磁盘
+New-Item -ItemType Directory -Force -Path $backup | Out-Null
+
+# 1. 数据库（使用 SQLite 在线备份，避免复制到写入中的文件）
+sqlite3 D:\ClassroomPlatform\data\classroom.db ".backup '$backup\classroom.db'"
+
+# 2. 资源文件
+robocopy D:\ClassroomPlatform\storage\objects "$backup\objects" /MIR /R:1 /W:1
+
+# 3. 配置
+Copy-Item D:\ClassroomPlatform\app\config\config.toml $backup\
 ```
 
-#### 4. 查看日志
+若无 `sqlite3` 命令，可先停止服务再复制 `classroom.db`、`classroom.db-wal`、`classroom.db-shm` 三个文件。
 
-```bash
-journalctl -u cums -f
+### 恢复
+
+```powershell
+# 1. 停止服务
+Stop-Service ClassroomPlatform
+
+# 2. 恢复数据库（三个文件需一起处理）
+Copy-Item E:\ClassroomBackup\20261016\classroom.db D:\ClassroomPlatform\data\ -Force
+Remove-Item D:\ClassroomPlatform\data\classroom.db-wal, D:\ClassroomPlatform\data\classroom.db-shm -ErrorAction SilentlyContinue
+
+# 3. 恢复资源文件
+robocopy E:\ClassroomBackup\20261016\objects D:\ClassroomPlatform\storage\objects /MIR
+
+# 4. 启动服务并验证
+Start-Service ClassroomPlatform
+Invoke-WebRequest http://localhost:8080/api/version
 ```
 
----
+**建议定期演练恢复流程**，确认备份可用，而不是只在故障时才第一次尝试。
 
-### 方式四：使用 Nginx 反向代理
+### 磁盘空间监控
 
-#### 1. 配置 Nginx
+通过管理端查看：
 
-创建 `/etc/nginx/conf.d/cums.conf`：
-
-```nginx
-upstream cums_backend {
-    server 127.0.0.1:3000;
-}
-
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://cums_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # 文件上传大小限制
-        client_max_body_size 100M;
-    }
-
-    # 静态文件缓存
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js)$ {
-        proxy_pass http://cums_backend;
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-}
+```powershell
+# 需要先获取令牌
+$login = Invoke-RestMethod -Uri http://localhost:8080/api/auth/login `
+    -Method POST -ContentType "application/json" `
+    -Body '{"username":"admin","password":"admin"}'
+Invoke-RestMethod -Uri http://localhost:8080/api/admin/health `
+    -Headers @{ Authorization = "Bearer $($login.token)" }
 ```
 
-#### 2. 重启 Nginx
+返回的 `objects_bytes` 为资源占用字节数。也可直接查看磁盘剩余空间：
 
-```bash
-nginx -t
-nginx -s reload
+```powershell
+Get-PSDrive D | Select-Object Used,Free
 ```
 
----
+磁盘空间不足时，上传会返回明确错误而不是静默失败。
 
-## 配置说明
+## 安全加固
 
-### 修改端口
+1. **立即修改初始口令**：登录后进入教师端，或调用 `/api/auth/password`。
+2. **限制管理端访问**：方案 9.1 要求管理接口必须认证。如需进一步限制，可在防火墙中只允许教师机访问 `/admin/*`。
+3. **保护配置文件**：`app/config/config.toml` 含 JWT 密钥，不要提交到版本库，也不要让学生网络可访问。
+4. **不要开放数据目录**：`data/`、`storage/`、`app/` 不应通过任何 Web 服务器暴露。
+5. **不可信网络启用 HTTPS**：局域网内如存在不可信设备，应在反向代理层启用 HTTPS。
+6. **定期检查审计日志**：`/api/admin/audit-logs` 记录关键操作。
 
-编辑 `config.json`：
+## 性能与容量
 
-```json
-{
-    "server_addr": ":8080"
-}
-```
+方案第八章给出的容量估算（80 台电脑下载 12 GB 资源包）：
 
-### 自定义上传路径
+| 链路 | 理想传输时间 |
+|------|-------------|
+| 1 Gbps | 约 2.1 小时 |
+| 2.5 Gbps | 约 51 分钟 |
+| 10 Gbps | 约 13 分钟 |
 
-```json
-{
-    "upload_dir": "/data/uploads"
-}
-```
+以上为理论值，未考虑协议开销、磁盘速度与其他流量。
 
-或为特定作业指定路径：
+**不要仅根据理论数据采购网络设备。** 应先用真实文件做 10、40、80 台并发测试，记录服务器网卡吞吐、磁盘读取、CPU、内存和失败率，再决定是否升级。
 
-```json
-{
-    "classes": {
-        "一班": {
-            "subjects": {
-                "数学": [
-                    { "name": "第一章作业", "upload_path": "/data/math" }
-                ]
-            }
-        }
-    }
-}
-```
+### 建议的服务器配置
 
----
+| 部件 | 建议 |
+|------|------|
+| 服务器 | SSD；优先评估 2.5GbE 或 10GbE 网卡 |
+| 交换机 | 千兆接入端口；重点检查上联带宽 |
+| 学生电脑 | 优先有线千兆网络 |
+| 地址配置 | 固定 IP 或 DHCP 地址保留 |
+| 资源准备 | 尽可能在上课前导入并校验大型资源 |
 
-## 安全建议
+### 教师机资源竞争
 
-### 1. 使用 HTTPS
+方案 12.1 风险 2 指出：教师机若同时承担视频剪辑、录屏和资源分发，可能出现磁盘或 CPU 争用。建议：
 
-使用 Nginx 或 Caddy 配置 SSL 证书。
-
-### 2. 设置防火墙
-
-只开放必要端口：
-
-```bash
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw enable
-```
-
-### 3. 文件上传限制
-
-在 Nginx 中限制上传大小：
-
-```nginx
-client_max_body_size 100M;
-```
-
-### 4. 使用非 root 用户
-
-创建专用用户运行服务：
-
-```bash
-useradd -r -s /bin/false cums
-chown -R cums:cums /opt/cums
-```
-
----
-
-## 备份策略
-
-### 配置备份
-
-```bash
-cp config.json config.json.backup.$(date +%Y%m%d)
-```
-
-### 文件备份
-
-```bash
-tar -czf uploads_backup_$(date +%Y%m%d).tar.gz uploads/
-```
-
-### 自动备份脚本
-
-创建 `backup.sh`：
-
-```bash
-#!/bin/bash
-BACKUP_DIR="/opt/backup"
-DATE=$(date +%Y%m%d)
-
-# 备份配置
-cp /opt/cums/config.json $BACKUP_DIR/config_$DATE.json
-
-# 备份文件
-tar -czf $BACKUP_DIR/uploads_$DATE.tar.gz /opt/cums/uploads/
-
-# 删除30天前的备份
-find $BACKUP_DIR -mtime +30 -delete
-```
-
-添加到 crontab：
-
-```bash
-crontab -e
-```
-
-每天凌晨2点备份：
-
-```
-0 2 * * * /opt/scripts/backup.sh
-```
-
----
-
-## 监控
-
-### 健康检查
-
-添加健康检查接口（可选）：
-
-```go
-http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte("OK"))
-})
-```
-
-### 日志监控
-
-使用 `journalctl`：
-
-```bash
-journalctl -u cums -f --since today
-```
-
----
-
-## 升级
-
-### 1. 备份
-
-```bash
-cp config.json config.json.backup
-cp -r uploads uploads.backup
-```
-
-### 2. 下载新版本
-
-```bash
-wget https://github.com/OXY20/cums/releases/download/v1.0.1/cums_1.0.1_linux_amd64
-mv cums_1.0.1_linux_amd64 cums
-chmod +x cums
-```
-
-### 3. 重启服务
-
-```bash
-systemctl restart cums
-```
-
-### 4. 验证
-
-```bash
-systemctl status cums
-curl http://localhost:3000/api/v1/version
-```
-
----
+- 条件允许时使用独立资源服务器；
+- 或将 `storage/objects` 放在独立磁盘上。
 
 ## 故障排查
 
-### 服务无法启动
+| 现象 | 排查方向 |
+|------|----------|
+| 服务无法启动 | 查看 `app/logs/` 最新日志；确认端口未被占用（程序会自动回退并记录） |
+| 学生端显示"无进行中的课堂" | 确认教师端课堂状态为"进行中"；检查是否已结束 |
+| 上传失败并提示校验错误 | 文件在传输中损坏，重试上传 |
+| 下载中断后无法续传 | 浏览器行为限制，见"续传边界"；确认服务端返回 `Accept-Ranges: bytes` |
+| 下载返回 409 | 资源状态不是 `ready`（可能仍在上传或文件缺失） |
+| 资源提示"文件缺失" | `storage/objects` 下文件被移动或删除，需重新上传 |
+| 课堂无法开始，返回 409 | 该班级已有活动课堂，需先结束 |
+| 课程无法删除，返回 409 | 该课程已有授课记录，应改为"停用" |
+| 磁盘空间不足 | 清理 `storage/staging` 中的残留文件；确认 `storage/objects` 所在磁盘剩余空间 |
 
-1. 检查端口是否被占用：
-```bash
-netstat -tulpn | grep 3000
+### 手动检查数据库
+
+```powershell
+sqlite3 D:\ClassroomPlatform\data\classroom.db
+
+sqlite> .tables
+sqlite> SELECT id, title, status FROM courses;
+sqlite> SELECT id, class_id, status, started_at FROM classroom_sessions ORDER BY id DESC LIMIT 10;
+sqlite> SELECT id, name, status, size_bytes FROM resources;
+sqlite> .quit
 ```
 
-2. 检查配置文件：
-```bash
-./cums --check-config
-```
+## 验收清单对照
 
-3. 查看日志：
-```bash
-journalctl -u cums -n 100
-```
+方案第十一章的 MVP 验收项与当前实现状态：
 
-### 文件上传失败
+### 课堂与课程
 
-1. 检查目录权限：
-```bash
-ls -la uploads/
-```
+- [x] 教师可以登录
+- [x] 可以创建课程和课时
+- [x] 可以选择班级、课程和课时并开始上课
+- [x] 学生打开固定网址即可看到当前课堂
+- [x] 课堂切换、暂停和结束状态正确
+- [x] 课堂历史记录不会因模板修改而意外改变
 
-2. 检查磁盘空间：
-```bash
-df -h
-```
+### 资源下载
 
-### 无法访问
+- [x] 可以导入并登记大文件
+- [x] 文件大小与 SHA-256 信息正确
+- [x] 支持 HTTP Range 请求
+- [x] 下载失败有明确提示
+- [x] 服务器不会一次性把大文件读入内存（200 MiB 上传内存峰值增量 2.6 MB）
+- [x] 学生无法访问未授权资源或任意服务器路径
+- [ ] 并发下载期间教师后台仍能正常使用（需在真实机房验证）
 
-1. 检查防火墙：
-```bash
-ufw status
-```
+### 运维与安全
 
-2. 检查服务状态：
-```bash
-systemctl status cums
-```
+- [x] 服务可以开机启动（提供任务计划与服务两种方式）
+- [x] 数据库和资源文件有明确的存储位置
+- [ ] 数据库备份与恢复经过验证（流程已提供，需现场演练）
+- [x] 磁盘空间不足时能够提示
+- [x] 有基本日志和故障排查说明
+- [ ] 完成至少 10、40 台并发测试（需在真实机房进行）
 
-3. 测试端口：
-```bash
-telnet localhost 3000
-```
+未勾选项需要在真实机房环境中完成，属于阶段四的工作内容。
