@@ -1,0 +1,496 @@
+:root {
+  /* 机房环境以清晰易读为主，避免高对比度疲劳 */
+  --page-bg: #f5f7fa;
+  --card-bg: #ffffff;
+  --text-main: #1f2329;
+  --text-sub: #646a73;
+  --border-color: #e5e6eb;
+  --brand: #2563eb;
+  --brand-soft: #eff4ff;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--page-bg);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC',
+    'Hiragino Sans GB', sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 布局 */
+.page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.page-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.page-subtitle {
+  margin: 0 0 20px;
+  color: var(--text-sub);
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 28px 0 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* 卡片 */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.card + .card {
+  margin-top: 14px;
+}
+
+/* 当前课堂横幅 */
+.current-session {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.current-session__cover {
+  flex: 0 0 148px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  border-radius: 8px;
+  color: var(--brand);
+  font-size: 13px;
+}
+
+.current-session__body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.current-session__title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.current-session__meta {
+  color: var(--text-sub);
+  margin-bottom: 12px;
+}
+
+/* 课程网格 */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 16px;
+}
+
+.course-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.course-card:hover {
+  border-color: var(--brand);
+  box-shadow: 0 2px 10px rgb(37 99 235 / 10%);
+}
+
+.course-card__cover {
+  height: 112px;
+  display: grid;
+  place-items: center;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 26px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.course-card__cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.course-card__body {
+  padding: 12px 14px 14px;
+}
+
+.course-card__title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.course-card__desc {
+  color: var(--text-sub);
+  font-size: 13px;
+  min-height: 40px;
+}
+
+.course-card__foot {
+  margin-top: 8px;
+  color: var(--text-sub);
+  font-size: 12px;
+}
+
+/* 资源列表 */
+.resource-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.resource-item:last-child {
+  border-bottom: none;
+}
+
+.resource-item__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-item__size {
+  color: var(--text-sub);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 状态标签 */
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.status-tag--running {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-tag--paused {
+  background: #fff4e5;
+  color: #b26a00;
+}
+
+.status-tag--ended {
+  background: #f2f3f5;
+  color: var(--text-sub);
+}
+
+/* 空状态 */
+.empty-state {
+  padding: 44px 20px;
+  text-align: center;
+  color: var(--text-sub);
+}
+
+/* 课时正文区块 */
+.lesson-block {
+  margin-bottom: 18px;
+}
+
+.lesson-block__title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.lesson-block__text {
+  white-space: pre-wrap;
+}
+
+/*
+ * 富文本正文展示样式。
+ *
+ * 内容为服务端清洗后的 HTML，因此这里只负责排版呈现；
+ * 具体的字号、颜色、对齐等由内联样式决定（编辑器写入）。
+ */
+.rich-content {
+  line-height: 1.8;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.rich-content h1,
+.rich-content h2,
+.rich-content h3,
+.rich-content h4,
+.rich-content h5,
+.rich-content h6 {
+  margin: 18px 0 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rich-content h1 {
+  font-size: 26px;
+}
+
+.rich-content h2 {
+  font-size: 22px;
+}
+
+.rich-content h3 {
+  font-size: 19px;
+}
+
+.rich-content h4 {
+  font-size: 17px;
+}
+
+.rich-content h5,
+.rich-content h6 {
+  font-size: 15px;
+}
+
+.rich-content p {
+  margin: 0 0 12px;
+}
+
+.rich-content ul,
+.rich-content ol {
+  margin: 0 0 12px;
+  padding-left: 26px;
+}
+
+.rich-content li {
+  margin: 4px 0;
+}
+
+.rich-content blockquote {
+  border-left: 4px solid var(--brand);
+  background: var(--brand-soft);
+  padding: 10px 14px;
+  margin: 12px 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.rich-content pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+.rich-content code {
+  background: var(--page-bg);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 13px;
+}
+
+.rich-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+.rich-content a {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.rich-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 10px 0;
+}
+
+.rich-content video {
+  max-width: 100%;
+  border-radius: 8px;
+  background: #000;
+  display: block;
+  margin: 10px 0;
+}
+
+.rich-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+}
+
+.rich-content th,
+.rich-content td {
+  border: 1px solid var(--border-color);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+/* 表头：同时兼容 <th> 与服务端标记的 td.ql-table-header */
+.rich-content th,
+.rich-content td.ql-table-header {
+  background: var(--page-bg);
+  font-weight: 600;
+}
+
+.rich-content hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 18px 0;
+}
+
+/*
+ * Quill 排版类。
+ *
+ * Quill 2 用 class 而非内联样式表达字号、对齐与缩进，
+ * 服务端清洗时已按前缀放行这些类，这里补上对应样式，
+ * 保证教师设置的排版在学生端同样生效。
+ */
+.rich-content .ql-align-center {
+  text-align: center;
+}
+
+.rich-content .ql-align-right {
+  text-align: right;
+}
+
+.rich-content .ql-align-justify {
+  text-align: justify;
+}
+
+.rich-content .ql-size-small {
+  font-size: 0.85em;
+}
+
+.rich-content .ql-size-large {
+  font-size: 1.5em;
+}
+
+.rich-content .ql-size-huge {
+  font-size: 2.2em;
+}
+
+.rich-content .ql-indent-1 {
+  padding-left: 2em;
+}
+
+.rich-content .ql-indent-2 {
+  padding-left: 4em;
+}
+
+.rich-content .ql-indent-3 {
+  padding-left: 6em;
+}
+
+.rich-content .ql-indent-4 {
+  padding-left: 8em;
+}
+
+.rich-content .ql-indent-5 {
+  padding-left: 10em;
+}
+
+.rich-content .ql-indent-6 {
+  padding-left: 12em;
+}
+
+.rich-content .ql-indent-7 {
+  padding-left: 14em;
+}
+
+.rich-content .ql-indent-8 {
+  padding-left: 16em;
+}
+
+.rich-content .ql-direction-rtl {
+  direction: rtl;
+  text-align: inherit;
+}
+
+/* 代码块：Quill 输出 <div class="ql-code-block-container"> 包裹多行 */
+.rich-content .ql-code-block-container {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 14px;
+  margin: 12px 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+}
+
+.rich-content .ql-code-block {
+  white-space: pre-wrap;
+}
+
+.rich-content .ql-syntax {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-radius: 6px;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 13px;
+}
+
+/* 视频嵌入 */
+.rich-content .ql-video {
+  width: 100%;
+  min-height: 320px;
+  border-radius: 8px;
+  background: #000;
+}
+
+/* 窄屏适配：侧栏折叠、卡片单列 */
+@media (max-width: 768px) {
+  .current-session {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .current-session__cover {
+    flex: none;
+    width: 100%;
+  }
+
+  .page {
+    padding: 16px 14px 40px;
+  }
+}
