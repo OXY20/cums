@@ -1,4 +1,5 @@
 /**
+
  * 作业提交接口端到端验证。
  *
  * 覆盖：登录 → 建班级/课程/课时 → 学生提交多文件 → 重复检测 →
@@ -6,6 +7,11 @@
  *
  * 用法：node scripts/verify-homework-submission.mjs [baseUrl]
  */
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const base = process.argv[2] ?? 'http://127.0.0.1:8090'
 
 let passed = 0
@@ -52,7 +58,7 @@ async function main() {
   const login = await json('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: 'admin', password: 'admin' }),
+    body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
   })
   check('登录成功', login.status === 200, `status=${login.status}`)
   const token = login.body?.token
@@ -86,6 +92,13 @@ async function main() {
 
   if (!classId || !courseId || !lessonId) throw new Error('基础数据创建失败，中止')
 
+  // 学生只能对已发布课程的课时提交作业，先发布再走提交流程。
+  await json(`/api/courses/${courseId}`, {
+    method: 'PUT',
+    headers: { ...auth(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'published' }),
+  })
+
   // ---- 提交前状态查询 ----
   console.log('\n[3] 提交前状态查询')
   const status0 = await json(`/api/student/submissions/status?lesson_id=${lessonId}&class_id=${classId}`)
@@ -107,6 +120,9 @@ async function main() {
   const submit1 = await json('/api/student/submissions', { method: 'POST', body: form })
   check('提交成功', submit1.status === 200, JSON.stringify(submit1.body).slice(0, 300))
   const sub1 = submit1.body?.submission
+  // 学生端没有账号，回读与下载都靠这张凭证
+  const accessToken = submit1.body?.access_token
+  check('返回 64 位提交凭证', typeof accessToken === 'string' && accessToken.length === 64, `len=${accessToken?.length}`)
   check('返回 3 个文件', sub1?.files?.length === 3, `files=${sub1?.files?.length}`)
   check('记录提交人姓名', sub1?.student_name === '张三', `name=${sub1?.student_name}`)
   check('服务端记录 IP', typeof sub1?.client_ip === 'string' && sub1.client_ip.length > 0, `ip=${sub1?.client_ip}`)
@@ -208,26 +224,45 @@ async function main() {
   check('非法审核状态被拒绝', badReview.status === 400, `status=${badReview.status}`)
 
   // ---- 文件预览 ----
-  console.log('\n[10] 文件内嵌预览')
+  //
+  // 作业文件属于学生提交内容，匿名访问必须出示提交凭证：
+  // 学生在预览弹窗里用的是 access_token，教师端用的是详情接口下发的
+  // preview_ticket（`<img>` / `<video>` 无法携带 Authorization 头）。
+  console.log('\n[10] 文件内嵌预览（带提交凭证）')
   const imageFile = sub1.files.find((f) => f.purpose === 'image')
-  const inlineRes = await fetch(`${base}/files/${imageFile.resource_id}?inline=1`)
+  const tokenParam = `submission_token=${encodeURIComponent(accessToken)}`
+
+  const inlineRes = await fetch(`${base}/files/${imageFile.resource_id}?inline=1&${tokenParam}`)
   check('inline 预览可访问', inlineRes.status === 200, `status=${inlineRes.status}`)
   const disposition = inlineRes.headers.get('content-disposition') ?? ''
   check('Content-Disposition 为 inline', disposition.startsWith('inline'), disposition)
   check('Content-Type 为图片', (inlineRes.headers.get('content-type') ?? '').startsWith('image/'), inlineRes.headers.get('content-type'))
+  check(
+    '带 nosniff 头',
+    inlineRes.headers.get('x-content-type-options') === 'nosniff',
+    inlineRes.headers.get('x-content-type-options'),
+  )
 
-  const downloadRes = await fetch(`${base}/files/${imageFile.resource_id}`)
+  const anonRes = await fetch(`${base}/files/${imageFile.resource_id}?inline=1`)
+  check('无凭证匿名访问作业文件被拒绝', anonRes.status === 403, `status=${anonRes.status}`)
+
+  const downloadRes = await fetch(`${base}/files/${imageFile.resource_id}?${tokenParam}`)
   const downloadDisposition = downloadRes.headers.get('content-disposition') ?? ''
   check('默认仍为附件下载', downloadDisposition.startsWith('attachment'), downloadDisposition)
 
-  const rangeRes = await fetch(`${base}/files/${imageFile.resource_id}`, { headers: { Range: 'bytes=0-9' } })
+  const rangeRes = await fetch(`${base}/files/${imageFile.resource_id}?${tokenParam}`, {
+    headers: { Range: 'bytes=0-9' },
+  })
   check('Range 请求仍返回 206', rangeRes.status === 206, `status=${rangeRes.status}`)
 
   // ---- 学生端回读 ----
   console.log('\n[11] 学生端上传后回读（用于弹窗预览）')
-  const publicDetail = await json(`/api/student/submissions/${sub1.id}`)
+  const publicDetail = await json(`/api/student/submissions/${sub1.id}?access_token=${accessToken}`)
   check('学生端可回读提交详情', publicDetail.status === 200, `status=${publicDetail.status}`)
   check('回读含文件列表', publicDetail.body?.files?.length === 3, `files=${publicDetail.body?.files?.length}`)
+
+  const publicNoToken = await json(`/api/student/submissions/${sub1.id}`)
+  check('回读必须带凭证', publicNoToken.status === 403, `status=${publicNoToken.status}`)
 
   // ---- 汇总 ----
   console.log(`\n${'='.repeat(50)}`)

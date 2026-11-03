@@ -49,15 +49,23 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(objects = %config.objects_dir.display(), "资源目录");
 
     let pool = db::init_pool(&config).await?;
-    db::ensure_bootstrap_admin(&pool).await?;
 
     let state = state::AppState::new(pool, config.clone());
+
+    // 后台清理：上传中途失败会在 staging 留下既无文件又无引用的占位记录，
+    // 进程崩溃时也会残留孤立文件。启动后清理一次，之后定期清理。
+    spawn_staging_cleanup(state.clone());
 
     let app = build_router(&state);
     let listener = bind_with_fallback(&config.raw.server.bind).await?;
     let addr = listener.local_addr()?;
 
     tracing::info!("服务已就绪：http://{addr}");
+
+    // 未完成安装时提示管理员访问安装向导。
+    if !config.raw.installed {
+        tracing::info!("尚未完成首次安装，请访问 http://{addr}/setup 运行安装向导");
+    }
 
     // 挂载连接信息：作业提交需要记录真实来源 IP，客户端无法自行指定。
     axum::serve(
@@ -71,6 +79,80 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// 后台清理 staging 残留。
+///
+/// 两类残留会随时间累积：
+/// 1. 数据库里 `status = 'staging'` 但既没有文件、也没有被任何提交/课时引用的占位记录
+///    （上传中途失败，或处理器在文件落盘后才发现参数不合法）；
+/// 2. `storage/staging` 下没有任何数据库行指向的文件（进程崩溃在 written 之后、
+///    事务提交之前）。
+///
+/// 只有「超过保留期」的记录才会被清理：正在上传中的请求也在 staging 里，
+/// 立即清理会把正常上传的文件删掉。
+fn spawn_staging_cleanup(state: state::AppState) {
+    /// 残留保留期：一次上传不可能持续这么久，超过即可判定为废弃。
+    const STALE_AFTER_SECS: i64 = 6 * 60 * 60;
+    /// 清理间隔。
+    const INTERVAL: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+
+    tokio::spawn(async move {
+        // 启动时先等一会，避免和刚启动的并发请求抢 IO
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+
+        loop {
+            match cleanup_stale_staging(&state, STALE_AFTER_SECS).await {
+                Ok(0) => {}
+                Ok(count) => tracing::info!(count, "已清理废弃的暂存资源"),
+                Err(err) => tracing::warn!(error = %err, "清理暂存资源失败"),
+            }
+
+            tokio::time::sleep(INTERVAL).await;
+        }
+    });
+}
+
+/// 执行一次清理，返回清理掉的记录数。
+async fn cleanup_stale_staging(
+    state: &state::AppState,
+    stale_after_secs: i64,
+) -> anyhow::Result<usize> {
+    let rows = sqlx::query_as::<_, (i64, String, String)>(
+        "SELECT id, name, storage_key FROM resources
+         WHERE status = 'staging'
+           AND created_at < datetime('now', ?1)
+           AND NOT EXISTS (
+               SELECT 1 FROM homework_submission_files f WHERE f.resource_id = resources.id
+           )
+           AND NOT EXISTS (
+               SELECT 1 FROM lesson_resources l WHERE l.resource_id = resources.id
+           )
+         LIMIT 500",
+    )
+    .bind(format!("-{stale_after_secs} seconds"))
+    .fetch_all(&state.db)
+    .await?;
+
+    let mut removed = 0usize;
+    for (id, name, storage_key) in rows {
+        let resource = crate::models::ResourceRow {
+            id,
+            name,
+            storage_key,
+            size_bytes: 0,
+            sha256: String::new(),
+            mime_type: String::new(),
+            version: 0,
+            status: "staging".to_string(),
+            created_at: String::new(),
+        };
+
+        crate::routes::resources::purge_resource(state, &resource).await;
+        removed += 1;
+    }
+
+    Ok(removed)
+}
+
 /// 组装路由：API + 可选的前端静态资源。
 fn build_router(state: &state::AppState) -> axum::Router {
     let cors = CorsLayer::new()
@@ -78,10 +160,9 @@ fn build_router(state: &state::AppState) -> axum::Router {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    let mut app = routes::api_router()
+    let mut app = routes::api_router(state.clone())
         .layer(TraceLayer::new_for_http())
-        .layer(cors)
-        .with_state(state.clone());
+        .layer(cors);
 
     // 前端构建产物存在时一并托管，学生只需访问一个地址。
     let static_dir = state

@@ -12,7 +12,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, fileUrl, type Course, type Lesson, type LessonResource } from '@/api'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatLessonTitle, splitLessonTitle } from '@/utils/format'
 import RichTextEditor from '@/components/RichTextEditor.vue'
 import CourseHomeworkPanel from '@/components/CourseHomeworkPanel.vue'
 
@@ -40,8 +40,35 @@ const editorRef = ref<InstanceType<typeof RichTextEditor> | null>(null)
 
 const courseId = computed(() => Number(props.courseId))
 
-/** 附件（非正文内嵌的资源） */
-const attachments = computed(() => resources.value.filter((r) => r.purpose === 'attachment'))
+/**
+ * 课时关联的资源列表。
+ *
+ * 服务端按 MIME 判定 `purpose`：图片为 image、视频为 video、其余为 attachment。
+ * 若只展示 attachment，上传的图片与视频虽然成功入库，
+ * 列表里却看不到，用户会以为上传失败，因此这里展示全部关联资源。
+ */
+const attachments = computed(() => resources.value)
+
+/** 资源用途中文标签 */
+const PURPOSE_LABELS: Record<string, string> = {
+  image: '图片',
+  video: '视频',
+  attachment: '附件',
+}
+
+function purposeLabel(purpose: string): string {
+  return PURPOSE_LABELS[purpose] ?? purpose
+}
+
+/**
+ * 当前课时的标题拆分结果。
+ *
+ * 课时标题可能自带"第 1 课时 · xxx"前缀，拆分后分别用于
+ * 序号位与名称位，避免与副标题里的序号重复。
+ */
+const activeTitle = computed(() =>
+  splitLessonTitle(active.value?.title, active.value?.sort_order),
+)
 
 /** 正文是否有未保存的修改 */
 const dirty = ref(false)
@@ -287,12 +314,12 @@ function openFile(resourceId: number | null) {
       {{ course?.title || '课程' }}
       <template v-if="active">
         <span class="title-sep">·</span>
-        <span class="title-lesson">{{ active.title }}</span>
+        <span class="title-lesson">{{ activeTitle.name || activeTitle.label }}</span>
       </template>
     </h1>
     <p class="page-subtitle">
       <template v-if="active">
-        第 {{ active.sort_order }} 课时
+        {{ activeTitle.label }}
         <span class="subtitle-sep">｜</span>
       </template>
       {{ course?.description || '暂无课程简介' }}
@@ -326,7 +353,7 @@ function openFile(resourceId: number | null) {
               :class="{ 'lesson-row--active': active?.id === lesson.id }"
               @click="select(lesson)"
             >
-              <span class="lesson-row__title">第 {{ lesson.sort_order }} 课时 · {{ lesson.title }}</span>
+              <span class="lesson-row__title">{{ formatLessonTitle(lesson.title, lesson.sort_order) }}</span>
               <span class="lesson-row__actions" @click.stop>
                 <el-button link size="small" title="上移" @click="moveLesson(lesson, -1)">↑</el-button>
                 <el-button link size="small" title="下移" @click="moveLesson(lesson, 1)">↓</el-button>
@@ -343,7 +370,7 @@ function openFile(resourceId: number | null) {
         <template v-if="active">
           <!-- 课时名已提升到页面顶部，这里只保留序号与保存操作 -->
           <div class="editor-head">
-            <span class="editor-head__label">第 {{ active.sort_order }} 课时</span>
+            <span class="editor-head__label">{{ activeTitle.label }}</span>
             <div>
               <el-tag v-if="dirty" size="small" type="warning" style="margin-right: 8px">
                 未保存
@@ -381,17 +408,18 @@ function openFile(resourceId: number | null) {
           <div class="attachment-head">
             <h3 class="section-title" style="margin: 0">
               课时附件
-              <span class="hint">（文档、压缩包等，学生可直接下载）</span>
+              <span class="hint">（图片、视频与文档，学生可直接下载）</span>
             </h3>
             <el-button size="small" @click="pickAttachment">上传附件</el-button>
           </div>
 
           <div v-if="attachments.length === 0" class="empty-state" style="padding: 18px">
-            暂无附件。上传的文档、压缩包等会出现在这里。
+            暂无附件。上传的图片、视频、文档会出现在这里。
           </div>
 
           <div v-for="item in attachments" :key="item.id" class="resource-item">
             <span class="resource-item__name">{{ item.name }}</span>
+            <el-tag size="small" type="info" effect="plain">{{ purposeLabel(item.purpose) }}</el-tag>
             <span class="resource-item__size">{{ formatBytes(item.size_bytes) }}</span>
             <el-button size="small" @click="insertAttachmentLink(item)">插入正文</el-button>
             <el-button size="small" @click="openFile(item.id)">下载</el-button>

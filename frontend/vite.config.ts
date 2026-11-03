@@ -13,9 +13,16 @@ export default defineConfig({
   server: {
     port: 5173,
     // 开发时把 API 与文件请求代理到后端，避免跨域配置。
+    // CLASSROOM_API 可把代理指向其它端口（例如与其它进程抢占 8080 时）。
     proxy: {
-      '/api': { target: 'http://127.0.0.1:8080', changeOrigin: true },
-      '/files': { target: 'http://127.0.0.1:8080', changeOrigin: true },
+      '/api': {
+        target: process.env.CLASSROOM_API ?? 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
+      '/files': {
+        target: process.env.CLASSROOM_API ?? 'http://127.0.0.1:8080',
+        changeOrigin: true,
+      },
     },
   },
   build: {

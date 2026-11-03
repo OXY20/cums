@@ -2,7 +2,7 @@
 
 use crate::error::{AppError, AppResult};
 use crate::models::{CourseRow, CreateCourseRequest, ListResponse, UpdateCourseRequest};
-use crate::routes::AuthUser;
+use crate::routes::{ensure_course_published, AuthUser, MaybeAuthUser};
 use crate::state::AppState;
 use axum::extract::{DefaultBodyLimit, Multipart, Path, State};
 use axum::routing::{get, post};
@@ -30,7 +30,10 @@ pub fn routes() -> Router<AppState> {
             "/api/courses/{id}/cover",
             post(upload_cover).layer(DefaultBodyLimit::disable()),
         )
-        .route("/api/courses/{id}/cover", axum::routing::delete(clear_cover))
+        .route(
+            "/api/courses/{id}/cover",
+            axum::routing::delete(clear_cover),
+        )
 }
 
 /// 学生端课程列表：仅已发布课程。
@@ -48,27 +51,33 @@ async fn list_published_courses(
 
 /// 课程列表（教师端）：包含草稿与归档课程。
 async fn list_courses(State(state): State<AppState>) -> AppResult<Json<ListResponse<CourseRow>>> {
-    let rows = sqlx::query_as::<_, CourseRow>(&format!(
-        "{COURSE_SELECT} ORDER BY c.updated_at DESC"
-    ))
-    .fetch_all(&state.db)
-    .await?;
+    let rows =
+        sqlx::query_as::<_, CourseRow>(&format!("{COURSE_SELECT} ORDER BY c.updated_at DESC"))
+            .fetch_all(&state.db)
+            .await?;
 
     Ok(Json(ListResponse::new(rows)))
 }
 
 /// 课程详情。
+///
+/// 学生端也走这个接口，因此未发布课程只对已登录教师可见。
 async fn get_course(
     State(state): State<AppState>,
+    viewer: MaybeAuthUser,
     Path(id): Path<i64>,
 ) -> AppResult<Json<CourseRow>> {
-    let row = sqlx::query_as::<_, CourseRow>(&format!("{COURSE_SELECT} WHERE c.id = ?1"))
+    ensure_course_published(&state, id, &viewer).await?;
+    fetch_course(&state, id).await.map(Json)
+}
+
+/// 读取课程行（内部复用，不做可见性判断）。
+pub async fn fetch_course(state: &AppState, id: i64) -> AppResult<CourseRow> {
+    sqlx::query_as::<_, CourseRow>(&format!("{COURSE_SELECT} WHERE c.id = ?1"))
         .bind(id)
         .fetch_optional(&state.db)
         .await?
-        .ok_or_else(|| AppError::NotFound(format!("课程 {id}")))?;
-
-    Ok(Json(row))
+        .ok_or_else(|| AppError::NotFound(format!("课程 {id}")))
 }
 
 /// 创建课程（需要教师或管理员身份）。
@@ -93,10 +102,16 @@ async fn create_course(
     .fetch_one(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "course.create", "course", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "course.create",
+        "course",
+        &id.to_string(),
+    )
+    .await;
 
-    get_course(State(state), Path(id)).await
+    fetch_course(&state, id).await.map(Json)
 }
 
 /// 更新课程。
@@ -139,10 +154,16 @@ async fn update_course(
     .execute(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "course.update", "course", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "course.update",
+        "course",
+        &id.to_string(),
+    )
+    .await;
 
-    get_course(State(state), Path(id)).await
+    fetch_course(&state, id).await.map(Json)
 }
 
 /// 删除课程；存在历史课堂时拒绝，避免破坏历史记录。
@@ -176,8 +197,14 @@ async fn delete_course(
         return Err(AppError::NotFound(format!("课程 {id}")));
     }
 
-    crate::routes::auth::audit(&state, Some(user.id()), "course.delete", "course", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "course.delete",
+        "course",
+        &id.to_string(),
+    )
+    .await;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -219,10 +246,16 @@ async fn copy_course(
     .execute(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "course.copy", "course", &new_id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "course.copy",
+        "course",
+        &new_id.to_string(),
+    )
+    .await;
 
-    get_course(State(state), Path(new_id)).await
+    fetch_course(&state, new_id).await.map(Json)
 }
 
 /// 上传课程封面。
@@ -256,25 +289,26 @@ async fn upload_cover(
 
     let placeholder = crate::routes::resources::fetch_resource(&state, resource_id).await?;
 
-    let resource = match crate::routes::resources::receive_content(&state, &placeholder, multipart).await
-    {
-        Ok(resource) => resource,
-        Err(err) => {
-            // 上传失败时清理占位记录与可能的残留文件。
-            let _ = sqlx::query("DELETE FROM resources WHERE id = ?1")
-                .bind(resource_id)
-                .execute(&state.db)
-                .await;
-            return Err(err);
-        }
-    };
+    let resource =
+        match crate::routes::resources::receive_content(&state, &placeholder, multipart).await {
+            Ok(resource) => resource,
+            Err(err) => {
+                // 上传失败时清理占位记录与可能的残留文件。
+                let _ = sqlx::query("DELETE FROM resources WHERE id = ?1")
+                    .bind(resource_id)
+                    .execute(&state.db)
+                    .await;
+                return Err(err);
+            }
+        };
 
     if !resource.mime_type.starts_with("image/") {
         let _ = sqlx::query("DELETE FROM resources WHERE id = ?1")
             .bind(resource_id)
             .execute(&state.db)
             .await;
-        let path = crate::routes::resources::safe_join(&state.config.objects_dir, &resource.storage_key)?;
+        let path =
+            crate::routes::resources::safe_join(&state.config.objects_dir, &resource.storage_key)?;
         let _ = tokio::fs::remove_file(&path).await;
         return Err(AppError::BadRequest(
             "课程封面必须是图片（JPG / PNG / WebP 等）".into(),
@@ -312,7 +346,7 @@ async fn upload_cover(
     )
     .await;
 
-    get_course(State(state), Path(id)).await
+    fetch_course(&state, id).await.map(Json)
 }
 
 /// 移除课程封面。
@@ -328,10 +362,12 @@ async fn clear_cover(
             .await?
             .ok_or_else(|| AppError::NotFound(format!("课程 {id}")))?;
 
-    sqlx::query("UPDATE courses SET cover_resource_id = NULL, updated_at = datetime('now') WHERE id = ?1")
-        .bind(id)
-        .execute(&state.db)
-        .await?;
+    sqlx::query(
+        "UPDATE courses SET cover_resource_id = NULL, updated_at = datetime('now') WHERE id = ?1",
+    )
+    .bind(id)
+    .execute(&state.db)
+    .await?;
 
     if let Some(old_id) = old_cover {
         delete_resource_quietly(&state, old_id).await;
@@ -346,7 +382,7 @@ async fn clear_cover(
     )
     .await;
 
-    get_course(State(state), Path(id)).await
+    fetch_course(&state, id).await.map(Json)
 }
 
 /// 删除资源记录与文件；失败不阻断主流程。

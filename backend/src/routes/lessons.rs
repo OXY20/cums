@@ -5,7 +5,7 @@ use crate::models::{
     CreateLessonRequest, LessonDetailView, LessonResourceRow, LessonRow, LessonStepRow,
     ListResponse, UpdateLessonRequest,
 };
-use crate::routes::AuthUser;
+use crate::routes::{ensure_course_published, ensure_lesson_published, AuthUser, MaybeAuthUser};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::routing::{get, post};
@@ -21,11 +21,11 @@ pub fn routes() -> Router<AppState> {
             "/api/lessons/{id}",
             get(get_lesson).put(update_lesson).delete(delete_lesson),
         )
+        .route("/api/lessons/{id}/steps", get(list_steps).post(create_step))
         .route(
-            "/api/lessons/{id}/steps",
-            get(list_steps).post(create_step),
+            "/api/lessons/{id}/resources",
+            get(crate::routes::resources::lesson_resources),
         )
-        .route("/api/lessons/{id}/resources", get(crate::routes::resources::lesson_resources))
         .route(
             "/api/lessons/{id}/resources/{resource_id}",
             post(crate::routes::resources::attach_resource)
@@ -34,10 +34,15 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// 某课程下的课时列表。
+///
+/// 学生端课程页也调用本接口，因此未发布课程只对已登录教师可见。
 async fn list_lessons(
     State(state): State<AppState>,
+    viewer: MaybeAuthUser,
     Path(course_id): Path<i64>,
 ) -> AppResult<Json<ListResponse<LessonRow>>> {
+    ensure_course_published(&state, course_id, &viewer).await?;
+
     let rows = sqlx::query_as::<_, LessonRow>(
         "SELECT id, course_id, title, sort_order, content_json, content_html, content_format, created_at, updated_at
          FROM lessons WHERE course_id = ?1 ORDER BY sort_order ASC, id ASC",
@@ -52,8 +57,10 @@ async fn list_lessons(
 /// 课时详情：附带正文块与关联资源，编辑器可一次加载。
 async fn get_lesson(
     State(state): State<AppState>,
+    viewer: MaybeAuthUser,
     Path(id): Path<i64>,
 ) -> AppResult<Json<LessonDetailView>> {
+    ensure_lesson_published(&state, id, &viewer).await?;
     let lesson = fetch_lesson(&state, id).await?;
     let blocks = crate::routes::blocks::fetch_blocks(&state, id).await?;
 
@@ -133,8 +140,14 @@ async fn create_lesson(
     .fetch_one(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "lesson.create", "lesson", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "lesson.create",
+        "lesson",
+        &id.to_string(),
+    )
+    .await;
 
     fetch_lesson(&state, id).await.map(Json)
 }
@@ -192,8 +205,14 @@ async fn update_lesson(
         sync_referenced_resources(&state, id, html).await?;
     }
 
-    crate::routes::auth::audit(&state, Some(user.id()), "lesson.update", "lesson", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "lesson.update",
+        "lesson",
+        &id.to_string(),
+    )
+    .await;
 
     fetch_lesson(&state, id).await.map(Json)
 }
@@ -202,11 +221,7 @@ async fn update_lesson(
 ///
 /// 只新增缺失的关联，不删除已有记录——资源可能是通过资源库显式关联的附件，
 /// 即使当前正文未引用也应保留在附件列表中。
-async fn sync_referenced_resources(
-    state: &AppState,
-    lesson_id: i64,
-    html: &str,
-) -> AppResult<()> {
+async fn sync_referenced_resources(state: &AppState, lesson_id: i64, html: &str) -> AppResult<()> {
     let referenced = crate::richtext::referenced_resource_ids(html);
     if referenced.is_empty() {
         return Ok(());
@@ -214,12 +229,11 @@ async fn sync_referenced_resources(
 
     for resource_id in referenced {
         // 只关联确实存在且已就绪的资源，忽略正文中残留的失效引用。
-        let exists: Option<String> = sqlx::query_scalar(
-            "SELECT status FROM resources WHERE id = ?1",
-        )
-        .bind(resource_id)
-        .fetch_optional(&state.db)
-        .await?;
+        let exists: Option<String> =
+            sqlx::query_scalar("SELECT status FROM resources WHERE id = ?1")
+                .bind(resource_id)
+                .fetch_optional(&state.db)
+                .await?;
 
         if exists.as_deref() != Some("ready") {
             continue;
@@ -266,8 +280,14 @@ async fn delete_lesson(
         return Err(AppError::NotFound(format!("课时 {id}")));
     }
 
-    crate::routes::auth::audit(&state, Some(user.id()), "lesson.delete", "lesson", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "lesson.delete",
+        "lesson",
+        &id.to_string(),
+    )
+    .await;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -314,8 +334,14 @@ async fn create_step(
     .fetch_one(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "lesson_step.create", "lesson_step", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "lesson_step.create",
+        "lesson_step",
+        &id.to_string(),
+    )
+    .await;
 
     let row = sqlx::query_as::<_, LessonStepRow>(
         "SELECT id, lesson_id, title, content, sort_order FROM lesson_steps WHERE id = ?1",

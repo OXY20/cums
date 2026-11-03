@@ -14,6 +14,12 @@ import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
+
+
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8090'
 const CDP = process.argv[3] ?? process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222'
 
@@ -45,7 +51,7 @@ async function apiJson(path, options = {}) {
 const login = await apiJson('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const token = login.body?.token
 if (!token) {
@@ -268,6 +274,22 @@ try {
   console.log('\n[4] 提交并等待成功预览弹窗')
   await clickByText('.el-dialog__footer button', '确认提交')
 
+  // 提交前有二次确认（核对姓名 / 学号 / 文件数与合计大小），
+  // 不点它就不会真正上传，因此这里必须显式处理确认框。
+  await waitFor(
+    `document.querySelector('.el-message-box') !== null`,
+    '提交确认框',
+    10000,
+  )
+  const confirmText = await evaluate(
+    `document.querySelector('.el-message-box')?.innerText ?? ''`,
+  )
+  check('提交前出现二次确认', confirmText.includes('确认提交'), confirmText.slice(0, 80))
+  check('确认框含提交人姓名', confirmText.includes('赵六'), confirmText.slice(0, 120))
+  check('确认框含文件数量', /文件[：:]\s*2\s*个/.test(confirmText), confirmText.slice(0, 160))
+
+  await clickByText('.el-message-box__btns button', '确认提交')
+
   await waitFor(
     `Array.from(document.querySelectorAll('.el-dialog__title')).some((t) => t.innerText.includes('作业已提交'))`,
     '提交成功弹窗',
@@ -332,6 +354,14 @@ try {
   await setFiles('.el-dialog input[type=file]', [docPath])
   await new Promise((r) => setTimeout(r, 500))
   await clickByText('.el-dialog__footer button', '确认提交')
+
+  // 第二次提交同样有二次确认框
+  await waitFor(
+    `document.querySelector('.el-message-box') !== null`,
+    '第二次确认框',
+    10000,
+  )
+  await clickByText('.el-message-box__btns button', '确认提交')
 
   await waitFor(
     `Array.from(document.querySelectorAll('.el-dialog__title')).some((t) => t.innerText.includes('作业已提交'))`,

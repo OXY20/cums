@@ -13,7 +13,7 @@ import {
   type CurrentSession,
   type Lesson,
 } from '@/api'
-import { formatTime, sessionStatusText } from '@/utils/format'
+import { formatLessonTitle, formatTime, sessionStatusText } from '@/utils/format'
 
 const classes = ref<ClassInfo[]>([])
 const courses = ref<Course[]>([])
@@ -53,7 +53,9 @@ async function loadClasses() {
 
 async function loadCourses() {
   try {
-    courses.value = (await api.courses()).items
+    // 未发布课程不进入课堂：学生端看不到课程详情，开课后也无法跟随，
+    // 还会占用该班级的唯一活动课堂名额。
+    courses.value = (await api.courses()).items.filter((item) => item.status === 'published')
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : '课程加载失败')
   }
@@ -151,7 +153,10 @@ async function end() {
 }
 
 function previewStudentPage() {
-  window.open('/student', '_blank')
+  // 有活动课堂时直接打开该课堂的学生端页面：
+  // 教师点「预览」通常是想确认学生此刻看到的内容，落到首页还得再点一次。
+  const id = activeSession.value?.id
+  window.open(id ? `/student/sessions/${id}` : '/student', '_blank')
 }
 
 function statusText(status: string) {
@@ -235,7 +240,7 @@ function statusText(status: string) {
             <el-option
               v-for="item in lessons"
               :key="item.id"
-              :label="`第 ${item.sort_order} 课时 · ${item.title}`"
+              :label="formatLessonTitle(item.title, item.sort_order)"
               :value="item.id"
             />
           </el-select>

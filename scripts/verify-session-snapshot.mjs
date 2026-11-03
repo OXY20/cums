@@ -1,9 +1,15 @@
 // 验证课堂快照保存富文本正文。
+
 //
 // 用法：node scripts/verify-session-snapshot.mjs [baseUrl]
 //
 // 课堂快照必须保存富文本 HTML，否则学生端看到的课堂内容会丢失排版。
 
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 
 let passed = 0
@@ -42,7 +48,7 @@ async function api(path, { method = 'GET', token, body } = {}) {
 
 const login = await api('/api/auth/login', {
   method: 'POST',
-  body: { username: 'admin', password: 'admin' },
+  body: { username: ADMIN_USER, password: ADMIN_PASS },
 })
 const token = login.json?.token
 if (!token) {

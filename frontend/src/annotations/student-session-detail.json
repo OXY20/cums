@@ -1,0 +1,62 @@
+{
+  "name": "学生端 · 课堂详情",
+  "items": [
+    {
+      "tag": "A1",
+      "note": "返回首页",
+      "sel": ".page > .el-button",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "A2",
+      "note": "课堂标题（课程 · 课时 · 状态）",
+      "sel": ".page-title",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "A3",
+      "note": "课堂信息行与提交作业按钮",
+      "sel": ".page-subtitle",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "B1",
+      "note": "富文本正文（图片 / 视频）",
+      "sel": ".rich-content",
+      "color": "#0090ff"
+    },
+    {
+      "tag": "B2",
+      "note": "正文内嵌图片",
+      "sel": ".rich-content img",
+      "color": "#0090ff",
+      "all": true
+    },
+    {
+      "tag": "B3",
+      "note": "正文内嵌视频",
+      "sel": ".rich-content video",
+      "color": "#0090ff",
+      "all": true
+    },
+    {
+      "tag": "C1",
+      "note": "课时附件区标题与全部下载",
+      "sel": ".section-title",
+      "color": "#12a594"
+    },
+    {
+      "tag": "C2",
+      "note": "附件条目（名称 / 用途 / 大小 / 下载）",
+      "sel": ".resource-item",
+      "color": "#12a594",
+      "all": true
+    },
+    {
+      "tag": "D1",
+      "note": "作业上传弹窗",
+      "sel": ".el-dialog",
+      "color": "#f5a524"
+    }
+  ]
+}

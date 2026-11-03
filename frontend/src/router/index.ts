@@ -1,13 +1,19 @@
 /**
  * 路由：学生端与教师端分离，教师端要求登录。
+ *
+ * 首次使用时服务尚未完成安装，所有路由都会被引导到 `/setup`。
  */
 import { createRouter, createWebHistory } from 'vue-router'
 import { getToken } from '@/api'
+import { fetchInstalled } from '@/utils/installState'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/student' },
+
+    // 首次安装向导
+    { path: '/setup', name: 'setup', component: () => import('@/views/SetupView.vue') },
 
     // 学生端
     {
@@ -91,8 +97,21 @@ const router = createRouter({
   ],
 })
 
-// 未登录访问教师端时跳转到登录页
-router.beforeEach((to) => {
+// 未安装时统一引导到安装向导；已安装后走原有的登录守卫
+router.beforeEach(async (to) => {
+  // 安装向导自身始终可访问，否则无法完成安装
+  if (to.name === 'setup') {
+    // 已安装时不应再展示向导，直接去登录页
+    if (await fetchInstalled()) {
+      return { name: 'login' }
+    }
+    return true
+  }
+
+  if (!(await fetchInstalled())) {
+    return { name: 'setup' }
+  }
+
   if (to.meta.requiresAuth && !getToken()) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }

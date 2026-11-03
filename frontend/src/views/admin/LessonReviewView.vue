@@ -18,6 +18,7 @@ import {
   api,
   REVIEW_LABEL_META,
   reviewLabelText,
+  setPreviewTickets,
   type ClassInfo,
   type LessonReviewBoard,
   type ReviewInput,
@@ -152,7 +153,25 @@ function openItem(item: SubmissionDetail) {
   activeId.value = item.id
   editScore.value = item.review_score
   editComment.value = item.review_comment
+  // 预览标签无法携带 Authorization 头，登记该份提交的短时效预览票
+  setPreviewTickets(collectPreviewTickets(item))
   drawerVisible.value = true
+}
+
+/** 关闭抽屉时清空预览票 */
+function closeItem() {
+  drawerVisible.value = false
+  activeId.value = null
+  setPreviewTickets(null)
+}
+
+/** 把详情里的预览票整理成「资源 ID → 票」的映射 */
+function collectPreviewTickets(view: SubmissionDetail | null): Record<number, string> {
+  const tickets: Record<number, string> = {}
+  for (const file of view?.files ?? []) {
+    if (file.preview_ticket) tickets[file.resource_id] = file.preview_ticket
+  }
+  return tickets
 }
 
 /** 单份打标签 */
@@ -563,7 +582,12 @@ function reviewInput(partial: ReviewInput): ReviewInput {
     </div>
 
     <!-- 逐份详情抽屉：不遮住列表，教师可以边看列表边批 -->
-    <el-drawer v-model="drawerVisible" :title="active?.student_name || '提交详情'" size="640px">
+    <el-drawer
+      v-model="drawerVisible"
+      :title="active?.student_name || '提交详情'"
+      size="640px"
+      @close="closeItem"
+    >
       <div v-if="active" class="detail">
         <div class="detail__meta">
           <span>{{ active.course_title }} · {{ active.lesson_title }}</span>

@@ -26,8 +26,15 @@ pub fn routes() -> Router<AppState> {
         .route("/api/teachers", get(list_teachers))
 }
 
-/// 班级列表。
-async fn list_classes(State(state): State<AppState>) -> AppResult<Json<ListResponse<ClassRow>>> {
+/// 班级列表（教师端）。
+///
+/// 学生端读取名单走公开的 `/api/student/class-roster`，
+/// 那个接口要求该班级有正在进行的课堂；这里保留认证口径，
+/// 避免匿名枚举全校班级名称。
+async fn list_classes(
+    State(state): State<AppState>,
+    _user: AuthUser,
+) -> AppResult<Json<ListResponse<ClassRow>>> {
     let rows = sqlx::query_as::<_, ClassRow>(
         "SELECT id, name, room_name, is_active, created_at, updated_at
          FROM classes ORDER BY name ASC",
@@ -38,7 +45,10 @@ async fn list_classes(State(state): State<AppState>) -> AppResult<Json<ListRespo
     Ok(Json(ListResponse::new(rows)))
 }
 
-async fn get_class(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<Json<ClassRow>> {
+async fn get_class(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+) -> AppResult<Json<ClassRow>> {
     fetch_class(&state, id).await.map(Json)
 }
 
@@ -65,21 +75,27 @@ async fn create_class(
         return Err(AppError::BadRequest("班级名称不能为空".into()));
     }
 
-    let id: i64 = sqlx::query_scalar(
-        "INSERT INTO classes (name, room_name) VALUES (?1, ?2) RETURNING id",
-    )
-    .bind(name)
-    .bind(payload.room_name.unwrap_or_default())
-    .fetch_one(&state.db)
-    .await
-    .map_err(|err| match err {
-        sqlx::Error::Database(ref db) if db.is_unique_violation() => {
-            AppError::Conflict("班级名称已存在".into())
-        }
-        other => AppError::Database(other),
-    })?;
+    let id: i64 =
+        sqlx::query_scalar("INSERT INTO classes (name, room_name) VALUES (?1, ?2) RETURNING id")
+            .bind(name)
+            .bind(payload.room_name.unwrap_or_default())
+            .fetch_one(&state.db)
+            .await
+            .map_err(|err| match err {
+                sqlx::Error::Database(ref db) if db.is_unique_violation() => {
+                    AppError::Conflict("班级名称已存在".into())
+                }
+                other => AppError::Database(other),
+            })?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "class.create", "class", &id.to_string()).await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "class.create",
+        "class",
+        &id.to_string(),
+    )
+    .await;
 
     fetch_class(&state, id).await.map(Json)
 }
@@ -109,7 +125,14 @@ async fn update_class(
     .execute(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "class.update", "class", &id.to_string()).await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "class.update",
+        "class",
+        &id.to_string(),
+    )
+    .await;
 
     fetch_class(&state, id).await.map(Json)
 }
@@ -144,7 +167,14 @@ async fn delete_class(
         return Err(AppError::NotFound(format!("班级 {id}")));
     }
 
-    crate::routes::auth::audit(&state, Some(user.id()), "class.delete", "class", &id.to_string()).await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "class.delete",
+        "class",
+        &id.to_string(),
+    )
+    .await;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }

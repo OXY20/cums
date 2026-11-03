@@ -4,13 +4,19 @@
 
 import { createHash } from 'node:crypto';
 
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
+
+
 const MB = Number(process.argv[2] || 200);
 const BASE = process.argv[3] || 'http://127.0.0.1:8080';
 
 const login = await fetch(`${BASE}/api/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 });
 const { token } = await login.json();
 

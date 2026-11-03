@@ -1,7 +1,13 @@
 // 运行状态检查：验证服务可用性与现有数据，供人工查看前确认。
+
 //
 // 用法：node scripts/status-check.mjs [baseUrl]
 
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 
 async function getJson(path, token) {
@@ -32,7 +38,7 @@ console.log()
 const loginRes = await fetch(`${BASE}/api/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const login = await loginRes.json()
 console.log('=== 登录 ===')

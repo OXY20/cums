@@ -19,7 +19,7 @@ import {
   type LessonHomeworkSummary,
   type LessonSubmissionBoard,
 } from '@/api'
-import { formatTime } from '@/utils/format'
+import { formatTime, splitLessonTitle } from '@/utils/format'
 
 const props = defineProps<{
   courseId: number
@@ -234,8 +234,8 @@ function statusText(status: string): string {
           @click="openBoard(lesson)"
         >
           <div class="hw__lesson-main">
-            <span class="hw__lesson-no">第 {{ lesson.sort_order }} 课时</span>
-            <span class="hw__lesson-title">{{ lesson.lesson_title }}</span>
+            <span class="hw__lesson-no">{{ splitLessonTitle(lesson.lesson_title, lesson.sort_order).label }}</span>
+            <span class="hw__lesson-title">{{ splitLessonTitle(lesson.lesson_title, lesson.sort_order).name }}</span>
           </div>
 
           <div class="hw__lesson-stats">

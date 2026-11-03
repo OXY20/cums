@@ -67,7 +67,7 @@ async function submit() {
         </el-button>
       </el-form>
 
-      <p class="login-hint">初始管理员账号为 admin，首次登录后请立即修改口令。</p>
+      <p class="login-hint">管理员账号由首次安装向导创建；若尚未安装，请先访问 /setup。</p>
     </div>
   </div>
 </template>

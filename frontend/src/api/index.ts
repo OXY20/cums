@@ -65,9 +65,85 @@ export async function request<T>(
   return payload as T
 }
 
-/** 资源下载地址；浏览器将按 Content-Disposition 处理文件名 */
-export function fileUrl(resourceId: number): string {
-  return `/files/${resourceId}`
+/** 提交凭证在下载地址上的参数名 */
+const SUBMISSION_TOKEN_PARAM = 'submission_token'
+
+/** 教师端预览票在下载地址上的参数名 */
+const PREVIEW_TICKET_PARAM = 'preview_ticket'
+
+/**
+ * 当前正在查看的提交凭证。
+ *
+ * 作业文件的预览组件（`SubmissionPreview`）只拿到资源 ID，
+ * 拿不到提交凭证。把「当前打开的是哪份提交」放在模块级，
+ * 预览组件无需改动就能让图片 / 视频 / PDF 的内联地址带上凭证。
+ * 教师端从不设置它，因此教学资源与教师端下载不受影响。
+ */
+let activeSubmissionToken: string | null = null
+
+/** 设置 / 清除当前查看的提交凭证；传入 null 表示离开该提交 */
+export function setActiveSubmissionToken(token: string | null): void {
+  activeSubmissionToken = token && token.trim() ? token : null
+}
+
+/** 读取当前查看的提交凭证 */
+export function getActiveSubmissionToken(): string | null {
+  return activeSubmissionToken
+}
+
+/** 解析实际使用的凭证：显式传入优先，否则退回当前查看中的提交 */
+function resolveSubmissionToken(submissionToken?: string | null): string {
+  if (submissionToken && submissionToken.trim()) return submissionToken
+  return activeSubmissionToken ?? ''
+}
+
+/**
+ * 当前正在查看的教师端预览票。
+ *
+ * 与提交凭证同理：`<img>` / `<video>` / `<iframe>` 无法携带
+ * `Authorization` 头，教师端详情接口为每个文件下发一张短时效票，
+ * 由预览组件自动拼进地址。学生端从不设置它。
+ */
+let activePreviewTickets: Record<number, string> = {}
+
+/** 登记一批预览票（键为资源 ID）；传入空对象表示清除 */
+export function setPreviewTickets(tickets: Record<number, string> | null): void {
+  activePreviewTickets = tickets ?? {}
+}
+
+/** 取某个资源的预览票 */
+export function getPreviewTicket(resourceId: number): string | null {
+  return activePreviewTickets[resourceId] ?? null
+}
+
+/** 把附加参数（提交凭证 / 预览票）拼到地址上 */
+function appendFileParams(
+  base: string,
+  resourceId: number,
+  submissionToken?: string | null,
+): string {
+  const params = new URLSearchParams()
+  const token = resolveSubmissionToken(submissionToken)
+  if (token) params.set(SUBMISSION_TOKEN_PARAM, token)
+
+  // 教师端预览票与提交凭证互不冲突：服务端任一有效即放行
+  const ticket = getPreviewTicket(resourceId)
+  if (ticket) params.set(PREVIEW_TICKET_PARAM, ticket)
+
+  const query = params.toString()
+  if (!query) return base
+  return base.includes('?') ? `${base}&${query}` : `${base}?${query}`
+}
+
+/**
+ * 资源下载地址；浏览器将按 Content-Disposition 处理文件名。
+ *
+ * 教学资源公开可下载；**作业文件**属于学生的提交内容，匿名访问时
+ * 服务端要求带上提交凭证，此时把 `submissionToken` 作为查询参数拼上。
+ * 教师端带 Bearer 令牌访问，不需要传这个参数。
+ */
+export function fileUrl(resourceId: number, submissionToken?: string | null): string {
+  return appendFileParams(`/files/${resourceId}`, resourceId, submissionToken)
 }
 
 /**
@@ -75,9 +151,10 @@ export function fileUrl(resourceId: number): string {
  *
  * `inline=1` 让服务端返回 `Content-Disposition: inline`，
  * PDF / 图片 / 视频才能在预览弹窗里直接展示而不是触发下载。
+ * 作业文件同样需要提交凭证，已有 `inline=1` 时用 `&` 追加。
  */
-export function inlineFileUrl(resourceId: number): string {
-  return `/files/${resourceId}?inline=1`
+export function inlineFileUrl(resourceId: number, submissionToken?: string | null): string {
+  return appendFileParams(`/files/${resourceId}?inline=1`, resourceId, submissionToken)
 }
 
 /**
@@ -374,6 +451,50 @@ export interface AuditLogEntry {
 }
 
 // ---------------------------------------------------------------------------
+// 首次安装向导
+// ---------------------------------------------------------------------------
+
+/** 向导中可调整的基础配置 */
+export interface SetupSummary {
+  /** 监听地址，如 `0.0.0.0:8080` */
+  bind: string
+  /** 数据库文件路径（相对数据根目录） */
+  database_path: string
+  /** 资源目录（相对数据根目录） */
+  storage_dir: string
+  /** 令牌有效期（小时） */
+  token_ttl_hours: number
+}
+
+/** 安装状态 */
+export interface SetupStatus {
+  /** 是否已完成安装 */
+  installed: boolean
+  /** 未安装时回显的当前配置，已安装时为 null */
+  defaults: SetupSummary | null
+}
+
+/** 安装请求 */
+export interface SetupInstallPayload {
+  username: string
+  password: string
+  password_confirm: string
+  display_name: string
+  bind: string
+  database_path: string
+  storage_dir: string
+  token_ttl_hours: number
+}
+
+/** 安装结果 */
+export interface SetupInstallResult {
+  ok: boolean
+  username: string
+  display_name: string
+  message: string
+}
+
+// ---------------------------------------------------------------------------
 // 作业提交
 // ---------------------------------------------------------------------------
 
@@ -413,6 +534,14 @@ export interface SubmissionFile {
   /** 用途由服务端根据 MIME 与扩展名推断，决定预览方式 */
   purpose: ResourcePurpose
   sort_order: number
+  /**
+   * 教师端预览票。
+   *
+   * `<img>` / `<video>` / `<iframe>` 不会携带 `Authorization` 头，
+   * 教师端必须把这张短时效票拼到地址上，否则预览会 403。
+   * 学生端回读走提交凭证，因此该字段为空。
+   */
+  preview_ticket?: string
 }
 
 /** 一条作业提交记录 */
@@ -429,7 +558,7 @@ export interface Submission {
   client_ip: string
   user_agent: string
   note: string
-  /** 1 表示该课时该班级已有其他人提交 */
+  /** 1 表示同一学生（按学号）或同一台设备在本课时已提交过 */
   duplicate_flag: number
   duplicate_of: number | null
   status: SubmissionStatus
@@ -446,6 +575,8 @@ export interface Submission {
   review_comment: string
   /** 最近一次审阅时间；未审阅为 null */
   reviewed_at: string | null
+  /** 学生撤回提交的时间；未撤回为 null，撤回后记录仍保留供教师核对 */
+  withdrawn_at: string | null
 }
 
 /** 提交详情：记录本体 + 文件列表 */
@@ -463,6 +594,21 @@ export interface DeviceSubmission {
 }
 
 /**
+ * 作业上传的服务端限制。
+ *
+ * 由服务端的 `status` 接口下发，前端据此做上传前预校验；
+ * 不在前端写死数字，避免配置调整后界面提示与真实上限不一致。
+ */
+export interface SubmissionLimits {
+  /** 一次提交允许的文件数上限 */
+  max_files: number
+  /** 单个文件的字节数上限 */
+  max_file_bytes: number
+  /** 单次提交所有文件合计的字节数上限 */
+  max_total_bytes: number
+}
+
+/**
  * 课时提交状态，用于上传前提醒。
  *
  * 提示以 `device` 为准（这台机器是否交过），
@@ -475,12 +621,23 @@ export interface LessonSubmissionStatus {
   class_total: number
   /** 当前设备的提交情况；无提交时为 null */
   device: DeviceSubmission | null
+  /** 服务端当前允许的上传上限 */
+  limits: SubmissionLimits
 }
 
-/** 提交接口的响应，携带重复提醒 */
+/**
+ * 提交接口的响应。
+ *
+ * `access_token` 是本次提交的凭证：学生端没有登录态，
+ * 凭它可以回读自己的提交、撤回提交、下载作业文件。
+ */
 export interface CreateSubmissionResponse {
   submission: SubmissionDetail
   duplicate_warning: string | null
+  /** 撤回截止时间（服务端时间）；null 表示不可撤回 */
+  withdraw_deadline: string | null
+  /** 提交凭证，前端需持久化保存 */
+  access_token: string
 }
 
 export interface SubmitHomeworkInput {
@@ -493,6 +650,105 @@ export interface SubmitHomeworkInput {
   /** 本设备标识，用于判断「本设备是否已提交」 */
   deviceId?: string
   files: File[]
+}
+
+// ---------------------------------------------------------------------------
+// 提交凭证（access_token）
+// ---------------------------------------------------------------------------
+//
+// 学生端没有登录态，提交凭证是学生回读、撤回自己作业、下载作业文件的唯一凭据。
+// 按课时存一份：学生在同一节课重新提交时，旧凭据失效，留最新那份即可。
+
+/** 提交凭证的持久化键 */
+const SUBMISSION_TOKENS_KEY = 'classroom.submission.tokens'
+
+/** 一条提交凭证的持久化形态 */
+export interface StoredSubmissionToken {
+  /** 对应的提交 ID */
+  submissionId: number
+  /** 提交凭证 */
+  token: string
+  /** 记录时间（ISO 字符串），便于排查过期问题 */
+  at: string
+  /** 撤回截止时间；null 表示已过期或不可撤回 */
+  withdraw_deadline?: string | null
+}
+
+/** 按课时 ID 索引的凭证表 */
+export type SubmissionTokenMap = Record<string, StoredSubmissionToken>
+
+/**
+ * 读取全部提交凭证。
+ *
+ * localStorage 在隐私模式或存储被禁用时会抛异常，
+ * 这里统一吞掉并返回空表：凭证丢失只影响撤回，不影响提交流程。
+ */
+export function listSubmissionTokens(): SubmissionTokenMap {
+  try {
+    const raw = localStorage.getItem(SUBMISSION_TOKENS_KEY)
+    if (!raw) return {}
+    const parsed: unknown = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    return parsed as SubmissionTokenMap
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * 保存一条提交凭证。
+ *
+ * `withdrawDeadline` 由服务端给出，界面据此决定是否显示撤回按钮；
+ * 收取时就记下来，后续打开结果弹窗无需再查询。
+ */
+export function saveSubmissionToken(
+  lessonId: number,
+  submissionId: number,
+  token: string,
+  withdrawDeadline?: string | null,
+): void {
+  if (!token) return
+  try {
+    const map = listSubmissionTokens()
+    map[String(lessonId)] = {
+      submissionId,
+      token,
+      at: new Date().toISOString(),
+      withdraw_deadline: withdrawDeadline ?? null,
+    }
+    localStorage.setItem(SUBMISSION_TOKENS_KEY, JSON.stringify(map))
+  } catch {
+    /* 存储不可用时静默跳过，不阻断提交 */
+  }
+}
+
+/**
+ * 取某课时的提交凭证。
+ *
+ * 传入 `submissionId` 时要求两者匹配：同一课时重复提交会产生新凭证，
+ * 旧的那份已失效，不能拿它去撤回或下载。
+ */
+export function getSubmissionToken(
+  lessonId: number,
+  submissionId?: number,
+): StoredSubmissionToken | null {
+  const map = listSubmissionTokens()
+  const found = map[String(lessonId)]
+  if (!found || typeof found.token !== 'string' || !found.token) return null
+  if (submissionId !== undefined && found.submissionId !== submissionId) return null
+  return found
+}
+
+/** 删除某课时的提交凭证（撤回成功或确认丢失时调用） */
+export function dropSubmissionToken(lessonId: number): void {
+  try {
+    const map = listSubmissionTokens()
+    if (!(String(lessonId) in map)) return
+    delete map[String(lessonId)]
+    localStorage.setItem(SUBMISSION_TOKENS_KEY, JSON.stringify(map))
+  } catch {
+    /* 存储不可用时静默跳过 */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -754,6 +1010,14 @@ export const api = {
     request<Course>(`/api/courses/${courseId}/cover`, { method: 'DELETE' }),
 
   resources: () => request<ListResponse<Resource>>('/api/resources'),
+
+  /**
+   * 学生端下载中心：已发布课程课时关联的资源。
+   *
+   * 与教师端 `resources()` 分开，是因为 `/api/resources` 需要登录，
+   * 且会列出草稿课程素材与未被引用的暂存文件。
+   */
+  studentResources: () => request<ListResponse<Resource>>('/api/student/resources'),
   registerResource: (body: { name: string; size_bytes: number; sha256?: string }) =>
     request<{ resource_id: number; upload_token: string; storage_key: string }>(
       '/api/resources/register',
@@ -828,9 +1092,28 @@ export const api = {
     return request<LessonSubmissionStatus>(`/api/student/submissions/status?${params.toString()}`)
   },
 
-  /** 学生端回读自己的提交，用于上传成功后弹窗预览 */
-  studentSubmission: (id: number) =>
-    request<SubmissionDetail>(`/api/student/submissions/${id}`),
+  /**
+   * 学生端回读自己的提交，用于上传成功后弹窗预览。
+   *
+   * 接口要求带上提交凭证（`access_token`），否则返回 403；
+   * 凭据来自提交响应或 `getSubmissionToken`。
+   */
+  studentSubmission: (id: number, accessToken: string) => {
+    const params = new URLSearchParams({ access_token: accessToken })
+    return request<SubmissionDetail>(`/api/student/submissions/${id}?${params.toString()}`)
+  },
+
+  /**
+   * 撤回自己的提交。
+   *
+   * 服务端只允许在撤回截止时间之前撤回，过期返回 409、凭据不匹配返回 403、
+   * 记录不存在返回 404；失败时把后端 message 原样抛给界面展示。
+   */
+  withdrawSubmission: (id: number, accessToken: string) =>
+    request<{ ok: boolean }>(`/api/student/submissions/${id}/withdraw`, {
+      method: 'POST',
+      body: { access_token: accessToken },
+    }),
 
   /** 教师端提交记录列表 */
   submissions: (query: {
@@ -871,6 +1154,15 @@ export const api = {
     }),
 
   // ---- 班级学生名单 ----
+
+  /**
+   * 学生端读取正在上课班级的名单。
+   *
+   * 学生端未登录，不能调用需要认证的 `/api/classes/{id}/students`；
+   * 这个公开接口只返回「有活动课堂」的班级名单。
+   */
+  studentClassRoster: (classId: number) =>
+    request<ListResponse<ClassStudent>>(`/api/student/class-roster?class_id=${classId}`),
 
   /** 班级名单 */
   classStudents: (classId: number) =>
@@ -929,4 +1221,16 @@ export const api = {
 
   /** 公开的服务版本信息，无需登录 */
   version: () => request<{ name: string; version: string }>('/api/version'),
+
+  // ---- 首次安装向导 ----
+
+  /** 查询安装状态；未安装时返回可修改的基础配置默认值 */
+  setupStatus: () => request<SetupStatus>('/api/setup/status'),
+
+  /** 执行安装：创建管理员账号并写入基础配置 */
+  setupInstall: (payload: SetupInstallPayload) =>
+    request<SetupInstallResult>('/api/setup/install', {
+      method: 'POST',
+      body: payload,
+    }),
 }

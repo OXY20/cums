@@ -57,6 +57,37 @@ export function formatTime(value: string | null | undefined): string {
   return `${year}-${month}-${day} ${hour}:${minute}:${second}`
 }
 
+/**
+ * 拆分课时标题：拆出"第 N 课时"标签与纯课时名称。
+ *
+ * 课时 `title` 字段本身可能已经带"第 1 课时 · 网络体系结构"这样的前缀
+ * （历史数据与课程模板即如此）。若展示时再拼一次序号，
+ * 就会显示成"第 1 课时 · 第 1 课时 · 网络体系结构"。
+ *
+ * 标题已自带前缀时以标题里的序号为准，否则用 `sortOrder` 补齐。
+ */
+export function splitLessonTitle(
+  title: string | null | undefined,
+  sortOrder?: number | null,
+): { label: string; name: string } {
+  const text = (title ?? '').trim()
+  const matched = text.match(/^(第\s*\d+\s*课时)\s*[·・\-—:：]?\s*(.*)$/)
+  if (matched) return { label: matched[1], name: matched[2].trim() }
+  const label =
+    sortOrder === null || sortOrder === undefined ? '' : `第 ${sortOrder} 课时`
+  return { label, name: text }
+}
+
+/** 课时标题完整展示：标签与名称用"·"连接，不重复前缀 */
+export function formatLessonTitle(
+  title: string | null | undefined,
+  sortOrder?: number | null,
+): string {
+  const { label, name } = splitLessonTitle(title, sortOrder)
+  if (!label) return name
+  return name ? `${label} · ${name}` : label
+}
+
 /** 课堂状态中文标签 */
 export function sessionStatusText(status: string): string {
   switch (status) {

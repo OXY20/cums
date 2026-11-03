@@ -12,11 +12,14 @@ import { ElMessage } from 'element-plus'
 import {
   api,
   fileUrl,
+  type CreateSubmissionResponse,
   type CurrentSession,
   type LessonBlock,
   type LessonResource,
 } from '@/api'
 import { formatBytes, formatTime, sessionStatusText } from '@/utils/format'
+import HomeworkSubmitDialog from '@/components/HomeworkSubmitDialog.vue'
+import SubmissionResultDialog from '@/components/SubmissionResultDialog.vue'
 
 const props = defineProps<{ id: string }>()
 const router = useRouter()
@@ -51,8 +54,43 @@ const textBlocks = computed(() => {
     }))
 })
 
-/** 附件（非图片、非视频） */
-const attachments = computed(() => resources.value.filter((r) => r.purpose === 'attachment'))
+/**
+ * 课时关联的全部资源。
+ *
+ * 服务端按 MIME 判定 `purpose`：图片为 image、视频为 video、其余为 attachment。
+ * 只取 attachment 会让正文里插入的图片、视频在附件区完全看不到，
+ * 因此这里展示全部关联资源，学生均可下载。
+ */
+const attachments = computed(() => resources.value)
+
+/** 资源用途中文标签 */
+const PURPOSE_LABELS: Record<string, string> = {
+  image: '图片',
+  video: '视频',
+  attachment: '附件',
+}
+
+function purposeLabel(purpose: string): string {
+  return PURPOSE_LABELS[purpose] ?? purpose
+}
+
+/** 作业上传弹窗 */
+const submitVisible = ref(false)
+/** 提交成功后的预览弹窗 */
+const resultVisible = ref(false)
+const submitResult = ref<CreateSubmissionResponse | null>(null)
+
+/** 打开作业上传弹窗 */
+function openSubmit() {
+  if (!view.value) return
+  submitVisible.value = true
+}
+
+/** 提交成功：弹出预览 */
+function onSubmitted(payload: CreateSubmissionResponse) {
+  submitResult.value = payload
+  resultVisible.value = true
+}
 
 async function load() {
   try {
@@ -115,6 +153,9 @@ function statusText(status: string) {
         班级：{{ view.class_name }} ｜ 教师：{{ view.teacher_name }} ｜ 开始时间：{{
           formatTime(view.session.started_at)
         }}
+        <el-button type="primary" size="small" style="margin-left: 12px" @click="openSubmit">
+          提交作业
+        </el-button>
       </p>
 
       <!--
@@ -195,6 +236,7 @@ function statusText(status: string) {
         <div class="card">
           <div v-for="resource in attachments" :key="resource.id" class="resource-item">
             <span class="resource-item__name">{{ resource.name }}</span>
+            <el-tag size="small" type="info" effect="plain">{{ purposeLabel(resource.purpose) }}</el-tag>
             <span class="resource-item__size">{{ formatBytes(resource.size_bytes) }}</span>
             <el-button
               size="small"
@@ -220,6 +262,18 @@ function statusText(status: string) {
       >
         本节课暂无内容。
       </div>
+
+      <!-- 作业上传弹窗 -->
+      <HomeworkSubmitDialog
+        v-model="submitVisible"
+        :lesson-id="view.session.lesson_id"
+        :lesson-title="view.lesson_title"
+        :class-id="view.session.class_id"
+        @submitted="onSubmitted"
+      />
+
+      <!-- 提交成功后的预览弹窗 -->
+      <SubmissionResultDialog v-model="resultVisible" :result="submitResult" />
     </template>
 
     <div v-else class="card empty-state">课堂不存在或已被删除。</div>

@@ -1,4 +1,5 @@
 // 验证富媒体正文接口与 HTML 清洗。
+
 //
 // 用法：node scripts/verify-richtext.mjs [baseUrl]
 //
@@ -9,6 +10,11 @@
 //   4. 正文引用的资源自动登记为课时资源
 //   5. 课堂快照保存富文本，学生端可读
 
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 
 let passed = 0
@@ -79,7 +85,7 @@ function tinyPng() {
 
 const login = await api('/api/auth/login', {
   method: 'POST',
-  body: { username: 'admin', password: 'admin' },
+  body: { username: ADMIN_USER, password: ADMIN_PASS },
 })
 const token = login.json?.token
 if (!token) {

@@ -9,12 +9,13 @@
  * 这里是「按记录逐条翻」的视角；需要整班批量批改时走课时批改页，
  * 两个入口共用同一套审阅字段，互不冲突。
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   api,
   REVIEW_LABEL_META,
   reviewLabelText,
+  setPreviewTickets,
   type Course,
   type Lesson,
   type ReviewLabel,
@@ -22,7 +23,7 @@ import {
   type SubmissionDetail,
   type SubmissionStatus,
 } from '@/api'
-import { formatTime, submissionStatusText } from '@/utils/format'
+import { formatLessonTitle, formatTime, submissionStatusText } from '@/utils/format'
 import SubmissionPreview from '@/components/SubmissionPreview.vue'
 
 /**
@@ -183,12 +184,30 @@ async function openDetail(row: Submission) {
   detail.value = null
   try {
     detail.value = await api.submission(row.id)
+    // 预览标签无法携带 Authorization 头，登记服务端下发的短时效预览票，
+    // 否则教师端打开详情会看到图片 / 视频 / PDF 全部 403
+    setPreviewTickets(collectPreviewTickets(detail.value))
   } catch (err) {
     ElMessage.error(err instanceof Error ? err.message : '提交详情加载失败')
     detailVisible.value = false
   } finally {
     detailLoading.value = false
   }
+}
+
+/** 关闭详情时清空预览票，避免离开页面后仍持有可用票据 */
+function closeDetail() {
+  detailVisible.value = false
+  setPreviewTickets(null)
+}
+
+/** 把详情里的预览票整理成「资源 ID → 票」的映射 */
+function collectPreviewTickets(view: SubmissionDetail | null): Record<number, string> {
+  const tickets: Record<number, string> = {}
+  for (const file of view?.files ?? []) {
+    if (file.preview_ticket) tickets[file.resource_id] = file.preview_ticket
+  }
+  return tickets
 }
 
 /** 标记审阅状态：成功后同时刷新弹窗与列表 */
@@ -237,7 +256,7 @@ async function labelDetail(label: ReviewLabel) {
   <div>
     <h1 class="page-title">作业提交记录</h1>
     <p class="page-subtitle">
-      学生每次提交都会记录提交时间与来源 IP；同一课时同一班级出现多人提交时会被自动标记为重复，便于核对。
+      学生每次提交都会记录提交时间与来源 IP；同一学生（按学号）或同一台设备重复提交时才会标记为重复，便于核对。
     </p>
 
     <!-- 筛选区 -->
@@ -269,7 +288,7 @@ async function labelDetail(label: ReviewLabel) {
           <el-option
             v-for="item in lessons"
             :key="item.id"
-            :label="`第 ${item.sort_order} 课时 · ${item.title}`"
+            :label="formatLessonTitle(item.title, item.sort_order)"
             :value="item.id"
           />
         </el-select>
@@ -392,7 +411,14 @@ async function labelDetail(label: ReviewLabel) {
     </div>
 
     <!-- 详情弹窗：信息 + 文件预览 + 审阅操作 -->
-    <el-dialog v-model="detailVisible" title="提交详情" width="760px" top="6vh" destroy-on-close>
+    <el-dialog
+      v-model="detailVisible"
+      title="提交详情"
+      width="760px"
+      top="6vh"
+      destroy-on-close
+      @close="closeDetail"
+    >
       <div v-loading="detailLoading" class="detail">
         <template v-if="detail">
           <!-- 重复提交提示：说明本节课本班级已有其他人先提交 -->
@@ -495,7 +521,7 @@ async function labelDetail(label: ReviewLabel) {
       </div>
 
       <template #footer>
-        <el-button @click="detailVisible = false">关闭</el-button>
+        <el-button @click="closeDetail">关闭</el-button>
         <el-button
           type="primary"
           :disabled="!detail"

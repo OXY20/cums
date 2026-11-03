@@ -5,7 +5,7 @@ use crate::models::{
     AttachResourceRequest, LessonResourceRow, ListResponse, RegisterResourceRequest,
     RegisterResourceResponse, ResourceRow,
 };
-use crate::routes::AuthUser;
+use crate::routes::{ensure_lesson_published, AuthUser, MaybeAuthUser};
 use crate::state::AppState;
 use axum::extract::{DefaultBodyLimit, Multipart, Path, State};
 use axum::routing::{get, post};
@@ -16,6 +16,9 @@ use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        // 学生端下载中心：只暴露已发布课程课时关联的资源。
+        // 不能直接复用 `/api/resources`，那个接口面向教师，会列出全部资源。
+        .route("/api/student/resources", get(list_student_resources))
         .route("/api/resources", get(list_resources))
         .route("/api/resources/register", post(register_resource))
         // 大文件上传必须解除 axum 默认 2 MiB 请求体上限；
@@ -24,12 +27,39 @@ pub fn routes() -> Router<AppState> {
             "/api/resources/{id}/upload",
             post(upload_resource).layer(DefaultBodyLimit::disable()),
         )
-        .route("/api/resources/{id}", get(get_resource).delete(delete_resource))
+        .route(
+            "/api/resources/{id}",
+            get(get_resource).delete(delete_resource),
+        )
         // 课时内直传：一步完成登记、上传与关联，免去「先去资源库再回来关联」。
         .route(
             "/api/lessons/{lesson_id}/resources/upload",
             post(upload_lesson_resource).layer(DefaultBodyLimit::disable()),
         )
+}
+
+/// 学生端：已发布课程课时关联的资源。
+///
+/// AGENT-DECISION: 下载中心面向匿名学生，不能复用教师端的 `/api/resources`
+/// （它要求登录且会列出未发布课程的资源）。这里只放行 `published` 课程下
+/// `ready` 状态的资源，并按资源去重——同一文件可能挂在多个课时上。
+async fn list_student_resources(
+    State(state): State<AppState>,
+) -> AppResult<Json<ListResponse<ResourceRow>>> {
+    let rows = sqlx::query_as::<_, ResourceRow>(
+        "SELECT DISTINCT r.id, r.name, r.storage_key, r.size_bytes, r.sha256, r.mime_type,
+                r.version, r.status, r.created_at
+         FROM resources r
+         JOIN lesson_resources lr ON lr.resource_id = r.id
+         JOIN lessons l ON l.id = lr.lesson_id
+         JOIN courses c ON c.id = l.course_id
+         WHERE c.status = 'published' AND r.status = 'ready'
+         ORDER BY r.created_at DESC, r.id DESC LIMIT 500",
+    )
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(ListResponse::new(rows)))
 }
 
 /// 资源列表。
@@ -108,8 +138,14 @@ async fn register_resource(
     .fetch_one(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "resource.register", "resource", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "resource.register",
+        "resource",
+        &id.to_string(),
+    )
+    .await;
 
     Ok(Json(RegisterResourceResponse {
         resource_id: id,
@@ -130,8 +166,14 @@ async fn upload_resource(
     let resource = fetch_resource(&state, id).await?;
     let updated = receive_content(&state, &resource, multipart).await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "resource.upload", "resource", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "resource.upload",
+        "resource",
+        &id.to_string(),
+    )
+    .await;
 
     Ok(Json(updated))
 }
@@ -221,9 +263,13 @@ pub async fn store_file_field(
     tokio::fs::rename(&staging_path, &objects_path).await?;
 
     // 以实际提交的文件名与类型为准，避免浏览器把视频报成 octet-stream。
-    let final_name = uploaded_name
-        .filter(|n| !n.trim().is_empty())
-        .unwrap_or_else(|| resource.name.clone());
+    // 文件名来自客户端，必须先清理：控制字符、路径分隔符与超长名字都会
+    // 污染列表展示、审计日志，并在 Content-Disposition 里制造响应头注入风险。
+    let final_name = sanitize_filename(
+        &uploaded_name
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| resource.name.clone()),
+    );
     let final_mime = uploaded_mime
         .filter(|m| m != "application/octet-stream")
         .or_else(|| {
@@ -266,8 +312,14 @@ async fn delete_resource(
         .execute(&state.db)
         .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "resource.delete", "resource", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "resource.delete",
+        "resource",
+        &id.to_string(),
+    )
+    .await;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -275,8 +327,11 @@ async fn delete_resource(
 /// 课时关联的资源列表，含用途与排序。
 pub async fn lesson_resources(
     State(state): State<AppState>,
+    viewer: MaybeAuthUser,
     Path(lesson_id): Path<i64>,
 ) -> AppResult<Json<ListResponse<LessonResourceRow>>> {
+    ensure_lesson_published(&state, lesson_id, &viewer).await?;
+
     let rows = sqlx::query_as::<_, LessonResourceRow>(
         "SELECT r.id, r.name, r.storage_key, r.size_bytes, r.sha256, r.mime_type,
                 r.version, r.status, r.created_at,
@@ -371,18 +426,122 @@ pub(crate) async fn create_staging_resource(
     name: &str,
 ) -> AppResult<ResourceRow> {
     let storage_key = format!("{}/{}", &Uuid::new_v4().to_string()[..2], Uuid::new_v4());
+    let name = sanitize_filename(name);
 
     let id: i64 = sqlx::query_scalar(
         "INSERT INTO resources (name, storage_key, size_bytes, sha256, mime_type, status, uploaded_by)
          VALUES (?1, ?2, 0, '', 'application/octet-stream', 'staging', ?3) RETURNING id",
     )
-    .bind(name)
+    .bind(&name)
     .bind(&storage_key)
     .bind(user_id)
     .fetch_one(&state.db)
     .await?;
 
     fetch_resource(state, id).await
+}
+
+/// 清理并规范化客户端提交的文件名。
+///
+/// 处理顺序：
+/// 1. 逐个字符过滤：ASCII 控制字符（`< 0x20` 与 `0x7f`）会破坏日志与响应头，
+///    反斜杠与正斜杠是路径分隔符，一并去掉；
+/// 2. 去掉首尾空格与点：Windows 会静默丢弃结尾的点与空格，
+///    也会因此产生 `..` 形式的相对路径片段；
+/// 3. 截断到 120 个字符：超长名字在列表页与审计日志里无法使用，
+///    但**保留扩展名**——先按扩展名切分，只截断主体，再拼回扩展名；
+/// 4. 结果为空时回退为「未命名文件」，保证 `name` 列永远非空且可读。
+pub fn sanitize_filename(name: &str) -> String {
+    /// 文件名允许的最大字符数（含扩展名）。
+    const MAX_CHARS: usize = 120;
+
+    let filtered: String = name
+        .chars()
+        .filter(|ch| {
+            let code = *ch as u32;
+            !(code < 0x20 || code == 0x7f || *ch == '\\' || *ch == '/')
+        })
+        .collect();
+
+    let trimmed = filtered
+        .trim_matches(|ch: char| ch == ' ' || ch == '.')
+        .trim();
+
+    if trimmed.is_empty() {
+        return "未命名文件".to_string();
+    }
+
+    if trimmed.chars().count() <= MAX_CHARS {
+        return trimmed.to_string();
+    }
+
+    // 超长时保留扩展名：按最后一个点切分，主体截断后拼回。
+    let path = std::path::Path::new(trimmed);
+    let extension = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .filter(|ext| !ext.is_empty() && ext.chars().count() <= 16);
+
+    match extension {
+        Some(ext) => {
+            let suffix = format!(".{ext}");
+            let body_budget = MAX_CHARS.saturating_sub(suffix.chars().count());
+            let body: String = trimmed.chars().take(body_budget).collect();
+            let body = body
+                .trim_end_matches(|ch: char| ch == ' ' || ch == '.')
+                .trim_end();
+            if body.is_empty() {
+                format!("未命名文件{suffix}")
+            } else {
+                format!("{body}{suffix}")
+            }
+        }
+        None => trimmed.chars().take(MAX_CHARS).collect(),
+    }
+}
+
+/// 尽力删除资源：先清 objects 与 staging 两处文件，再删数据库行。
+///
+/// 用于撤回、清理孤儿资源等场景：磁盘上可能只存在其中一处（上传中断）或
+/// 两处都不存在（已清理过），因此每一步都只记日志、不向上返回错误，
+/// 避免「文件已经不在了」导致调用方无法完成后续清理。
+pub async fn purge_resource(state: &AppState, resource: &ResourceRow) {
+    for root in [&state.config.objects_dir, &state.config.staging_dir] {
+        match safe_join(root, &resource.storage_key) {
+            Ok(path) => match tokio::fs::remove_file(&path).await {
+                Ok(()) => {}
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => {
+                    tracing::warn!(
+                        resource_id = resource.id,
+                        path = %path.display(),
+                        error = %err,
+                        "删除资源文件失败"
+                    );
+                }
+            },
+            Err(err) => {
+                tracing::warn!(
+                    resource_id = resource.id,
+                    storage_key = resource.storage_key,
+                    error = %err,
+                    "资源存储路径不合法，跳过文件清理"
+                );
+            }
+        }
+    }
+
+    if let Err(err) = sqlx::query("DELETE FROM resources WHERE id = ?1")
+        .bind(resource.id)
+        .execute(&state.db)
+        .await
+    {
+        tracing::warn!(
+            resource_id = resource.id,
+            error = %err,
+            "删除资源记录失败"
+        );
+    }
 }
 
 /// 关联资源到课时，并指定用途。
@@ -506,4 +665,40 @@ pub fn safe_join(root: &std::path::Path, storage_key: &str) -> AppResult<PathBuf
     }
 
     Ok(candidate)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sanitize_filename;
+
+    #[test]
+    fn 去掉路径分隔符与控制字符() {
+        assert_eq!(sanitize_filename("../../evil.html"), "evil.html");
+        assert_eq!(sanitize_filename("a\u{7}b\u{7f}c.txt"), "abc.txt");
+        assert_eq!(sanitize_filename("dir/sub/name.txt"), "dirsubname.txt");
+    }
+
+    #[test]
+    fn 去掉首尾空格与点() {
+        assert_eq!(
+            sanitize_filename("  ...trim...  .txt".trim()),
+            "trim...  .txt"
+        );
+        assert_eq!(sanitize_filename("...a.txt..."), "a.txt");
+    }
+
+    #[test]
+    fn 超长时截断主体并保留扩展名() {
+        let long = format!("{}.pdf", "名字".repeat(100));
+        let cleaned = sanitize_filename(&long);
+        assert_eq!(cleaned.chars().count(), 120);
+        assert!(cleaned.ends_with(".pdf"));
+    }
+
+    #[test]
+    fn 空结果回退为未命名文件() {
+        assert_eq!(sanitize_filename("   "), "未命名文件");
+        assert_eq!(sanitize_filename("\\\\/"), "未命名文件");
+        assert_eq!(sanitize_filename("..."), "未命名文件");
+    }
 }

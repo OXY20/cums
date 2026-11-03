@@ -16,6 +16,47 @@ import Quill from 'quill'
 import 'quill/dist/quill.snow.css'
 import { ElMessage } from 'element-plus'
 
+/**
+ * 视频嵌入改用 `<video>` 标签。
+ *
+ * Quill 2 内置的 video blot 承载方式是 `<iframe class="ql-video">`，
+ * 而服务端 HTML 白名单不放行 iframe，视频在保存时会被整体丢弃，
+ * 学生端与编辑器回填都看不到。
+ *
+ * 这里改为语义正确的 `<video>`，与后端白名单里的 `video` / `source` 对齐；
+ * `src` 仍由服务端限制为站内 `/files/` 路径。
+ */
+// Quill.import 返回 any，这里保持 any 以便继承其静态成员
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const BaseVideo = Quill.import('formats/video') as any
+
+class ClassroomVideo extends BaseVideo {
+  /** 覆盖内置 blot 的标签名，使 Quill 创建 <video> 而非 <iframe> */
+  static tagName = 'VIDEO'
+
+  static create(value: string): HTMLElement {
+    const node = document.createElement('video')
+    node.classList.add('ql-video')
+    node.setAttribute('src', this.sanitize(value))
+    node.setAttribute('controls', 'true')
+    node.setAttribute('preload', 'metadata')
+    node.setAttribute('contenteditable', 'false')
+    return node
+  }
+
+  static value(domNode: Element): string | null {
+    return domNode.getAttribute('src')
+  }
+
+  html(): string {
+    const src = this.value()
+    return `<video class="ql-video" controls preload="metadata" src="${src}"></video>`
+  }
+}
+
+// 覆盖 Quill 内置的 video blot
+Quill.register(ClassroomVideo, true)
+
 const props = withDefaults(
   defineProps<{
     modelValue: string

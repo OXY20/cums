@@ -10,6 +10,7 @@ app/config/config.toml
 
 # Rust 构建产物
 backend/target/
+backend/target-verify/
 backend/.cargo/
 /target/
 
@@ -37,6 +38,8 @@ Thumbs.db
 
 # 构建产物
 build/
+# 本地发布包（含 CUMS.exe 与前端产物），由 CI 或手工打包生成
+/dist/
 
 # 临时与调试文件
 *.tmp

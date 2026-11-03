@@ -1,4 +1,5 @@
 // 浏览器端验证「课程管理内直接上传」的完整交互。
+
 //
 // 用法：node scripts/verify-inline-ui.mjs [baseUrl]
 //
@@ -8,6 +9,11 @@
 //   3. 用 DOM 直接构造 File 并触发上传，确认图片内嵌渲染
 //   4. 检查控制台无报错
 
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 const CDP = process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222'
 
@@ -30,7 +36,7 @@ function check(name, ok, detail = '') {
 const loginRes = await fetch(`${BASE}/api/auth/login`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const { token } = await loginRes.json()
 if (!token) {
@@ -171,7 +177,9 @@ console.log('\n二、课时编辑器：富媒体上传入口')
 // -------------------------------------------------------------------------
 await withPage(`${BASE}/admin/courses/${courseId}`, async ({ evaluate, errors }) => {
   const text = await evaluate(`document.querySelector('#app')?.innerText ?? ''`)
-  check('页面含课时标题', text.includes('第 1 课时：直接上传图片'))
+  // 课时标题在页面上拆成「第 N 课时 · 名称」两部分展示，
+  // 因此分别断言序号与名称，而不是原始标题串。
+  check('页面含课时标题', text.includes('第 1 课时') && text.includes('直接上传图片'))
   check('存在富媒体编辑器', (await evaluate(`document.querySelectorAll('.ql-editor').length`)) > 0)
   check('存在编辑器工具栏', (await evaluate(`document.querySelectorAll('.ql-toolbar').length`)) > 0)
   check(
@@ -292,7 +300,7 @@ if (sessionId) {
   if (createdSession) {
     await withPage(`${BASE}/student/sessions/${sessionId}`, async ({ evaluate, errors }) => {
       const text = await evaluate(`document.querySelector('#app')?.innerText ?? ''`)
-      check('学生端显示课时标题', text.includes('第 1 课时：直接上传图片'))
+      check('学生端显示课时标题', text.includes('第 1 课时') && text.includes('直接上传图片'))
       check(
         '学生端出现内嵌图片',
         (await evaluate(`document.querySelectorAll('.rich-content img').length`)) > 0,
@@ -304,7 +312,7 @@ if (sessionId) {
     // 复用现有课堂：用课程主页验证图片渲染（不干扰正在进行的课堂）
     await withPage(`${BASE}/student/courses/${courseId}`, async ({ evaluate, errors }) => {
       const text = await evaluate(`document.querySelector('#app')?.innerText ?? ''`)
-      check('课程主页显示课时标题', text.includes('第 1 课时：直接上传图片'))
+      check('课程主页显示课时标题', text.includes('第 1 课时') && text.includes('直接上传图片'))
       check('无控制台错误', errors.length === 0, errors.join(' | '))
     })
   }

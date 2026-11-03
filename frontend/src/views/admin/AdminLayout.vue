@@ -57,10 +57,19 @@ function logout() {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 20px;
-  max-width: 1320px;
+  /* 与顶栏、学生端 .page 保持同一总宽度，页面左右边界才对齐 */
+  max-width: 1440px;
   margin: 0 auto;
   padding: 20px;
   align-items: start;
+}
+
+/*
+ * AGENT-DECISION: grid 项默认 min-width:auto，内容（本项目是宽表格）
+ * 会把 1fr 列撑破，导致页面横向溢出。置 0 后由表格自身横向滚动。
+ */
+.admin-content {
+  min-width: 0;
 }
 
 .admin-sidebar {

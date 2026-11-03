@@ -1,4 +1,5 @@
 // 验证 Quill 2 的排版 class 在保存后是否保留。
+
 //
 // 用法：node scripts/verify-quill-classes.mjs [baseUrl]
 //
@@ -6,6 +7,11 @@
 // 缩进（ql-indent-1）与代码块（ql-code-block-container）。
 // 若服务端清洗丢弃这些 class，教师设置的排版会在保存后全部失效。
 
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 
 let passed = 0
@@ -44,7 +50,7 @@ async function api(path, { method = 'GET', token, body } = {}) {
 
 const login = await api('/api/auth/login', {
   method: 'POST',
-  body: { username: 'admin', password: 'admin' },
+  body: { username: ADMIN_USER, password: ADMIN_PASS },
 })
 const token = login.json?.token
 if (!token) {

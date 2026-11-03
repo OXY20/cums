@@ -9,7 +9,13 @@
  * 该脚本会创建并清理自己的测试数据，但请勿指向生产数据目录。
  */
 
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
+
 const BASE = process.argv[2] ?? process.env.BASE_URL ?? 'http://127.0.0.1:8080'
+
 
 let passed = 0
 let failed = 0
@@ -79,13 +85,13 @@ async function main() {
 
   const badLogin = await api('/api/auth/login', {
     method: 'POST',
-    body: { username: 'admin', password: 'definitely-wrong' },
+    body: { username: ADMIN_USER, password: 'definitely-wrong' },
   })
   check('错误口令被拒绝', badLogin.status === 401, `实际 ${badLogin.status}`)
 
   const login = await api('/api/auth/login', {
     method: 'POST',
-    body: { username: 'admin', password: 'admin' },
+    body: { username: ADMIN_USER, password: ADMIN_PASS },
   })
   check('管理员登录成功', login.status === 200 && typeof login.json?.token === 'string')
   const token = login.json.token
@@ -97,7 +103,7 @@ async function main() {
   check('伪造令牌被拒绝', badToken.status === 401, `实际 ${badToken.status}`)
 
   const me = await api('/api/auth/me', { token })
-  check('获取当前用户信息', me.status === 200 && me.json?.username === 'admin')
+  check('获取当前用户信息', me.status === 200 && me.json?.username === ADMIN_USER)
 
   const version = await api('/api/version')
   check('公开版本接口无需登录', version.status === 200 && !!version.json?.version)
@@ -124,7 +130,8 @@ async function main() {
   })
   check('同名班级被拒绝（唯一约束）', dupClass.status === 409, `实际 ${dupClass.status}`)
 
-  const listClasses = await api('/api/classes')
+  // 班级与课程列表属于教师接口，必须带令牌（学生端走 /api/student/*）
+  const listClasses = await api('/api/classes', { token })
   check(
     '班级列表包含新建班级',
     listClasses.status === 200 && listClasses.json.items.some((c) => c.id === classId),
@@ -189,7 +196,8 @@ async function main() {
   check('复制课程模板', copyCourse.status === 200 && copyCourse.json?.title.includes('副本'))
   const copiedCourseId = copyCourse.json.id
 
-  const copiedLessons = await api(`/api/courses/${copiedCourseId}/lessons`)
+  // 副本是草稿课程，匿名读取会被 404；教师端带令牌读取
+  const copiedLessons = await api(`/api/courses/${copiedCourseId}/lessons`, { token })
   check('复制课程同时复制课时', copiedLessons.json?.total === 2, `实际 ${copiedLessons.json?.total}`)
 
   // -------------------------------------------------------------------------

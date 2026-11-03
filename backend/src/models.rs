@@ -364,6 +364,15 @@ pub struct SubmissionRow {
     pub duplicate_of: Option<i64>,
     pub status: String,
     pub created_at: String,
+    /// 本次提交的合计字节数；旧记录为 0，需要时可回落到文件表求和
+    #[sqlx(default)]
+    pub total_bytes: i64,
+    /// 学生撤回提交的时间；未撤回为 `None`
+    ///
+    /// 撤回是软删除：记录保留供教师核对「谁交过又撤了」，
+    /// 但文件不再对外提供匿名下载，统计口径也将其排除。
+    #[sqlx(default)]
+    pub withdrawn_at: Option<String>,
     /// 冗余展示字段，列表查询时附带
     #[sqlx(default)]
     pub course_title: Option<String>,
@@ -398,6 +407,14 @@ pub struct SubmissionFileRow {
     /// 用途：image / video / attachment，决定前端如何预览
     pub purpose: String,
     pub sort_order: i64,
+    /// 教师端预览票。
+    ///
+    /// `<img>` / `<video>` / `<iframe>` 不会携带 `Authorization` 头，
+    /// 教师端若不带上这张短时效票，作业文件预览会一律 403。
+    /// 学生端回读拿不到票（凭证路径用 `submission_token`），因此这里可为空。
+    #[sqlx(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_ticket: Option<String>,
 }
 
 /// 提交详情：记录本体 + 文件列表。
@@ -424,6 +441,22 @@ pub struct LessonSubmissionStatus {
     pub class_total: i64,
     /// 当前设备的提交情况；无提交时为 `None`
     pub device: Option<DeviceSubmission>,
+    /// 服务端当前的提交限制，供前端在上传前做同等校验
+    pub limits: SubmissionLimits,
+}
+
+/// 服务端提交限制，学生端据此提前校验，避免传完才被拒绝。
+///
+/// 前端不再各自硬编码上限：配置调整后前端自动跟随，
+/// 也不会出现「前端允许 20 GiB、服务端只收 4 GiB」这种不一致。
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct SubmissionLimits {
+    /// 单次提交的文件数量上限
+    pub max_files: usize,
+    /// 单文件字节上限
+    pub max_file_bytes: u64,
+    /// 单次提交的合计字节上限
+    pub max_total_bytes: u64,
 }
 
 /// 当前设备在本课时的提交记录摘要。
@@ -435,12 +468,36 @@ pub struct DeviceSubmission {
     pub latest: SubmissionRow,
 }
 
-/// 提交成功后的响应，携带重复提醒。
+/// 提交成功后的响应，携带重复提醒与后续操作凭证。
 #[derive(Debug, Serialize)]
 pub struct CreateSubmissionResponse {
     pub submission: SubmissionDetailView,
     /// 本次提交被标记为重复时给出原因
     pub duplicate_warning: Option<String>,
+    /// 回读、撤回与下载本提交文件所需的凭证。
+    ///
+    /// 学生端没有账号，公开接口若只按自增 ID 取数据，
+    /// 任何递增数字都能读到别人的提交人、来源 IP 与文件清单。
+    /// 凭证在这里一次性下发，前端保存在本地，不做二次找回。
+    pub access_token: String,
+    /// 允许撤回的截止时间；服务端关闭撤回功能时为 `None`
+    pub withdraw_deadline: Option<String>,
+}
+
+/// 学生撤回提交的请求体。
+#[derive(Debug, Deserialize)]
+pub struct WithdrawSubmissionRequest {
+    /// 提交时下发的凭证
+    pub access_token: String,
+}
+
+/// 学生撤回提交的查询参数。
+///
+/// 撤回是 POST，但学生端没有 Authorization 头可带，
+/// 凭证只能放在请求体里；脚本与链接场景下也可用 query 传。
+#[derive(Debug, Deserialize)]
+pub struct StudentAccessQuery {
+    pub access_token: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -684,4 +741,63 @@ pub struct HealthResponse {
     pub active_sessions: i64,
     pub active_downloads: i64,
     pub objects_bytes: u64,
+}
+
+// ---------------------------------------------------------------------------
+// 首次安装向导
+// ---------------------------------------------------------------------------
+
+/// 安装状态查询结果。
+#[derive(Debug, Serialize)]
+pub struct SetupStatusResponse {
+    /// 是否已完成安装
+    pub installed: bool,
+    /// 未安装时回显的当前配置，作为向导表单的初始值
+    pub defaults: Option<SetupSummary>,
+}
+
+/// 向导中可调整的基础配置。
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SetupSummary {
+    /// 监听地址，如 `0.0.0.0:8080`
+    pub bind: String,
+    /// 数据库文件路径（相对数据根目录）
+    pub database_path: String,
+    /// 资源目录（相对数据根目录）
+    pub storage_dir: String,
+    /// 令牌有效期（小时）
+    pub token_ttl_hours: i64,
+}
+
+/// 安装请求：管理员账号 + 基础配置。
+#[derive(Debug, Deserialize)]
+pub struct SetupInstallRequest {
+    pub username: String,
+    pub password: String,
+    /// 确认口令
+    pub password_confirm: String,
+    /// 显示名，留空时使用「系统管理员」
+    #[serde(default)]
+    pub display_name: String,
+    /// 监听地址，留空时保持原值
+    #[serde(default)]
+    pub bind: String,
+    /// 数据库路径，留空时保持原值
+    #[serde(default)]
+    pub database_path: String,
+    /// 资源目录，留空时保持原值
+    #[serde(default)]
+    pub storage_dir: String,
+    /// 令牌有效期（小时），0 表示保持原值
+    #[serde(default)]
+    pub token_ttl_hours: i64,
+}
+
+/// 安装结果。
+#[derive(Debug, Serialize)]
+pub struct SetupInstallResponse {
+    pub ok: bool,
+    pub username: String,
+    pub display_name: String,
+    pub message: String,
 }

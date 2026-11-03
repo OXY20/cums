@@ -18,17 +18,55 @@ use std::collections::HashSet;
 /// 引用、代码块、表格、链接与媒体。
 const ALLOWED_TAGS: &[&str] = &[
     // 段落与标题
-    "p", "br", "div", "span", "h1", "h2", "h3", "h4", "h5", "h6", "hr",
+    "p",
+    "br",
+    "div",
+    "span",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hr",
     // 行内样式
-    "strong", "b", "em", "i", "u", "s", "strike", "sub", "sup", "mark", "small", "big",
+    "strong",
+    "b",
+    "em",
+    "i",
+    "u",
+    "s",
+    "strike",
+    "sub",
+    "sup",
+    "mark",
+    "small",
+    "big",
     // 列表
-    "ul", "ol", "li",
+    "ul",
+    "ol",
+    "li",
     // 引用与代码
-    "blockquote", "pre", "code",
+    "blockquote",
+    "pre",
+    "code",
     // 链接与媒体
-    "a", "img", "video", "source", "figure", "figcaption",
+    "a",
+    "img",
+    "video",
+    "source",
+    "figure",
+    "figcaption",
     // 表格
-    "table", "thead", "tbody", "tr", "th", "td", "caption", "colgroup", "col",
+    "table",
+    "thead",
+    "tbody",
+    "tr",
+    "th",
+    "td",
+    "caption",
+    "colgroup",
+    "col",
 ];
 
 /// 允许的属性集合。
@@ -36,8 +74,8 @@ const ALLOWED_TAGS: &[&str] = &[
 /// 注意：不要包含 `rel`——它由 `Builder::link_rel` 统一注入，
 /// 若同时出现在通用属性中，ammonia 会在 clean 时触发断言。
 const ALLOWED_ATTRS: &[&str] = &[
-    "href", "title", "target", "src", "alt", "width", "height", "controls", "preload",
-    "poster", "colspan", "rowspan", "class", "style", "type",
+    "href", "title", "target", "src", "alt", "width", "height", "controls", "preload", "poster",
+    "colspan", "rowspan", "class", "style", "type",
 ];
 
 /// 允许的内联样式属性。
@@ -154,10 +192,7 @@ fn normalize_tables(html: &str) -> String {
                 &open_tag[value_end + 1..]
             )
         } else {
-            format!(
-                "<td class=\"ql-table-header\"{}",
-                &open_tag["<th".len()..]
-            )
+            format!("<td class=\"ql-table-header\"{}", &open_tag["<th".len()..])
         };
 
         out.push_str(&new_open);
@@ -221,7 +256,10 @@ pub fn sanitize(html: &str) -> String {
             }
             // class 只保留排版相关的 Quill 类
             (_, "class") => {
-                let kept: Vec<&str> = value.split_whitespace().filter(|c| is_allowed_class(c)).collect();
+                let kept: Vec<&str> = value
+                    .split_whitespace()
+                    .filter(|c| is_allowed_class(c))
+                    .collect();
                 if kept.is_empty() {
                     None
                 } else {
@@ -387,8 +425,14 @@ mod tests {
         // Quill 2 回填多个 <th> 时会合并单元格，因此统一转成 td + class
         let html = r#"<table><tbody><tr><th>参数</th><th>取值</th></tr><tr><td>宽度</td><td>8cm</td></tr></tbody></table>"#;
         let cleaned = sanitize(html);
-        assert!(cleaned.contains(r#"<td class="ql-table-header">参数</td>"#), "{cleaned}");
-        assert!(cleaned.contains(r#"<td class="ql-table-header">取值</td>"#), "{cleaned}");
+        assert!(
+            cleaned.contains(r#"<td class="ql-table-header">参数</td>"#),
+            "{cleaned}"
+        );
+        assert!(
+            cleaned.contains(r#"<td class="ql-table-header">取值</td>"#),
+            "{cleaned}"
+        );
         assert!(!cleaned.contains("<th"), "{cleaned}");
         // 数据行保持普通 td
         assert!(cleaned.contains("<td>宽度</td>"), "{cleaned}");
@@ -396,7 +440,8 @@ mod tests {
 
     #[test]
     fn 表头标记不会被重复添加() {
-        let html = r#"<table><tbody><tr><th class="ql-table-header">表头</th></tr></tbody></table>"#;
+        let html =
+            r#"<table><tbody><tr><th class="ql-table-header">表头</th></tr></tbody></table>"#;
         let cleaned = sanitize(html);
         assert_eq!(cleaned.matches("ql-table-header").count(), 1, "{cleaned}");
     }
@@ -415,6 +460,28 @@ mod tests {
 
         let rejected = sanitize(r#"<img src="https://evil.example/x.png">"#);
         assert!(!rejected.contains("evil.example"));
+    }
+
+    #[test]
+    fn 保留站内视频() {
+        // 编辑器把视频写成 <video>，白名单必须放行，否则保存后视频整体消失
+        let allowed = sanitize(
+            r#"<video class="ql-video" controls preload="metadata" src="/files/34"></video>"#,
+        );
+        assert!(allowed.contains("<video"), "{allowed}");
+        assert!(allowed.contains("/files/34"), "{allowed}");
+        assert!(allowed.contains("controls"), "{allowed}");
+
+        // 外链视频一律拒绝
+        let rejected = sanitize(r#"<video src="https://evil.example/v.mp4"></video>"#);
+        assert!(!rejected.contains("evil.example"), "{rejected}");
+    }
+
+    #[test]
+    fn 丢弃内嵌框架() {
+        // iframe 不在白名单内，视频不得用 iframe 承载
+        let cleaned = sanitize(r#"<iframe class="ql-video" src="/files/12"></iframe>"#);
+        assert!(!cleaned.contains("iframe"), "{cleaned}");
     }
 
     #[test]

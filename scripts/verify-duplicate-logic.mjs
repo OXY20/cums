@@ -1,4 +1,5 @@
 /**
+
  * 验证重复判定的口径。
  *
  * 关键行为：
@@ -8,6 +9,11 @@
  *
  * 用法：node scripts/verify-duplicate-logic.mjs [baseUrl]
  */
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 
 let passed = 0
@@ -39,7 +45,7 @@ async function j(path, options = {}) {
 const login = await j('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const token = login.body.token
 const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -63,6 +69,13 @@ const lesson = await j(`/api/courses/${courseId}/lessons`, {
   body: JSON.stringify({ title: '第 1 课时' }),
 })
 const lessonId = lesson.body.id
+
+// 学生只能对已发布课程的课时提交作业，先发布再走提交流程。
+await j(`/api/courses/${courseId}`, {
+  method: 'PUT',
+  headers: H,
+  body: JSON.stringify({ status: 'published' }),
+})
 
 // 导入名单：看板只把名单内的人算作「已交」，没有名单时全归「名单外」
 await j(`/api/classes/${classId}/students/import`, {
@@ -112,15 +125,24 @@ check('提示语说明是本人重复提交',
   typeof a2.body.duplicate_warning === 'string' && a2.body.duplicate_warning.includes('你已提交过'),
   `${a2.body.duplicate_warning}`)
 
-console.log('\n[3] 不带学号：退回设备判断')
-// 用一个全新设备，但班级里已有提交
+console.log('\n[3] 不带学号：只按设备判断，不再因「本班有人交过」而误标')
+// 全新设备、本班已有提交：这不是同一个人重复交，不该标重复。
+// 早期版本有一条「本班已有其他人提交就标重复」的分支，会把一个班里
+// 除第一个交的人之外全部标成重复，标记因此失去意义，已移除。
 const d = await submit('临时同学', '', { deviceId: 'dev-new' })
 check('无学号提交成功', d.status === 200)
-check('无学号且本班已有提交 → 标记重复',
-  d.body.submission.duplicate_flag === 1, `flag=${d.body.submission.duplicate_flag}`)
-check('无学号时提示语不指名他人',
-  typeof d.body.duplicate_warning === 'string' && !d.body.duplicate_warning.includes('张三'),
+check('无学号但换了一台设备 → 不标记重复',
+  d.body.submission.duplicate_flag === 0, `flag=${d.body.submission.duplicate_flag}`)
+check('无学号且新设备无重复警告', d.body.duplicate_warning === null,
   `${d.body.duplicate_warning}`)
+
+// 同一台设备再交一次，才算「可能是同一个人重复提交」
+const d2 = await submit('临时同学', '', { deviceId: 'dev-new' })
+check('同一设备再次提交被标记重复',
+  d2.body.submission.duplicate_flag === 1, `flag=${d2.body.submission.duplicate_flag}`)
+check('重复提示不指名他人',
+  typeof d2.body.duplicate_warning === 'string' && !d2.body.duplicate_warning.includes('张三'),
+  `${d2.body.duplicate_warning}`)
 
 console.log('\n[4] 统计口径：去重人数按学生算')
 const overview = await j(`/api/courses/${courseId}/homework-overview?class_id=${classId}`, {
@@ -128,10 +150,10 @@ const overview = await j(`/api/courses/${courseId}/homework-overview?class_id=${
 })
 const l = overview.body.lessons[0]
 console.log(`  提交 ${l.submitted_count} 份，去重 ${l.submitter_count} 人，重复 ${l.duplicate_count} 份`)
-check('提交份数为 5', l.submitted_count === 5, `count=${l.submitted_count}`)
+check('提交份数为 6', l.submitted_count === 6, `count=${l.submitted_count}`)
 check('去重人数为 4（张三/李四/王五/临时同学）', l.submitter_count === 4,
   `count=${l.submitter_count}`)
-check('重复份数为 2（张三二次 + 无学号临时同学）', l.duplicate_count === 2,
+check('重复份数为 2（张三二次 + 临时同学同设备二次）', l.duplicate_count === 2,
   `count=${l.duplicate_count}`)
 
 const board = await j(`/api/lessons/${lessonId}/submission-board?class_id=${classId}`, {

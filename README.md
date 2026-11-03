@@ -72,9 +72,21 @@ $env:CLASSROOM_ROOT = "E:\ClassroomPlatform"
 
 启动后：
 
+- 安装向导：<http://localhost:8080/setup>
 - 学生端：<http://localhost:8080/>
 - 教师端：<http://localhost:8080/admin/console>
-- 初始账号：`admin` / `admin`（**首次登录后请立即修改**）
+
+### 首次安装
+
+首次启动时服务处于**安装模式**：除 `/api/setup/*` 外的所有接口均返回 409，
+页面会自动跳转到安装向导。向导分两步：
+
+1. **管理员账号**：设置用户名、显示名称与登录口令（至少 8 位）。
+2. **基础配置**：确认监听地址、数据库路径、资源目录与令牌有效期。
+
+完成后向导会创建管理员账号、在 `app/config/config.toml` 中写入 `installed = true`，
+并把所选路径下的既有数据迁移到新位置（数据目录变更时不会丢失已有数据）。
+安装完成后业务接口立即可用，无需重启服务。
 
 ### 开发模式
 
@@ -91,12 +103,27 @@ npm run dev
 
 开发时访问 <http://localhost:5173>，接口与文件请求会代理到后端。
 
+后端端口在 `app/config/config.toml` 的 `server.bind` 中配置（默认 `0.0.0.0:8080`）。
+若该端口被其它程序占用，可改用别的端口，并让 Vite 代理指向它：
+
+```powershell
+# 后端：改 config.toml 的 server.bind，例如 0.0.0.0:8099
+cd backend
+$env:CLASSROOM_ROOT = "E:\WorkSpace\Code\cums"
+cargo run
+
+# 前端：CLASSROOM_API 覆盖代理目标
+cd frontend
+$env:CLASSROOM_API = "http://127.0.0.1:8099"
+npm run dev
+```
+
 ## 已实现功能
 
 ### 阶段一：工程基础与权限
 
 - 教师/管理员登录，Argon2id 口令哈希 + JWT 令牌
-- 首次启动自动创建管理员账号
+- 首次启动进入安装向导，由使用者创建管理员账号（不预置弱口令账号）
 - 统一错误格式 `{ "error": { "code", "message" } }`
 - SQLite + WAL、数据库迁移、`tracing` 日志
 - 端口占用时自动回退到后续端口
@@ -123,10 +150,15 @@ npm run dev
 - 流式传输，内存占用与文件大小无关
 - 相同内容识别（按 SHA-256 提示复用）
 - 资源与课时多对多关联
+- 学生端「下载中心」列出已发布课程关联的可用资源，匿名即可下载；
+  该接口与教师端资源库分离，不会暴露草稿课程素材与未引用文件
+- 未发布课程（草稿 / 归档）的课程、课时、课堂只对已登录教师可见，
+  匿名直链统一返回 404；未发布课程也不允许开始上课
 
 ### 阶段四：学生作业提交
 
 - 课程页课时区域提供「提交作业」按钮，点击弹出上传窗口
+- 课堂详情页（`/student/sessions/:id`）同样提供「提交作业」入口，并列出本节课的全部附件
 - 支持一次选择多个文件，视频、图片、文档、压缩包均可（单文件上限 20 GiB）
 - **选中文件后立即在弹窗内预览内容**：图片直接显示、视频可播放、文本显示前若干行；
   其余类型给出类型与大小说明，不必等提交后才发现选错文件
@@ -140,7 +172,9 @@ npm run dev
   「当前设备已提交过本节课作业」及提交时间，便于学生确认自己是否已交
 - 提示语不展示其他同学的姓名或提交时间，仅显示「本班已有 N 份提交」这样的背景数字
 - 服务端记录提交时间、来源 IP、设备标识与 User-Agent，客户端无法伪造
-- 同一课时同一班级已有提交时仍会保存本次提交，并标记为重复，由教师判断性质
+- 同一名学生（按学号）或同一台设备重复提交时仍会保存本次提交并标记为重复，由教师判断性质
+- 提交后 2 小时内可撤回；撤回后记录保留供教师核对，但学生端不再回读、文件也不再可下载
+- 关闭结果弹窗后，课程页仍保留「查看上次提交」入口，可继续查看或撤回
 - 教师端「作业提交」页可按课程/课时筛选、只看重复提交、查看详情与文件预览、标记已查看或问题
 
 ### 阶段五：学生名单与作业统计
@@ -206,10 +240,13 @@ node scripts/reset-data.mjs --yes                   # 需要重来时清空（�
 ### 端到端冒烟测试
 
 ```powershell
+# 管理员凭据与安装向导创建的一致，不设置时默认 admin / admin
+$env:ADMIN_USER = "admin"
+$env:ADMIN_PASS = "Passw0rd!"
 node scripts/smoke-test.mjs
 ```
 
-覆盖认证权限、班级机房、课程课时、课堂控制、资源与大文件传输、审计监控、SSE 事件共 **68 项**，全部通过。
+覆盖认证权限、班级机房、课程课时、课堂控制、资源与大文件传输、审计监控、SSE 事件共 **69 项**，全部通过。
 
 ### 大文件流式验证
 
@@ -238,6 +275,50 @@ node scripts/verify-admin-ui.mjs
 使用无头 Chrome 实际渲染 6 个页面（课堂控制台、课程管理、资源库、系统状态、学生端首页、下载中心），检查关键内容与控制台错误，全部通过，无控制台报错。
 
 界面截图见 `docs/screenshots/`。
+
+### 界面标注与交互调试
+
+界面标注用于沟通前端调整：给页面元素加带色方框，并标上 A1 / A2 / B1 这样的编号，
+右下角给出编号与说明的对照清单。标注集定义在 `frontend/src/annotations/*.json`，
+一个标注项包含 `tag`（编号）、`note`（说明）、`sel`（CSS 选择器）、`color`（方框颜色），
+`all: true` 表示标注全部匹配元素。
+
+**页面上直接看**（仅开发模式，`npm run dev` 时顶栏出现「标注」按钮）：
+
+```text
+http://localhost:5174/student/courses/4?annotate=student-course-detail
+http://localhost:5174/student/sessions/6?annotate=student-session-detail
+```
+
+也可以在顶栏点「标注」开关；开关状态会写进地址栏的 `annotate` 参数，便于把带标注的
+链接直接发给同事。标注层不拦截鼠标事件，开启后页面仍可正常点击；异步加载出来的
+元素会自动补上标注。生产构建不包含该功能（`import.meta.env.DEV` 判断 + 动态 import）。
+
+**导出带标注的整页截图**：
+
+```powershell
+# 默认用 student-course-detail 标注集
+node scripts/annotate-page.mjs "http://localhost:5174/student/courses/4" "docs/screenshots/annotate-course-detail.png" 1440 1200
+
+# 指定标注集（frontend/src/annotations 下的文件名）或任意 JSON 路径
+node scripts/annotate-page.mjs "http://localhost:5174/student/sessions/6" "docs/screenshots/annotate-session-detail.png" 1440 1200 student-session-detail
+```
+
+脚本会打印每个编号的命中情况（未命中的选择器会标为「未找到」），
+并把清单面板一起画进截图。
+
+**其他调试脚本**：
+
+```powershell
+# 点击某个元素后再截图，验证交互后的界面
+node scripts/click-capture.mjs <url> <输出文件> ".lesson-row" 2
+
+# 在页面中执行表达式并打印结果
+node scripts/eval-page.mjs <url> "document.title"
+```
+
+三个脚本都基于 CDP 调试协议，需先用 `--remote-debugging-port=9222` 启动 Chrome；
+截取教师端页面时通过环境变量 `CAPTURE_TOKEN` 传入登录令牌。
 
 ### 作业提交验证
 
@@ -324,6 +405,34 @@ node scripts/verify-seeded-ui.mjs
 
 ## 关键设计说明
 
+### 页面宽度
+
+全站只有一套宽度基准，各页面的左右边界因此完全对齐：
+
+| 区域 | 容器 | 最大宽度 | 覆盖页面 |
+|------|------|----------|----------|
+| 顶栏 | `.app-header__inner` | 1440px | 品牌与导航 |
+| 学生端 | `.page` | 1440px | 首页、课程详情、课堂详情、下载中心 |
+| 教师端 | `.admin-layout` | 1440px | 200px 侧栏 + 内容区（控制台、课程、名单、资源、提交、批改、系统状态） |
+| 登录页 | `.login-page` | 整屏 | 居中卡片 |
+
+两条配套约束：
+
+- `html { scrollbar-gutter: stable }` 统一预留滚动条位置。否则页面内容长短不一时，
+  居中内容会因滚动条出现与否横向错位十几像素，各页面的有效宽度就对不齐。
+- 教师端内容区设 `min-width: 0`。CSS 栅格项默认 `min-width: auto`，
+  宽表格（作业提交页列宽合计 1600px 以上）会把 `1fr` 列撑破导致整页横向溢出；
+  置 0 后由表格自身横向滚动，`操作` 列仍固定在右侧。
+
+验证方式：
+
+```powershell
+node scripts/measure-widths.mjs http://localhost:5174 1440
+```
+
+逐页输出容器、外框宽度、有效宽度、左右边距与是否横向溢出，并按有效宽度分组，
+可直接看出各页面是否对齐。
+
 ### 课堂与课程分离
 
 课程和课时是可复用模板；课堂是某位教师面向某个班级的一次实际授课。创建课堂时把课时内容写入 `lesson_snapshot`，因此教师后续修改课程模板不会改变已结束课堂的历史展示。
@@ -384,20 +493,31 @@ token_ttl_hours = 12
 [limits]
 max_concurrent_downloads = 64
 per_client_rate_kib = 0        # 0 表示不限速
+# 作业提交限制；前端从 /api/student/submissions/status 读取后做同等预校验
+submission_max_files = 10                  # 单次最多几个文件
+submission_max_total_bytes = 4294967296    # 单次合计上限（4 GiB）
+submission_rate_limit = 20                 # 同一来源地址窗口内允许的提交次数
+submission_rate_window_secs = 60           # 限流窗口长度
+submission_withdraw_secs = 7200            # 提交后允许撤回的时长（2 小时），0 表示禁止撤回
 ```
 
 `jwt_secret` 在首次启动时随机生成并写回配置。**该文件包含密钥，不应提交到版本库。**
+
+`submission_*` 这组限制都有默认值，配置里缺省即可正常工作。超过 `submission_rate_limit` 的提交会返回 `429`，超过文件数或合计大小的提交会返回 `400` 并清理已上传的内容。
 
 ## API 一览
 
 | 方法 | 接口 | 用途 |
 |------|------|------|
+| GET | `/api/setup/status` | 安装状态（未安装时回显可修改的基础配置） |
+| POST | `/api/setup/install` | 执行安装：创建管理员账号并写入基础配置 |
 | POST | `/api/auth/login` | 登录 |
 | GET | `/api/auth/me` | 当前用户 |
 | POST | `/api/auth/password` | 修改口令 |
 | GET | `/api/version` | 公开版本信息 |
 | GET | `/api/student/current-session` | 学生端当前课堂 |
 | GET | `/api/student/courses` | 学生端课程列表（仅已发布） |
+| GET | `/api/student/resources` | 学生端下载中心资源（仅已发布课程课时关联的可用文件） |
 | GET/POST | `/api/classes` | 班级列表 / 创建 |
 | GET/POST | `/api/courses` | 课程列表 / 创建 |
 | POST | `/api/courses/{id}/copy` | 复制课程模板 |
@@ -429,7 +549,13 @@ per_client_rate_kib = 0        # 0 表示不限速
 | GET | `/api/admin/health` | 服务健康状态 |
 | GET | `/api/admin/audit-logs` | 审计日志 |
 
-除 `/api/version`、`/api/auth/login`、`/api/student/*` 与 `/files/*` 外，其余接口需要 `Authorization: Bearer <token>`。
+公开接口：`/api/version`、`/api/auth/login`、`/api/student/*` 与 `/files/*`，以及课程与课时的只读接口
+（`/api/courses/{id}`、`/api/courses/{id}/lessons`、`/api/lessons/{id}` 及其正文块与关联资源）。
+后者只返回**已发布**课程的内容，草稿与归档课程对匿名请求一律返回 404；带上教师令牌则可正常编辑。
+其余接口需要 `Authorization: Bearer <token>`。
+
+安装模式说明：`config.toml` 中 `installed = false` 时，除 `/api/setup/*` 外的所有接口均返回
+409「系统尚未完成首次安装」；此时前端路由会把所有页面引导到 `/setup`。
 
 ## 尚未实现
 
@@ -452,7 +578,7 @@ per_client_rate_kib = 0        # 0 表示不限速
 ## 文档
 
 - `docs/ARCHITECTURE.md`：架构与数据模型说明
-- `docs/API.md`：接口详细说明
 - `docs/DEPLOYMENT.md`：部署与运维说明
 - `docs/TESTING.md`：测试与验证说明
 - `docs/screenshots/`：界面截图
+- `docs/ARCHIVE.md`：历史文档索引（旧版 CUMS 的 API / CONFIG / DEVELOPMENT 等文档归于此）

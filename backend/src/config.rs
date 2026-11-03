@@ -101,6 +101,45 @@ pub struct LimitsConfig {
     pub max_concurrent_downloads: u32,
     /// 每客户端下载限速（KiB/s），0 表示不限速。
     pub per_client_rate_kib: u32,
+    /// 单次作业提交允许的文件数量上限。
+    #[serde(default = "default_submission_max_files")]
+    pub submission_max_files: usize,
+    /// 单次作业提交允许的合计字节数上限（128 MiB）。
+    ///
+    /// 单文件上限由 `storage.max_file_bytes` 控制，两者是不同口径：
+    /// 学生交一段视频可能就接近 1 GiB，但一次交十个大文件会长时间占住连接，
+    /// 因此总量另设一道上限。
+    #[serde(default = "default_submission_max_total_bytes")]
+    pub submission_max_total_bytes: u64,
+    /// 同一来源地址在窗口期内允许的提交次数。
+    #[serde(default = "default_submission_rate_limit")]
+    pub submission_rate_limit: u32,
+    /// 提交限流的窗口长度（秒）。
+    #[serde(default = "default_submission_rate_window_secs")]
+    pub submission_rate_window_secs: u64,
+    /// 提交成功后允许撤回的时长（秒），0 表示不允许撤回。
+    #[serde(default = "default_submission_withdraw_secs")]
+    pub submission_withdraw_secs: u64,
+}
+
+fn default_submission_max_files() -> usize {
+    10
+}
+
+fn default_submission_max_total_bytes() -> u64 {
+    4 * 1024 * 1024 * 1024
+}
+
+fn default_submission_rate_limit() -> u32 {
+    20
+}
+
+fn default_submission_rate_window_secs() -> u64 {
+    60
+}
+
+fn default_submission_withdraw_secs() -> u64 {
+    2 * 60 * 60
 }
 
 impl Default for LimitsConfig {
@@ -108,6 +147,11 @@ impl Default for LimitsConfig {
         Self {
             max_concurrent_downloads: 64,
             per_client_rate_kib: 0,
+            submission_max_files: default_submission_max_files(),
+            submission_max_total_bytes: default_submission_max_total_bytes(),
+            submission_rate_limit: default_submission_rate_limit(),
+            submission_rate_window_secs: default_submission_rate_window_secs(),
+            submission_withdraw_secs: default_submission_withdraw_secs(),
         }
     }
 }
@@ -115,6 +159,12 @@ impl Default for LimitsConfig {
 /// 完整应用配置。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
+    /// 安装向导是否已完成。
+    ///
+    /// 未完成时服务进入安装模式：只开放 `/api/setup/*` 与前端页面，
+    /// 其余业务接口一律拒绝，直到管理员在向导中创建账号为止。
+    #[serde(default)]
+    pub installed: bool,
     #[serde(default)]
     pub server: ServerConfig,
     #[serde(default)]

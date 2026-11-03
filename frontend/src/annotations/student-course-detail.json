@@ -1,0 +1,110 @@
+{
+  "name": "学生端 · 课程详情",
+  "items": [
+    {
+      "tag": "A1",
+      "note": "返回首页",
+      "sel": ".page > .el-button",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "A2",
+      "note": "页面标题（课程 · 课时）",
+      "sel": ".page-title",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "A3",
+      "note": "页面副标题（课时序号 ｜ 课程简介）",
+      "sel": ".page-subtitle",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "A4",
+      "note": "进行中课堂提示条",
+      "sel": ".lesson-main > .card",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "A5",
+      "note": "左侧主列（标题与课时正文）",
+      "sel": ".lesson-main",
+      "color": "#e5484d"
+    },
+    {
+      "tag": "B1",
+      "note": "课时列表侧栏",
+      "sel": "aside.lesson-nav",
+      "color": "#0090ff"
+    },
+    {
+      "tag": "B2",
+      "note": "课时列表标题",
+      "sel": ".lesson-nav__title",
+      "color": "#0090ff"
+    },
+    {
+      "tag": "B3",
+      "note": "课时条目（当前选中）",
+      "sel": ".lesson-nav__item--active",
+      "color": "#0090ff"
+    },
+    {
+      "tag": "B4",
+      "note": "课时条目（未选中）",
+      "sel": ".lesson-nav__item:not(.lesson-nav__item--active)",
+      "color": "#0090ff",
+      "all": true
+    },
+    {
+      "tag": "C1",
+      "note": "课时正文区",
+      "sel": "section.lesson-content",
+      "color": "#12a594"
+    },
+    {
+      "tag": "C2",
+      "note": "课时定位条 + 提交作业按钮",
+      "sel": ".lesson-head",
+      "color": "#12a594"
+    },
+    {
+      "tag": "C3",
+      "note": "课时序号与名称",
+      "sel": ".lesson-content__head",
+      "color": "#12a594"
+    },
+    {
+      "tag": "C4",
+      "note": "提交作业按钮",
+      "sel": ".lesson-head .el-button",
+      "color": "#12a594"
+    },
+    {
+      "tag": "C5",
+      "note": "富文本正文",
+      "sel": ".rich-content",
+      "color": "#12a594"
+    },
+    {
+      "tag": "C6",
+      "note": "结构化正文块",
+      "sel": ".lesson-block",
+      "color": "#12a594",
+      "all": true
+    },
+    {
+      "tag": "D1",
+      "note": "相关资源标题与下载全部",
+      "sel": ".lesson-content > .section-title",
+      "color": "#f5a524"
+    },
+    {
+      "tag": "D2",
+      "note": "资源条目",
+      "sel": ".resource-item",
+      "color": "#f5a524",
+      "all": true
+    }
+  ]
+}

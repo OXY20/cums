@@ -1,4 +1,5 @@
 /**
+
  * 验证时间显示与运行设备时区一致。
  *
  * 后端用 SQLite 的 datetime('now') 存 UTC 且不带时区标记，
@@ -7,6 +8,11 @@
  *
  * 用法：node scripts/verify-timezone.mjs [baseUrl] [cdpEndpoint]
  */
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 const CDP = process.argv[3] ?? process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222'
 
@@ -79,7 +85,7 @@ console.log('\n[2] 接口返回的时间基准')
 const login = await j('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const token = login.body.token
 const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }

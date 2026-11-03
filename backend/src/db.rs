@@ -33,30 +33,3 @@ pub async fn init_pool(config: &ResolvedConfig) -> anyhow::Result<SqlitePool> {
 
     Ok(pool)
 }
-
-/// 首次启动时确保存在一个管理员账号。
-///
-/// 默认口令仅用于初始化，登录后应立即修改。
-pub async fn ensure_bootstrap_admin(pool: &SqlitePool) -> anyhow::Result<()> {
-    let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-        .fetch_one(pool)
-        .await?;
-
-    if count > 0 {
-        return Ok(());
-    }
-
-    let hash = crate::auth::hash_password("admin")?;
-    sqlx::query(
-        "INSERT INTO users (username, display_name, password_hash, role, is_active)
-         VALUES (?1, ?2, ?3, 'admin', 1)",
-    )
-    .bind("admin")
-    .bind("系统管理员")
-    .bind(hash)
-    .execute(pool)
-    .await?;
-
-    tracing::warn!("已创建初始管理员账号 admin，初始口令 admin，请登录后立即修改");
-    Ok(())
-}

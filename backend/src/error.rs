@@ -25,6 +25,9 @@ pub enum AppError {
     #[error("状态冲突：{0}")]
     Conflict(String),
 
+    #[error("请求过于频繁：{0}")]
+    TooManyRequests(String),
+
     #[error("请求范围无效")]
     RangeNotSatisfiable,
 
@@ -47,6 +50,7 @@ impl AppError {
             AppError::Forbidden => "forbidden",
             AppError::NotFound(_) => "not_found",
             AppError::Conflict(_) => "conflict",
+            AppError::TooManyRequests(_) => "too_many_requests",
             AppError::RangeNotSatisfiable => "range_not_satisfiable",
             AppError::Database(_) => "database_error",
             AppError::Io(_) => "io_error",
@@ -62,6 +66,7 @@ impl AppError {
             AppError::Forbidden => StatusCode::FORBIDDEN,
             AppError::NotFound(_) => StatusCode::NOT_FOUND,
             AppError::Conflict(_) => StatusCode::CONFLICT,
+            AppError::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             AppError::RangeNotSatisfiable => StatusCode::RANGE_NOT_SATISFIABLE,
             AppError::Database(_) | AppError::Io(_) | AppError::Internal(_) => {
                 StatusCode::INTERNAL_SERVER_ERROR

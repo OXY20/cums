@@ -2,7 +2,9 @@
 
 use crate::config::ResolvedConfig;
 use crate::error::{AppError, AppResult};
-use argon2::password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::{
+    rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
+};
 use argon2::Argon2;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
@@ -61,7 +63,12 @@ pub fn verify_password(plain: &str, hash: &str) -> bool {
 }
 
 /// 为指定用户签发令牌。
-pub fn issue_token(config: &ResolvedConfig, user_id: i64, username: &str, role: Role) -> AppResult<String> {
+pub fn issue_token(
+    config: &ResolvedConfig,
+    user_id: i64,
+    username: &str,
+    role: Role,
+) -> AppResult<String> {
     let now = Utc::now();
     let claims = Claims {
         sub: user_id,
@@ -89,4 +96,63 @@ pub fn verify_token(config: &ResolvedConfig, token: &str) -> AppResult<Claims> {
     .map_err(|_| AppError::Unauthorized)?;
 
     Ok(data.claims)
+}
+
+/// 文件预览票的有效期（秒）。
+///
+/// 预览票只是为了让 `<img>` / `<video>` / `<iframe>` 这类
+/// **无法携带 Authorization 头**的标签能取到文件，
+/// 因此时效必须很短：页面打开后几分钟内够用，泄漏出去也很快失效。
+pub const PREVIEW_TICKET_TTL_SECS: i64 = 600;
+
+/// 文件预览票载荷。
+///
+/// 与登录令牌分开签发：即使预览票被复制到别处，也只能读
+/// `resource_id` 对应的那一个文件，且十分钟后自动失效，
+/// 不能当作登录令牌去调用其它管理接口。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreviewClaims {
+    /// 固定为 `preview`，用于和登录令牌区分用途
+    pub purpose: String,
+    /// 允许读取的资源 ID
+    pub res: i64,
+    /// 过期时间（Unix 秒）
+    pub exp: i64,
+}
+
+/// 为单个资源签发短时效预览票。
+pub fn issue_preview_ticket(config: &ResolvedConfig, resource_id: i64) -> AppResult<String> {
+    let claims = PreviewClaims {
+        purpose: "preview".to_string(),
+        res: resource_id,
+        exp: (Utc::now() + Duration::seconds(PREVIEW_TICKET_TTL_SECS)).timestamp(),
+    };
+
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(config.raw.auth.jwt_secret.as_bytes()),
+    )
+    .map_err(|e| AppError::Internal(format!("预览票签发失败：{e}")))
+}
+
+/// 校验预览票，并且要求它确实是签给 `resource_id` 的。
+pub fn verify_preview_ticket(
+    config: &ResolvedConfig,
+    resource_id: i64,
+    ticket: &str,
+) -> AppResult<()> {
+    let data = decode::<PreviewClaims>(
+        ticket,
+        &DecodingKey::from_secret(config.raw.auth.jwt_secret.as_bytes()),
+        &Validation::default(),
+    )
+    .map_err(|_| AppError::Forbidden)?;
+
+    let claims = data.claims;
+    if claims.purpose != "preview" || claims.res != resource_id {
+        return Err(AppError::Forbidden);
+    }
+
+    Ok(())
 }

@@ -11,13 +11,15 @@ use crate::models::{
 };
 use crate::routes::AuthUser;
 use crate::state::AppState;
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde::Deserialize;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        // 学生端：正在上课的班级名单（公开，用于「选择自己」）
+        .route("/api/student/class-roster", get(student_class_roster))
         // 班级名单
         .route(
             "/api/classes/{id}/students",
@@ -44,6 +46,48 @@ pub fn routes() -> Router<AppState> {
 // ---------------------------------------------------------------------------
 // 学生名单
 // ---------------------------------------------------------------------------
+
+/// 学生端：读取正在上课班级的名单。
+///
+/// AGENT-DECISION: 学生端未登录，而 `/api/classes/{id}/students` 需要认证，
+/// 因此单独开一个公开接口。限制条件是「该班级必须有正在进行的课堂」——
+/// 只有本机正在上课的班级才可读到名单，别的班级拿不到。
+async fn student_class_roster(
+    State(state): State<AppState>,
+    Query(query): Query<StudentRosterQuery>,
+) -> AppResult<Json<ListResponse<ClassStudent>>> {
+    let class_id = query.class_id;
+
+    // 确认该班级存在活动课堂，否则不泄露名单。
+    let active: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM classroom_sessions
+         WHERE class_id = ?1 AND status IN ('running', 'paused')",
+    )
+    .bind(class_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if active == 0 {
+        return Err(AppError::NotFound("当前没有正在进行的课堂".into()));
+    }
+
+    let rows = sqlx::query_as::<_, ClassStudent>(
+        "SELECT id, class_id, student_no, student_name, created_at
+         FROM class_students WHERE class_id = ?1
+         ORDER BY student_no ASC",
+    )
+    .bind(class_id)
+    .fetch_all(&state.db)
+    .await?;
+
+    Ok(Json(ListResponse::new(rows)))
+}
+
+/// 学生端名单查询参数。
+#[derive(Debug, Deserialize)]
+pub struct StudentRosterQuery {
+    pub class_id: i64,
+}
 
 /// 名单列表。
 async fn list_students(
@@ -375,73 +419,75 @@ async fn course_homework_overview(
 
     for (lesson_id, lesson_title, sort_order) in lessons {
         // 提交份数、去重人数、重复份数
-        let (submitted_count, submitter_count, duplicate_count): (i64, i64, i64) =
-            match query.class_id {
-                Some(class_id) => {
-                    let total: i64 = sqlx::query_scalar(
+        let (submitted_count, submitter_count, duplicate_count): (i64, i64, i64) = match query
+            .class_id
+        {
+            Some(class_id) => {
+                let total: i64 = sqlx::query_scalar(
                         "SELECT COUNT(*) FROM homework_submissions
-                     WHERE lesson_id = ?1 AND class_id = ?2",
+                     WHERE lesson_id = ?1 AND class_id = ?2 AND withdrawn_at IS NULL AND withdrawn_at IS NULL",
                     )
                     .bind(lesson_id)
                     .bind(class_id)
                     .fetch_one(&state.db)
                     .await?;
 
-                    // 去重人数：有学号按学号，没有学号按姓名
-                    let distinct: i64 = sqlx::query_scalar(
-                        "SELECT COUNT(DISTINCT CASE
+                // 去重人数：有学号按学号，没有学号按姓名
+                let distinct: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(DISTINCT CASE
                          WHEN student_no <> '' THEN 'no:' || student_no
                          ELSE 'name:' || TRIM(student_name)
                      END)
                      FROM homework_submissions
-                     WHERE lesson_id = ?1 AND class_id = ?2",
-                    )
-                    .bind(lesson_id)
-                    .bind(class_id)
-                    .fetch_one(&state.db)
-                    .await?;
+                     WHERE lesson_id = ?1 AND class_id = ?2 AND withdrawn_at IS NULL",
+                )
+                .bind(lesson_id)
+                .bind(class_id)
+                .fetch_one(&state.db)
+                .await?;
 
-                    let dup: i64 = sqlx::query_scalar(
+                let dup: i64 = sqlx::query_scalar(
                         "SELECT COUNT(*) FROM homework_submissions
-                     WHERE lesson_id = ?1 AND class_id = ?2 AND duplicate_flag = 1",
+                     WHERE lesson_id = ?1 AND class_id = ?2 AND withdrawn_at IS NULL AND withdrawn_at IS NULL AND duplicate_flag = 1",
                     )
                     .bind(lesson_id)
                     .bind(class_id)
                     .fetch_one(&state.db)
                     .await?;
 
-                    (total, distinct, dup)
-                }
-                None => {
-                    let total: i64 = sqlx::query_scalar(
-                        "SELECT COUNT(*) FROM homework_submissions WHERE lesson_id = ?1",
-                    )
-                    .bind(lesson_id)
-                    .fetch_one(&state.db)
-                    .await?;
+                (total, distinct, dup)
+            }
+            None => {
+                let total: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM homework_submissions
+                     WHERE lesson_id = ?1 AND withdrawn_at IS NULL",
+                )
+                .bind(lesson_id)
+                .fetch_one(&state.db)
+                .await?;
 
-                    let distinct: i64 = sqlx::query_scalar(
-                        "SELECT COUNT(DISTINCT CASE
+                let distinct: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(DISTINCT CASE
                          WHEN student_no <> '' THEN 'no:' || student_no
                          ELSE 'name:' || TRIM(student_name)
                      END)
-                     FROM homework_submissions WHERE lesson_id = ?1",
-                    )
-                    .bind(lesson_id)
-                    .fetch_one(&state.db)
-                    .await?;
+                     FROM homework_submissions WHERE lesson_id = ?1 AND withdrawn_at IS NULL",
+                )
+                .bind(lesson_id)
+                .fetch_one(&state.db)
+                .await?;
 
-                    let dup: i64 = sqlx::query_scalar(
-                        "SELECT COUNT(*) FROM homework_submissions
-                     WHERE lesson_id = ?1 AND duplicate_flag = 1",
-                    )
-                    .bind(lesson_id)
-                    .fetch_one(&state.db)
-                    .await?;
+                let dup: i64 = sqlx::query_scalar(
+                    "SELECT COUNT(*) FROM homework_submissions
+                     WHERE lesson_id = ?1 AND duplicate_flag = 1 AND withdrawn_at IS NULL",
+                )
+                .bind(lesson_id)
+                .fetch_one(&state.db)
+                .await?;
 
-                    (total, distinct, dup)
-                }
-            };
+                (total, distinct, dup)
+            }
+        };
 
         // 未交人数：名单人数 - 名单内已交人数（只算名单内的人）
         let missing_count = if roster_total > 0 {
@@ -510,6 +556,7 @@ pub(crate) async fn count_roster_submitters(
                SELECT 1 FROM homework_submissions h
                WHERE h.lesson_id = ?1
                  AND h.class_id = ?2
+                 AND h.withdrawn_at IS NULL
                  AND (
                      (h.student_no <> '' AND h.student_no = s.student_no)
                      OR (h.student_no = '' AND TRIM(h.student_name) = TRIM(s.student_name))
@@ -740,10 +787,11 @@ async fn lesson_review_board(
     .fetch_all(&state.db)
     .await?;
 
-    // 逐份补文件清单：教师批改时要直接看到内容，不能只给文件名
+    // 逐份补文件清单：教师批改时要直接看到内容，不能只给文件名。
+    // 审阅看板属于教师端，附带预览票，渲染标签才能取到文件。
     let mut items = Vec::with_capacity(rows.len());
     for row in rows {
-        items.push(crate::routes::submissions::build_detail_from(&state, row).await?);
+        items.push(crate::routes::submissions::build_detail_with_tickets(&state, row, true).await?);
     }
 
     let stats =

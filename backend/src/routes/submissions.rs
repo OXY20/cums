@@ -10,8 +10,9 @@
 
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    CreateSubmissionResponse, LessonSubmissionStatus, ListResponse, SubmissionDetailView,
-    SubmissionFileRow, SubmissionRow,
+    CreateSubmissionResponse, LessonSubmissionStatus, ListResponse, StudentAccessQuery,
+    SubmissionDetailView, SubmissionFileRow, SubmissionLimits, SubmissionRow,
+    WithdrawSubmissionRequest,
 };
 use crate::routes::resources::{create_staging_resource, infer_purpose, store_file_field};
 use crate::routes::AuthUser;
@@ -20,13 +21,15 @@ use axum::extract::{ConnectInfo, DefaultBodyLimit, Multipart, Path, Query, State
 use axum::http::HeaderMap;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use rand::RngCore;
 use serde::Deserialize;
 use std::net::SocketAddr;
 
-/// 单次提交允许的文件数量上限。
+/// 单次提交允许的文件数量上限的兜底值。
 ///
-/// 学生通常提交 1 个视频或若干张截图；上限过高会让一次请求占用过多连接时间。
-const MAX_FILES_PER_SUBMISSION: usize = 10;
+/// 实际上限取自 `limits.submission_max_files`，配置可调；
+/// 这里只作为配置缺省时的默认值，与实际运行时上限保持一致。
+const DEFAULT_MAX_FILES_PER_SUBMISSION: usize = 10;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -36,7 +39,15 @@ pub fn routes() -> Router<AppState> {
             post(create_submission).layer(DefaultBodyLimit::disable()),
         )
         .route("/api/student/submissions/status", get(lesson_status))
-        .route("/api/student/submissions/{id}", get(get_public_submission))
+        // 静态段优先于 `{id}`：学生端撤回与回读都挂在这两个前缀下
+        .route(
+            "/api/student/submissions/{id}",
+            get(get_public_submission).delete(withdraw_submission),
+        )
+        .route(
+            "/api/student/submissions/{id}/withdraw",
+            post(withdraw_submission_post),
+        )
         // 教师端：需要登录
         .route("/api/admin/submissions", get(list_submissions))
         // 批量路由必须能被静态匹配优先命中，避免被 `{id}` 吞掉
@@ -76,12 +87,13 @@ async fn lesson_status(
     headers: HeaderMap,
     Query(query): Query<StatusQuery>,
 ) -> AppResult<Json<LessonSubmissionStatus>> {
-    // 本班该课时提交总数：仅作为背景数字，不含姓名
+    // 本班该课时提交总数：仅作为背景数字，不含姓名。
+    // 学生已撤回的不计入，否则「本班已有 N 份」会虚高。
     let class_total: i64 = match query.class_id {
         Some(class_id) => {
             sqlx::query_scalar(
                 "SELECT COUNT(*) FROM homework_submissions
-             WHERE lesson_id = ?1 AND class_id = ?2",
+             WHERE lesson_id = ?1 AND class_id = ?2 AND withdrawn_at IS NULL",
             )
             .bind(query.lesson_id)
             .bind(class_id)
@@ -89,10 +101,13 @@ async fn lesson_status(
             .await?
         }
         None => {
-            sqlx::query_scalar("SELECT COUNT(*) FROM homework_submissions WHERE lesson_id = ?1")
-                .bind(query.lesson_id)
-                .fetch_one(&state.db)
-                .await?
+            sqlx::query_scalar(
+                "SELECT COUNT(*) FROM homework_submissions
+                 WHERE lesson_id = ?1 AND withdrawn_at IS NULL",
+            )
+            .bind(query.lesson_id)
+            .fetch_one(&state.db)
+            .await?
         }
     };
 
@@ -110,7 +125,22 @@ async fn lesson_status(
         class_id: query.class_id,
         class_total,
         device,
+        limits: current_limits(&state),
     }))
+}
+
+/// 当前服务端生效的提交限制，下发给前端做同等校验。
+fn current_limits(state: &AppState) -> SubmissionLimits {
+    SubmissionLimits {
+        max_files: state
+            .config
+            .raw
+            .limits
+            .submission_max_files
+            .clamp(1, DEFAULT_MAX_FILES_PER_SUBMISSION.max(50)),
+        max_file_bytes: state.config.raw.storage.max_file_bytes,
+        max_total_bytes: state.config.raw.limits.submission_max_total_bytes,
+    }
 }
 
 /// 查询当前设备在某课时的提交情况。
@@ -128,18 +158,21 @@ async fn fetch_device_submission(
     let device_id = device_id.map(str::trim).filter(|text| !text.is_empty());
 
     // 条件按是否有 device_id 分两种，参数全部走 bind 绑定。
+    // 已撤回的记录不计入「本设备已提交」，否则学生撤回后重开会一直看到旧提醒。
     let (count_sql, latest_tail) = if device_id.is_some() {
         (
             "SELECT COUNT(*) FROM homework_submissions
-             WHERE lesson_id = ?1 AND client_ip = ?2 AND device_id = ?3",
+             WHERE lesson_id = ?1 AND client_ip = ?2 AND device_id = ?3
+               AND withdrawn_at IS NULL",
             "WHERE s.lesson_id = ?1 AND s.client_ip = ?2 AND s.device_id = ?3
+               AND s.withdrawn_at IS NULL
              ORDER BY s.created_at DESC, s.id DESC LIMIT 1",
         )
     } else {
         (
             "SELECT COUNT(*) FROM homework_submissions
-             WHERE lesson_id = ?1 AND client_ip = ?2",
-            "WHERE s.lesson_id = ?1 AND s.client_ip = ?2
+             WHERE lesson_id = ?1 AND client_ip = ?2 AND withdrawn_at IS NULL",
+            "WHERE s.lesson_id = ?1 AND s.client_ip = ?2 AND s.withdrawn_at IS NULL
              ORDER BY s.created_at DESC, s.id DESC LIMIT 1",
         )
     };
@@ -181,6 +214,12 @@ pub struct ListQuery {
     pub duplicate_only: bool,
     /// 按审阅标签筛选；`unreviewed` 表示「尚未评价」
     pub review_label: Option<String>,
+    /// 是否把学生已撤回的记录也列出来
+    ///
+    /// 默认排除：撤回意味着学生不该再被要求交这份作业，
+    /// 混在列表里会让教师误以为还有待批的作业。
+    #[serde(default)]
+    pub include_withdrawn: bool,
     #[serde(default = "default_limit")]
     pub limit: i64,
 }
@@ -236,8 +275,20 @@ async fn list_submissions(
         format!("WHERE {}", conditions.join(" AND "))
     };
 
+    // 已撤回的提交默认不进列表：教师关心的是「手上有哪些作业要批」。
+    // 需要核对撤回记录时走 include_withdrawn=true。
+    let withdrawn_clause = if query.include_withdrawn {
+        ""
+    } else {
+        if where_clause.is_empty() {
+            "WHERE s.withdrawn_at IS NULL"
+        } else {
+            "AND s.withdrawn_at IS NULL"
+        }
+    };
+
     let sql = submission_select_sql(&format!(
-        "{where_clause} ORDER BY s.created_at DESC, s.id DESC LIMIT ?"
+        "{where_clause} {withdrawn_clause} ORDER BY s.created_at DESC, s.id DESC LIMIT ?"
     ));
 
     let mut statement = sqlx::query_as::<_, SubmissionRow>(&sql);
@@ -268,18 +319,189 @@ async fn get_submission(
     _user: AuthUser,
     Path(id): Path<i64>,
 ) -> AppResult<Json<SubmissionDetailView>> {
-    build_detail(&state, id).await.map(Json)
+    let submission = sqlx::query_as::<_, SubmissionRow>(&submission_select_sql("WHERE s.id = ?1"))
+        .bind(id)
+        .fetch_optional(&state.db)
+        .await?
+        .ok_or_else(|| AppError::NotFound(format!("提交 {id}")))?;
+
+    // 教师端带预览票：预览标签无法携带 Authorization 头
+    build_detail_with_tickets(&state, submission, true)
+        .await
+        .map(Json)
 }
 
-/// 学生端：上传成功后回读自己的提交，用于弹出预览窗口。
+/// 学生端：回读自己的提交，用于上传后弹窗预览。
 ///
-/// 只返回文件清单与元数据，不校验身份；提交 ID 不可枚举出他人隐私，
-/// 因为返回内容仅包含本人上传的文件名与大小。
+/// 必须带提交时下发的 `access_token`：学生端没有账号，
+/// 若只按自增 ID 取数据，任何一串递增数字都能读到别人的
+/// 提交人姓名、来源 IP 与文件清单。
 async fn get_public_submission(
     State(state): State<AppState>,
     Path(id): Path<i64>,
+    Query(query): Query<StudentAccessQuery>,
 ) -> AppResult<Json<SubmissionDetailView>> {
+    let token = query
+        .access_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .ok_or(AppError::Forbidden)?;
+
+    ensure_submission_token(&state, id, token).await?;
+
+    // 撤回后不再对外可读，与文件下载（403）保持同一口径。
+    // 记录本身仍保留，教师端可通过 include_withdrawn=true 核对。
+    let withdrawn: Option<Option<String>> =
+        sqlx::query_scalar("SELECT withdrawn_at FROM homework_submissions WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    if withdrawn.flatten().is_some() {
+        return Err(AppError::Forbidden);
+    }
+
     build_detail(&state, id).await.map(Json)
+}
+
+/// 学生端：撤回提交（DELETE 形式，凭证走 query）。
+async fn withdraw_submission(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Query(query): Query<StudentAccessQuery>,
+) -> AppResult<Json<serde_json::Value>> {
+    let token = query.access_token.unwrap_or_default();
+    withdraw_with_token(&state, id, token.trim()).await
+}
+
+/// 学生端：撤回提交（POST 形式，凭证走请求体）。
+///
+/// 与 DELETE 形式并存，是因为部分浏览器与代理会剥掉
+/// DELETE 请求的 query 参数，POST + JSON 更稳妥。
+async fn withdraw_submission_post(
+    State(state): State<AppState>,
+    Path(id): Path<i64>,
+    Json(payload): Json<WithdrawSubmissionRequest>,
+) -> AppResult<Json<serde_json::Value>> {
+    withdraw_with_token(&state, id, payload.access_token.trim()).await
+}
+
+/// 校验提交凭证；不匹配一律 403，不区分「不存在」与「凭证错误」。
+///
+/// 区分两者会让攻击者用状态码差异判断某个 ID 是否真实存在。
+async fn ensure_submission_token(
+    state: &AppState,
+    submission_id: i64,
+    provided: &str,
+) -> AppResult<()> {
+    if provided.is_empty() {
+        return Err(AppError::Forbidden);
+    }
+
+    let expected: Option<String> =
+        sqlx::query_scalar("SELECT access_token FROM homework_submissions WHERE id = ?1")
+            .bind(submission_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    // 常量时间比较：凭证是随机串，普通比较的时序差异足以被逐字节试探
+    match expected {
+        Some(expected) if constant_time_eq(expected.as_bytes(), provided.as_bytes()) => Ok(()),
+        _ => Err(AppError::Forbidden),
+    }
+}
+
+/// 定长时间字符串比较，长度不同直接判不等。
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+
+    let mut diff = 0u8;
+    for (a, b) in left.iter().zip(right.iter()) {
+        diff |= a ^ b;
+    }
+    diff == 0
+}
+
+/// 撤回实现：校验凭证 → 校验时间窗 → 置撤回时间 → 文件资源降级。
+async fn withdraw_with_token(
+    state: &AppState,
+    submission_id: i64,
+    token: &str,
+) -> AppResult<Json<serde_json::Value>> {
+    ensure_submission_token(state, submission_id, token).await?;
+
+    let row: Option<(Option<String>, String)> =
+        sqlx::query_as("SELECT withdrawn_at, created_at FROM homework_submissions WHERE id = ?1")
+            .bind(submission_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    let (withdrawn_at, created_at) =
+        row.ok_or_else(|| AppError::NotFound(format!("提交 {submission_id}")))?;
+
+    if withdrawn_at.is_some() {
+        return Err(AppError::Conflict("该提交已撤回".into()));
+    }
+
+    let window = state.config.raw.limits.submission_withdraw_secs;
+    if window == 0 {
+        return Err(AppError::Forbidden);
+    }
+
+    // 时间比较放到 SQLite 里做：created_at 是 UTC 无标记字符串，
+    // 用 datetime('now', '-N seconds') 与它直接比较最稳妥，不受时区影响。
+    let withdrawable: i64 = sqlx::query_scalar(
+        "SELECT CASE WHEN created_at >= datetime('now', ?1) THEN 1 ELSE 0 END
+         FROM homework_submissions WHERE id = ?2",
+    )
+    .bind(format!("-{} seconds", window))
+    .bind(submission_id)
+    .fetch_one(&state.db)
+    .await?;
+
+    if withdrawable == 0 {
+        return Err(AppError::Conflict(format!(
+            "已超过可撤回时限（提交后 {} 小时内）",
+            window / 3600
+        )));
+    }
+
+    let mut tx = state.db.begin().await?;
+
+    sqlx::query("UPDATE homework_submissions SET withdrawn_at = datetime('now') WHERE id = ?1")
+        .bind(submission_id)
+        .execute(&mut *tx)
+        .await?;
+
+    // 文件资源降级为 staging：仍留在磁盘供教师核对，
+    // 但 /files 的 ready 校验会让匿名下载直接失败。
+    sqlx::query(
+        "UPDATE resources SET status = 'staging', updated_at = datetime('now')
+         WHERE id IN (
+             SELECT resource_id FROM homework_submission_files WHERE submission_id = ?1
+         )",
+    )
+    .bind(submission_id)
+    .execute(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    crate::routes::auth::audit(
+        state,
+        None,
+        "submission.withdraw",
+        "submission",
+        &submission_id.to_string(),
+    )
+    .await;
+
+    tracing::info!(submission_id, created_at = %created_at, "学生撤回作业提交");
+
+    Ok(Json(serde_json::json!({ "ok": true })))
 }
 
 /// 审核请求。
@@ -577,13 +799,26 @@ async fn apply_review(
 /// - `class_id`：选填，缺省时从当前课堂推断；
 /// - `student_no`：选填，学号；从班级名单选择自己时带上，便于统计「谁没交」；
 /// - `device_id`：选填，前端生成的设备标识，用于判断「本设备是否已提交」；
-/// - `file`：可重复，一次最多 [`MAX_FILES_PER_SUBMISSION`] 个。
+/// - `file`：可重复，数量上限取自配置。
+///
+/// 失败路径的处理原则：**任何一步失败都要把已落盘的文件清干净**。
+/// 早期版本只在「单个文件落盘失败」时清理，像「姓名没填」「课时不存在」
+/// 这类发生在全部文件之后的校验失败，会留下一批孤儿 staging 资源。
 async fn create_submission(
     State(state): State<AppState>,
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     mut multipart: Multipart,
 ) -> AppResult<Json<CreateSubmissionResponse>> {
+    // 限流放在最前面：被限流的请求不应有机会写磁盘。
+    let client_ip = resolve_client_ip(&headers, peer);
+    if let Some(wait) = state.try_acquire_submission_slot(&client_ip) {
+        return Err(AppError::TooManyRequests(format!(
+            "提交过于频繁，请 {wait} 秒后再试"
+        )));
+    }
+
+    let limits = current_limits(&state);
     let mut student_name: Option<String> = None;
     let mut student_no = String::new();
     let mut note = String::new();
@@ -591,6 +826,7 @@ async fn create_submission(
     let mut class_id: Option<i64> = None;
     let mut device_id = String::new();
     let mut files: Vec<crate::models::ResourceRow> = Vec::new();
+    let mut total_bytes: u64 = 0;
 
     // 逐字段读取：文本字段可能出现在文件之前或之后，因此先缓存文件名，
     // 真正落盘在 multipart 迭代过程中完成，避免把大文件读进内存。
@@ -644,9 +880,11 @@ async fn create_submission(
                 }
             }
             Some("file") => {
-                if files.len() >= MAX_FILES_PER_SUBMISSION {
+                if files.len() >= limits.max_files {
+                    discard_uploads(&state, &files).await;
                     return Err(AppError::BadRequest(format!(
-                        "一次最多提交 {MAX_FILES_PER_SUBMISSION} 个文件"
+                        "一次最多提交 {} 个文件",
+                        limits.max_files
                     )));
                 }
 
@@ -659,14 +897,24 @@ async fn create_submission(
                 let placeholder = create_staging_resource(&state, None, &placeholder_name).await?;
 
                 match store_file_field(&state, &placeholder, field).await {
-                    Ok(resource) => files.push(resource),
+                    Ok(resource) => {
+                        total_bytes = total_bytes.saturating_add(resource.size_bytes.max(0) as u64);
+                        files.push(resource);
+
+                        // 单个文件已在 store_file_field 内按 max_file_bytes 校验，
+                        // 这里补一道「合计大小」：一次交十个大文件会长时间占住连接。
+                        if limits.max_total_bytes > 0 && total_bytes > limits.max_total_bytes {
+                            discard_uploads(&state, &files).await;
+                            return Err(AppError::BadRequest(format!(
+                                "本次提交合计超出上限（最多 {} MiB）",
+                                limits.max_total_bytes / (1024 * 1024)
+                            )));
+                        }
+                    }
                     Err(err) => {
                         // 单个文件失败时清理已落盘的占位记录，避免脏数据。
-                        let _ = sqlx::query("DELETE FROM resources WHERE id = ?1")
-                            .bind(placeholder.id)
-                            .execute(&state.db)
-                            .await;
-                        cleanup_resources(&state, &files).await;
+                        crate::routes::resources::purge_resource(&state, &placeholder).await;
+                        discard_uploads(&state, &files).await;
                         return Err(err);
                     }
                 }
@@ -678,13 +926,61 @@ async fn create_submission(
         }
     }
 
+    // 从这里开始是「全部文件已落盘」之后的校验，任何失败都要丢弃已传内容。
+    let outcome = finalize_submission(
+        &state,
+        &headers,
+        &client_ip,
+        student_name.as_deref(),
+        &student_no,
+        &note,
+        lesson_id,
+        class_id,
+        &device_id,
+        &files,
+        total_bytes,
+    )
+    .await;
+
+    match outcome {
+        Ok(response) => Ok(Json(response)),
+        Err(err) => {
+            discard_uploads(&state, &files).await;
+            Err(err)
+        }
+    }
+}
+
+/// 落盘完成后的收尾：校验身份信息、确定班级、判定重复、在单事务内写库。
+///
+/// 拆成独立函数是为了让失败清理只有一处：只要它返回错误，
+/// 调用方就丢弃全部已落盘文件。
+#[allow(clippy::too_many_arguments)]
+async fn finalize_submission(
+    state: &AppState,
+    headers: &HeaderMap,
+    client_ip: &str,
+    student_name: Option<&str>,
+    student_no: &str,
+    note: &str,
+    lesson_id: Option<i64>,
+    requested_class_id: Option<i64>,
+    device_id: &str,
+    files: &[crate::models::ResourceRow],
+    total_bytes: u64,
+) -> AppResult<CreateSubmissionResponse> {
     let student_name = student_name
-        .map(|name| name.trim().to_string())
+        .map(str::trim)
         .filter(|name| !name.is_empty())
         .ok_or_else(|| AppError::BadRequest("请填写提交人姓名".into()))?;
 
     if student_name.chars().count() > 40 {
         return Err(AppError::BadRequest("姓名过长（最多 40 个字符）".into()));
+    }
+
+    // 控制字符会污染日志与导出文件，也常被用来伪造显示
+    if student_name.chars().any(char::is_control) {
+        return Err(AppError::BadRequest("姓名包含不可见字符".into()));
     }
 
     let lesson_id = lesson_id.ok_or_else(|| AppError::BadRequest("缺少 lesson_id".into()))?;
@@ -694,18 +990,68 @@ async fn create_submission(
     }
 
     // 课时必须存在，避免产生指向不存在课时的提交。
-    let lesson = crate::routes::lessons::fetch_lesson(&state, lesson_id).await?;
+    let lesson = crate::routes::lessons::fetch_lesson(state, lesson_id).await?;
 
-    // 未指定班级时从当前活动课堂推断，保证「本班已提交」判断尽量准确。
-    let (class_id, session_id) = match class_id {
-        Some(class_id) => (Some(class_id), None),
-        None => match current_session_for_lesson(&state, lesson_id).await? {
-            Some((class_id, session_id)) => (Some(class_id), Some(session_id)),
+    // 作业只能交到已发布课程的课时上。草稿课程在学生端不可见，
+    // 但直链仍可能被构造，因此以课程状态为准而不是信任来源页面。
+    let course_status: Option<String> = sqlx::query_scalar(
+        "SELECT c.status FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ?1",
+    )
+    .bind(lesson_id)
+    .fetch_optional(&state.db)
+    .await?;
+
+    if course_status.as_deref() != Some("published") {
+        return Err(AppError::NotFound(format!("课时 {lesson_id}")));
+    }
+
+    // 班级与服务场次一律以服务端状态为准。
+    //
+    // 学生端填的 class_id 不可信：选错班、旧缓存、甚至手工构造请求都会让
+    // 统计落到别的班级。这里优先取该课时正在进行的课堂，没有活动课堂时
+    // 才退回请求值（同时校验该班级真实存在）。
+    let (class_id, session_id) = match current_session_for_lesson(state, lesson_id).await? {
+        Some((session_class_id, session_id)) => (Some(session_class_id), Some(session_id)),
+        None => match requested_class_id {
+            Some(class_id) => {
+                crate::routes::classes::fetch_class(state, class_id).await?;
+                (Some(class_id), None)
+            }
             None => (None, None),
         },
     };
 
-    let client_ip = resolve_client_ip(&headers, peer);
+    // 学号必须落在本班名单里，姓名以名单为准。
+    //
+    // 否则学生随手填一个别人的学号，就能把自己的提交算在别人头上，
+    // 或者把「未交」统计彻底打乱。学号不在名单内时丢弃学号，
+    // 退回按姓名匹配，仍然保存提交（不因为名单没导入而阻断交作业）。
+    let mut student_no = student_no.trim().to_string();
+    let mut effective_name = student_name.to_string();
+    if !student_no.is_empty() {
+        match class_id {
+            Some(class_id) => {
+                let roster_name: Option<String> = sqlx::query_scalar(
+                    "SELECT student_name FROM class_students
+                     WHERE class_id = ?1 AND student_no = ?2",
+                )
+                .bind(class_id)
+                .bind(&student_no)
+                .fetch_optional(&state.db)
+                .await?;
+
+                match roster_name {
+                    Some(roster_name) => effective_name = roster_name,
+                    None => {
+                        tracing::warn!(lesson_id, %student_no, "学号不在班级名单内，已忽略");
+                        student_no.clear();
+                    }
+                }
+            }
+            None => student_no.clear(),
+        }
+    }
+
     let user_agent = headers
         .get(axum::http::header::USER_AGENT)
         .and_then(|value| value.to_str().ok())
@@ -714,23 +1060,15 @@ async fn create_submission(
         .take(512)
         .collect::<String>();
 
-    // 重复检测。
+    // 重复检测：只认「同一个学生」与「同一台设备」两种情况。
     //
-    // 判定口径分两种，取决于这次提交有没有带学号：
-    //
-    // 1. **带学号**（从班级名单选了自己）：按「同一个学生」判断。
-    //    张三交过、李四再交属于正常情况，不该标重复；
-    //    只有同一学号重复提交才标记，用于提醒「你可能交重了」。
-    //
-    // 2. **不带学号**（手填姓名）：只能退回按设备/班级判断。
-    //    此时无法确认是不是同一个人，保守地给出提醒，
-    //    但仍保存记录，由教师核对。
-    //
-    // 提示语一律不指名其他同学，避免把班里信息暴露给学生。
-    let same_student_previous: Option<(i64, String)> = if !student_no.is_empty() {
-        sqlx::query_as::<_, (i64, String)>(
-            "SELECT id, student_name FROM homework_submissions
-             WHERE lesson_id = ?1 AND student_no = ?2
+    // 早期版本还有一条「本班已有其他人提交就标重复」的分支，
+    // 它会把一个班除了第一个交的人之外全部标成重复，标记因此失去意义，
+    // 教师端筛选也就用不上。去掉后 duplicate 的含义收敛为真正的可疑情形。
+    let same_student_previous: Option<i64> = if !student_no.is_empty() {
+        sqlx::query_scalar(
+            "SELECT id FROM homework_submissions
+             WHERE lesson_id = ?1 AND student_no = ?2 AND withdrawn_at IS NULL
              ORDER BY created_at DESC, id DESC LIMIT 1",
         )
         .bind(lesson_id)
@@ -741,98 +1079,83 @@ async fn create_submission(
         None
     };
 
-    let device_previous: Option<(i64, String)> = if student_no.is_empty() {
+    let device_previous: Option<i64> = if student_no.is_empty() {
         let sql = if device_id.is_empty() {
-            "SELECT id, student_name FROM homework_submissions
-             WHERE lesson_id = ?1 AND client_ip = ?2
+            "SELECT id FROM homework_submissions
+             WHERE lesson_id = ?1 AND client_ip = ?2 AND withdrawn_at IS NULL
              ORDER BY created_at DESC, id DESC LIMIT 1"
         } else {
-            "SELECT id, student_name FROM homework_submissions
+            "SELECT id FROM homework_submissions
              WHERE lesson_id = ?1 AND client_ip = ?2 AND device_id = ?3
+               AND withdrawn_at IS NULL
              ORDER BY created_at DESC, id DESC LIMIT 1"
         };
-        let mut query = sqlx::query_as::<_, (i64, String)>(sql)
+        let mut query = sqlx::query_scalar::<_, i64>(sql)
             .bind(lesson_id)
-            .bind(&client_ip);
+            .bind(client_ip);
         if !device_id.is_empty() {
-            query = query.bind(&device_id);
+            query = query.bind(device_id);
         }
         query.fetch_optional(&state.db).await?
     } else {
         None
     };
 
-    // 班级级「已有人提交」只在完全无法识别身份时才用于提醒
-    let class_existing = if student_no.is_empty() && device_previous.is_none() {
-        match class_id {
-            Some(class_id) => {
-                sqlx::query_as::<_, (i64, String)>(
-                    "SELECT id, student_name FROM homework_submissions
-                     WHERE lesson_id = ?1 AND class_id = ?2
-                     ORDER BY created_at ASC, id ASC LIMIT 1",
-                )
-                .bind(lesson_id)
-                .bind(class_id)
-                .fetch_optional(&state.db)
-                .await?
-            }
-            None => {
-                sqlx::query_as::<_, (i64, String)>(
-                    "SELECT id, student_name FROM homework_submissions
-                     WHERE lesson_id = ?1 AND class_id IS NULL
-                     ORDER BY created_at ASC, id ASC LIMIT 1",
-                )
-                .bind(lesson_id)
-                .fetch_optional(&state.db)
-                .await?
-            }
-        }
+    let (duplicate_flag, duplicate_of, duplicate_warning) = if let Some(id) = same_student_previous
+    {
+        (
+            1,
+            Some(id),
+            Some("你已提交过本节课作业，本次为再次提交，两次记录都会保留".to_string()),
+        )
+    } else if let Some(id) = device_previous {
+        (
+            1,
+            Some(id),
+            Some("当前设备已提交过本节课作业，本次提交已记录并标记为重复".to_string()),
+        )
+    } else {
+        (0, None, None)
+    };
+
+    let access_token = generate_access_token();
+    let withdraw_secs = state.config.raw.limits.submission_withdraw_secs;
+    let withdraw_deadline = if withdraw_secs > 0 {
+        sqlx::query_scalar::<_, String>("SELECT datetime('now', ?1)")
+            .bind(format!("+{} seconds", withdraw_secs))
+            .fetch_one(&state.db)
+            .await
+            .ok()
     } else {
         None
     };
 
-    let (duplicate_flag, duplicate_of, duplicate_warning) =
-        if let Some((id, _)) = &same_student_previous {
-            (
-                1,
-                Some(*id),
-                Some("你已提交过本节课作业，本次为再次提交，两次记录都会保留".to_string()),
-            )
-        } else if let Some((id, _)) = &device_previous {
-            (
-                1,
-                Some(*id),
-                Some("当前设备已提交过本节课作业，本次提交已记录并标记为重复".to_string()),
-            )
-        } else if class_existing.is_some() {
-            (
-                1,
-                class_existing.as_ref().map(|(id, _)| *id),
-                Some("本节课本班已有其他提交，本次提交已记录并标记为重复".to_string()),
-            )
-        } else {
-            (0, None, None)
-        };
+    // 主表与文件关联表必须同事务：只写一半会留下「有提交没文件」
+    // 或「有文件挂不上提交」的脏数据，而两种脏数据都无法靠重试修复。
+    let mut tx = state.db.begin().await?;
 
     let submission_id: i64 = sqlx::query_scalar(
         "INSERT INTO homework_submissions
             (course_id, lesson_id, class_id, session_id, student_name, student_no,
-             client_ip, user_agent, device_id, note, duplicate_flag, duplicate_of)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12) RETURNING id",
+             client_ip, user_agent, device_id, note, duplicate_flag, duplicate_of,
+             access_token, total_bytes)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14) RETURNING id",
     )
     .bind(lesson.course_id)
     .bind(lesson_id)
     .bind(class_id)
     .bind(session_id)
-    .bind(&student_name)
+    .bind(&effective_name)
     .bind(&student_no)
-    .bind(&client_ip)
+    .bind(client_ip)
     .bind(&user_agent)
-    .bind(&device_id)
-    .bind(note.trim())
+    .bind(device_id)
+    .bind(truncate_chars(note.trim(), 500))
     .bind(duplicate_flag)
     .bind(duplicate_of)
-    .fetch_one(&state.db)
+    .bind(&access_token)
+    .bind(total_bytes as i64)
+    .fetch_one(&mut *tx)
     .await?;
 
     for (index, resource) in files.iter().enumerate() {
@@ -843,12 +1166,14 @@ async fn create_submission(
         .bind(submission_id)
         .bind(resource.id)
         .bind(index as i64)
-        .execute(&state.db)
+        .execute(&mut *tx)
         .await?;
     }
 
+    tx.commit().await?;
+
     crate::routes::auth::audit(
-        &state,
+        state,
         None,
         "submission.create",
         "submission",
@@ -862,16 +1187,46 @@ async fn create_submission(
         ?class_id,
         client_ip,
         files = files.len(),
+        total_bytes,
         duplicate = duplicate_flag == 1,
         "学生提交作业"
     );
 
-    let detail = build_detail(&state, submission_id).await?;
+    let detail = build_detail(state, submission_id).await?;
 
-    Ok(Json(CreateSubmissionResponse {
+    Ok(CreateSubmissionResponse {
         submission: detail,
         duplicate_warning,
-    }))
+        access_token,
+        withdraw_deadline,
+    })
+}
+
+/// 生成提交凭证：32 字节随机数的十六进制表示。
+///
+/// 用 CSPRNG 而不是时间戳或自增数，凭证被猜中即等于提交被他人接管。
+fn generate_access_token() -> String {
+    let mut buffer = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut buffer);
+    hex::encode(buffer)
+}
+
+/// 按字符数截断，避免把多字节字符切断。
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    text.chars().take(max_chars).collect()
+}
+
+/// 丢弃本次已落盘但不会入库的文件资源。
+///
+/// 同时清理 objects 与 staging 两处文件并删除资源行，
+/// 保证「提交失败」不会在磁盘上留下无法追踪的垃圾。
+async fn discard_uploads(state: &AppState, files: &[crate::models::ResourceRow]) {
+    for resource in files {
+        crate::routes::resources::purge_resource(state, resource).await;
+    }
 }
 
 /// 读取文本字段内容，限制长度避免异常请求占用内存。
@@ -946,27 +1301,13 @@ fn resolve_client_ip(headers: &HeaderMap, peer: SocketAddr) -> String {
     peer_ip.to_string()
 }
 
-/// 清理已落盘但最终未写入提交的资源，避免残留孤儿文件。
-async fn cleanup_resources(state: &AppState, resources: &[crate::models::ResourceRow]) {
-    for resource in resources {
-        if let Ok(path) =
-            crate::routes::resources::safe_join(&state.config.objects_dir, &resource.storage_key)
-        {
-            let _ = tokio::fs::remove_file(&path).await;
-        }
-        let _ = sqlx::query("DELETE FROM resources WHERE id = ?1")
-            .bind(resource.id)
-            .execute(&state.db)
-            .await;
-    }
-}
-
 /// 提交列表与详情共用的 SELECT，附带课程/课时/班级标题与文件数。
 pub(crate) fn submission_select_sql(tail: &str) -> String {
     format!(
         "SELECT s.id, s.course_id, s.lesson_id, s.class_id, s.session_id, s.student_name,
                 s.student_no, s.client_ip, s.user_agent, s.device_id, s.note,
                 s.duplicate_flag, s.duplicate_of, s.status, s.created_at,
+                s.total_bytes, s.withdrawn_at,
                 s.review_label, s.review_score, s.review_comment, s.reviewed_at,
                 c.title AS course_title,
                 l.title AS lesson_title,
@@ -997,6 +1338,19 @@ pub(crate) async fn build_detail_from(
     state: &AppState,
     submission: SubmissionRow,
 ) -> AppResult<SubmissionDetailView> {
+    build_detail_with_tickets(state, submission, false).await
+}
+
+/// 组装详情，可选择附带教师端预览票。
+///
+/// 预览票只发给已认证的教师端：`<img>` / `<video>` / `<iframe>`
+/// 不会带 `Authorization` 头，没有票的话预览必然 403。
+/// 学生端回读走 `submission_token`，不需要也不应该拿到票。
+pub(crate) async fn build_detail_with_tickets(
+    state: &AppState,
+    submission: SubmissionRow,
+    with_preview_tickets: bool,
+) -> AppResult<SubmissionDetailView> {
     let id = submission.id;
 
     let files = sqlx::query_as::<_, SubmissionFileRow>(
@@ -1016,6 +1370,10 @@ pub(crate) async fn build_detail_from(
         .into_iter()
         .map(|mut row| {
             row.purpose = infer_purpose(&row.mime_type, &row.name).to_string();
+            if with_preview_tickets {
+                row.preview_ticket =
+                    crate::auth::issue_preview_ticket(&state.config, row.resource_id).ok();
+            }
             row
         })
         .collect();
@@ -1050,7 +1408,8 @@ pub(crate) async fn collect_review_stats(
 ) -> AppResult<crate::models::ReviewStats> {
     let rows: Vec<(String, Option<f64>)> = sqlx::query_as(
         "SELECT review_label, review_score FROM homework_submissions
-         WHERE lesson_id = ?1 AND (?2 IS NULL OR class_id = ?2)",
+         WHERE lesson_id = ?1 AND (?2 IS NULL OR class_id = ?2)
+           AND withdrawn_at IS NULL",
     )
     .bind(lesson_id)
     .bind(class_id)

@@ -3,7 +3,7 @@
  * 应用外壳：顶部导航 + 路由出口。
  * 导航逻辑依据建设方案：未登录仅显示 [登录]；已登录显示 [全部课程] [我的课程] [用户]。
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, shallowRef, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { api } from '@/api'
@@ -18,7 +18,20 @@ const showAdminEntry = computed(() => auth.isLoggedIn)
 
 const isAdminArea = computed(() => route.path.startsWith('/admin'))
 
+/**
+ * 界面标注开关（仅开发模式）。
+ *
+ * AGENT-DECISION: 用动态 import 加载，生产构建时 import.meta.env.DEV 为 false，
+ * 整个分支被消除，标注组件与标注集都不会进入构建产物。
+ */
+const isDev = import.meta.env.DEV
+const devAnnotation = shallowRef<Component | null>(null)
+
 onMounted(async () => {
+  if (isDev) {
+    const mod = await import('@/components/DevAnnotation.vue')
+    devAnnotation.value = mod.default
+  }
   await auth.restore()
   try {
     // 公开接口，学生端未登录也能展示版本号。
@@ -48,9 +61,9 @@ function handleLogout() {
 
         <nav class="app-header__nav">
           <RouterLink to="/student" class="nav-link">全部课程</RouterLink>
+          <RouterLink to="/student/downloads" class="nav-link">下载中心</RouterLink>
 
           <template v-if="auth.isLoggedIn">
-            <RouterLink to="/student/downloads" class="nav-link">下载中心</RouterLink>
             <RouterLink v-if="showAdminEntry" to="/admin/console" class="nav-link">教师端</RouterLink>
             <el-dropdown>
               <span class="nav-user">
@@ -67,14 +80,16 @@ function handleLogout() {
               </span>
               <template #dropdown>
                 <el-dropdown-menu>
-                  <el-dropdown-item @click="router.push('/student/downloads')">下载中心</el-dropdown-item>
-                  <el-dropdown-item divided @click="handleLogout">退出登录</el-dropdown-item>
+                  <el-dropdown-item @click="handleLogout">退出登录</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
           </template>
 
           <RouterLink v-else to="/login" class="nav-link nav-link--primary">登录</RouterLink>
+
+          <!-- 开发模式下的界面标注开关 -->
+          <component :is="devAnnotation" v-if="devAnnotation" />
         </nav>
       </div>
     </header>
@@ -105,7 +120,7 @@ function handleLogout() {
 }
 
 .app-header__inner {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 0 20px;
   height: 56px;

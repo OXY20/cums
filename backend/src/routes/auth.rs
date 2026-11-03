@@ -2,9 +2,7 @@
 
 use crate::auth::{hash_password, issue_token, verify_password, Role};
 use crate::error::{AppError, AppResult};
-use crate::models::{
-    ChangePasswordRequest, LoginRequest, LoginResponse, UserInfo, UserRow,
-};
+use crate::models::{ChangePasswordRequest, LoginRequest, LoginResponse, UserInfo, UserRow};
 use crate::routes::AuthUser;
 use crate::state::AppState;
 use axum::extract::State;
@@ -47,7 +45,14 @@ async fn login(
     let role = Role::parse(&user.role)?;
     let token = issue_token(&state.config, user.id, &user.username, role)?;
 
-    audit(&state, Some(user.id), "auth.login", "user", &user.id.to_string()).await;
+    audit(
+        &state,
+        Some(user.id),
+        "auth.login",
+        "user",
+        &user.id.to_string(),
+    )
+    .await;
 
     Ok(Json(LoginResponse {
         token,
@@ -99,8 +104,8 @@ async fn change_password(
         return Err(AppError::BadRequest("原口令不正确".into()));
     }
 
-    let new_hash = hash_password(&payload.new_password)
-        .map_err(|e| AppError::Internal(e.to_string()))?;
+    let new_hash =
+        hash_password(&payload.new_password).map_err(|e| AppError::Internal(e.to_string()))?;
 
     sqlx::query("UPDATE users SET password_hash = ?1, updated_at = datetime('now') WHERE id = ?2")
         .bind(new_hash)
@@ -108,7 +113,14 @@ async fn change_password(
         .execute(&state.db)
         .await?;
 
-    audit(&state, Some(user.id()), "auth.change_password", "user", &user.id().to_string()).await;
+    audit(
+        &state,
+        Some(user.id()),
+        "auth.change_password",
+        "user",
+        &user.id().to_string(),
+    )
+    .await;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }

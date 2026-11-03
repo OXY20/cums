@@ -17,10 +17,7 @@ pub fn routes() -> Router<AppState> {
 }
 
 /// 服务健康状态：低开销查询，不写数据库。
-async fn health(
-    State(state): State<AppState>,
-    user: AuthUser,
-) -> AppResult<Json<HealthResponse>> {
+async fn health(State(state): State<AppState>, user: AuthUser) -> AppResult<Json<HealthResponse>> {
     user.require_admin()?;
 
     let database = if sqlx::query_scalar::<_, i64>("SELECT 1")

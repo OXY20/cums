@@ -21,6 +21,14 @@ body,
   margin: 0;
 }
 
+/*
+ * 统一预留滚动条位置：否则页面内容长短不一时，居中内容会因滚动条出现与否
+ * 产生十几像素的横向错位，各页面的有效宽度就对不齐了。
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   background: var(--page-bg);
   color: var(--text-main);
@@ -32,7 +40,7 @@ body {
 
 /* 布局 */
 .page {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 24px 20px 48px;
 }
@@ -490,7 +498,8 @@ body {
     width: 100%;
   }
 
+  /* 左右内边距与教师端 .admin-layout 保持一致，窄屏下有效宽度才对齐 */
   .page {
-    padding: 16px 14px 40px;
+    padding: 16px 20px 40px;
   }
 }

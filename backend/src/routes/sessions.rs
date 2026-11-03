@@ -2,7 +2,7 @@
 
 use crate::error::{AppError, AppResult};
 use crate::models::{CreateSessionRequest, CurrentSessionView, ListResponse, SessionRow};
-use crate::routes::AuthUser;
+use crate::routes::{ensure_lesson_published, AuthUser, MaybeAuthUser};
 use crate::state::{AppState, SessionEvent};
 use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
@@ -33,13 +33,19 @@ async fn current_session(
     State(state): State<AppState>,
     Query(query): Query<CurrentSessionQuery>,
 ) -> AppResult<Json<Option<CurrentSessionView>>> {
+    // 未发布课程的课堂不进入学生端：教师可以先给草稿课程试讲，
+    // 但学生端首页不应该出现一门学生看不到详情页的课。
     let row = match query.class_id {
         Some(class_id) => {
             sqlx::query_as::<_, SessionRow>(
-                "SELECT id, class_id, teacher_id, lesson_id, status, started_at, paused_at, ended_at
-                 FROM classroom_sessions
-                 WHERE class_id = ?1 AND status IN ('running', 'paused')
-                 ORDER BY started_at DESC LIMIT 1",
+                "SELECT s.id, s.class_id, s.teacher_id, s.lesson_id, s.status,
+                    s.started_at, s.paused_at, s.ended_at
+                 FROM classroom_sessions s
+                 JOIN lessons l ON l.id = s.lesson_id
+                 JOIN courses c ON c.id = l.course_id
+                 WHERE s.class_id = ?1 AND s.status IN ('running', 'paused')
+                   AND c.status = 'published'
+                 ORDER BY s.started_at DESC LIMIT 1",
             )
             .bind(class_id)
             .fetch_optional(&state.db)
@@ -47,10 +53,13 @@ async fn current_session(
         }
         None => {
             sqlx::query_as::<_, SessionRow>(
-                "SELECT id, class_id, teacher_id, lesson_id, status, started_at, paused_at, ended_at
-                 FROM classroom_sessions
-                 WHERE status IN ('running', 'paused')
-                 ORDER BY started_at DESC LIMIT 1",
+                "SELECT s.id, s.class_id, s.teacher_id, s.lesson_id, s.status,
+                    s.started_at, s.paused_at, s.ended_at
+                 FROM classroom_sessions s
+                 JOIN lessons l ON l.id = s.lesson_id
+                 JOIN courses c ON c.id = l.course_id
+                 WHERE s.status IN ('running', 'paused') AND c.status = 'published'
+                 ORDER BY s.started_at DESC LIMIT 1",
             )
             .fetch_optional(&state.db)
             .await?
@@ -92,9 +101,12 @@ async fn list_sessions(
 /// 课堂详情（含快照内容，历史稳定）。
 async fn get_session(
     State(state): State<AppState>,
+    viewer: MaybeAuthUser,
     Path(id): Path<i64>,
 ) -> AppResult<Json<CurrentSessionView>> {
     let session = fetch_session(&state, id).await?;
+    // 学生端课堂详情是公开链接，但草稿课程的课堂不应经直链泄露。
+    ensure_lesson_published(&state, session.lesson_id, &viewer).await?;
     Ok(Json(build_view(&state, session).await?))
 }
 
@@ -152,6 +164,20 @@ async fn create_session(
     // 后者已在保存课时时清洗过，这里原样快照即可。
     let lesson = crate::routes::lessons::fetch_lesson(&state, payload.lesson_id).await?;
 
+    // 未发布课程不允许开课：学生端看不到课程详情，课堂也无法跟随，
+    // 还会占用该班级唯一的活动课堂名额，导致真正要上的课开不起来。
+    let course_status: Option<String> =
+        sqlx::query_scalar("SELECT status FROM courses WHERE id = ?1")
+            .bind(lesson.course_id)
+            .fetch_optional(&state.db)
+            .await?;
+
+    if course_status.as_deref() != Some("published") {
+        return Err(AppError::BadRequest(
+            "课程尚未发布，请先发布课程后再开始上课".into(),
+        ));
+    }
+
     let snapshot = serde_json::json!({
         "fields": serde_json::from_str::<serde_json::Value>(&lesson.content_json)
             .unwrap_or_else(|_| serde_json::json!({})),
@@ -171,8 +197,14 @@ async fn create_session(
     .fetch_one(&state.db)
     .await?;
 
-    crate::routes::auth::audit(&state, Some(user.id()), "session.create", "session", &id.to_string())
-        .await;
+    crate::routes::auth::audit(
+        &state,
+        Some(user.id()),
+        "session.create",
+        "session",
+        &id.to_string(),
+    )
+    .await;
 
     fetch_session(&state, id).await.map(Json)
 }
@@ -314,7 +346,10 @@ async fn build_view(state: &AppState, session: SessionRow) -> AppResult<CurrentS
     let (fields, html) = if let Some(object) = snapshot.as_object() {
         if object.contains_key("fields") || object.contains_key("html") {
             (
-                object.get("fields").cloned().unwrap_or_else(|| serde_json::json!({})),
+                object
+                    .get("fields")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({})),
                 object
                     .get("html")
                     .and_then(|value| value.as_str())

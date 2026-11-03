@@ -14,12 +14,20 @@
  * 姓名与设备标识都保存在 localStorage，同一台机器下次无需重复输入。
  */
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { ElMessage, type UploadFile, type UploadUserFile } from 'element-plus'
 import {
+  ElMessage,
+  ElMessageBox,
+  type UploadFile,
+  type UploadUserFile,
+} from 'element-plus'
+import {
+  ApiError,
   api,
+  saveSubmissionToken,
   type ClassStudent,
   type CreateSubmissionResponse,
   type LessonSubmissionStatus,
+  type SubmissionLimits,
   type UploadProgress,
 } from '@/api'
 import { formatBytes, formatRemaining, formatSpeed, formatTime } from '@/utils/format'
@@ -111,7 +119,7 @@ async function loadRoster() {
   if (!props.classId) return
   rosterLoading.value = true
   try {
-    const result = await api.classStudents(props.classId)
+    const result = await api.studentClassRoster(props.classId)
     roster.value = result.items
     // 记住的学号若不在本班名单里，说明换了班级或名单已变更。
     // 此时学号与姓名都要清掉：姓名往往是从上一个班的名单带出来的，
@@ -240,6 +248,208 @@ const selectedFiles = computed<File[]>(() => {
 
 const totalBytes = computed(() => selectedFiles.value.reduce((sum, file) => sum + file.size, 0))
 
+/**
+ * 状态接口不可用时的保守上限。
+ *
+ * 宁可让学生少传一点，也不能让文件传到一半被服务端拒绝——
+ * 大文件重传的代价远高于提前提示。
+ */
+const FALLBACK_LIMITS: SubmissionLimits = {
+  max_files: 10,
+  max_file_bytes: 2 * 1024 * 1024 * 1024,
+  max_total_bytes: 4 * 1024 * 1024 * 1024,
+}
+
+/** 当前生效的上限：优先用服务端下发值，缺失时退化为保守默认 */
+const limits = computed<SubmissionLimits>(() => status.value?.limits ?? FALLBACK_LIMITS)
+
+/** 上限是否来自服务端；false 表示已退化为保守默认，界面需要提示 */
+const limitsFromServer = computed(() => Boolean(status.value?.limits))
+
+/**
+ * 网络类错误：请求根本没到达服务端或中途被打断。
+ *
+ * 这类失败与「服务端拒绝」不同——文件没被接收，学生应当能原地重试，
+ * 而不是重新选一遍文件。`status === 0` 是提交封装对网络错误的约定。
+ */
+function isRetryableError(err: unknown): boolean {
+  if (!(err instanceof ApiError)) return false
+  return err.code === 'network_error' || err.code === 'aborted' || err.status === 0
+}
+
+/** 上次提交失败但可重试时的错误文案 */
+const retryHint = ref('')
+
+/** 姓名长度上限 */
+const NAME_MAX = 40
+/** 控制字符（含 DEL），粘进来的姓名常带这些不可见字符 */
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
+
+/**
+ * 校验姓名，返回错误文案；通过时返回空串。
+ *
+ * 姓名是教师认出「谁交的」的唯一依据，比文件名更需要拦干净：
+ * 全空格、超长、带换行或制表符都会让名单匹配失败。
+ */
+function validateName(raw: string): string {
+  const name = raw.trim()
+  if (!name) return '请填写提交人姓名'
+  if (CONTROL_CHARS.test(raw)) return '姓名含有不可见字符，请重新输入'
+  if (name.length > NAME_MAX) return `姓名不能超过 ${NAME_MAX} 个字`
+  return ''
+}
+
+/**
+ * 姓名的即时校验提示。
+ *
+ * 只在学生已经开始输入时提示，避免刚打开弹窗就报错；
+ * 提交时仍会再校验一次，这里的作用是让学生当场看到问题。
+ */
+const nameHint = computed(() => {
+  if (!studentName.value) return ''
+  return validateName(studentName.value)
+})
+
+/** 未选课时不允许提交，按钮上直接体现，而不是等点了才提示 */
+const lessonMissing = computed(() => props.lessonId === null)
+
+/** 累计已选文件的字节数 */
+const totalSelectedBytes = computed(() =>
+  selectedFiles.value.reduce((sum, file) => sum + file.size, 0),
+)
+
+/**
+ * 上传前预校验，返回错误文案；通过时返回空串。
+ *
+ * 提示要能定位到具体文件与具体数字：只说「超出限制」，
+ * 学生面对十几个文件无从下手；说「第 3 个文件 xxx.mp4 超出 2 GB」
+ * 才知道该删哪个。
+ */
+function validateFiles(): string {
+  const files = selectedFiles.value
+  const limit = limits.value
+  if (files.length === 0) return '请至少选择一个文件'
+  if (files.length > limit.max_files) {
+    return `一次最多提交 ${limit.max_files} 个文件，当前已选 ${files.length} 个`
+  }
+  const perFile = formatBytes(limit.max_file_bytes)
+  for (let index = 0; index < files.length; index += 1) {
+    const file = files[index]
+    if (file.size > limit.max_file_bytes) {
+      return `第 ${index + 1} 个文件「${file.name}」（${formatBytes(file.size)}）超出单个文件上限 ${perFile}`
+    }
+  }
+  const total = totalSelectedBytes.value
+  if (total > limit.max_total_bytes) {
+    return `所选文件合计 ${formatBytes(total)}，超出 ${formatBytes(limit.max_total_bytes)} 的提交总上限，请减少文件`
+  }
+  return ''
+}
+
+/**
+ * 提交前二次确认：把关键信息摊开，避免误交别人的名字或选错课时。
+ *
+ * 摘要拼成单行用「；」分隔，而不是用换行或 HTML 片段：
+ * 姓名与备注都是学生输入，走 HTML 渲染会给 Message Box 引入注入面，
+ * 单行文本既安全也不会在小屏幕里被截断成两截。
+ */
+async function confirmBeforeSubmit(name: string): Promise<boolean> {
+  const no = studentNo.value.trim()
+  const files = selectedFiles.value
+  const parts = [
+    `课时：${props.lessonTitle || '未选择'}`,
+    `姓名：${name}${no ? `（学号 ${no}）` : ''}`,
+    `文件：${files.length} 个，合计 ${formatBytes(totalSelectedBytes.value)}`,
+  ]
+  if (note.value.trim()) parts.push('已填写备注')
+  try {
+    await ElMessageBox.confirm(parts.join('；'), '确认提交这份作业？', {
+      confirmButtonText: '确认提交',
+      cancelButtonText: '再看看',
+      type: 'info',
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function submit() {
+  // 上传中重复点击不重复提交
+  if (uploading.value) return
+
+  const name = studentName.value.trim()
+  const nameError = validateName(studentName.value)
+  if (nameError) {
+    ElMessage.warning(nameError)
+    return
+  }
+  if (props.lessonId === null) {
+    ElMessage.warning('未选择课时，无法提交')
+    return
+  }
+  const fileError = validateFiles()
+  if (fileError) {
+    ElMessage.warning(fileError)
+    return
+  }
+
+  const confirmed = await confirmBeforeSubmit(name)
+  // 取消确认只代表「这次不交」，失败重试提示要留着，不能一并清掉
+  if (!confirmed) return
+
+  uploading.value = true
+  progress.value = 0
+  resetSpeed()
+  try {
+    const lessonId = props.lessonId
+    const result = await api.submitHomework(
+      {
+        studentName: name,
+        studentNo: studentNo.value.trim() || undefined,
+        lessonId,
+        classId: props.classId ?? null,
+        note: note.value.trim(),
+        deviceId: deviceId.value,
+        files: selectedFiles.value,
+      },
+      (progressInfo) => {
+        progress.value = progressInfo.percent
+        updateSpeed(progressInfo)
+      },
+    )
+
+    // 提交凭证：学生端没有登录态，靠它回读/撤回/下载作业文件
+    saveSubmissionToken(lessonId, result.submission.id, result.access_token, result.withdraw_deadline)
+
+    localStorage.setItem(NAME_KEY, name)
+    if (studentNo.value.trim()) localStorage.setItem(NO_KEY, studentNo.value.trim())
+
+    if (result.duplicate_warning) {
+      ElMessage.warning(result.duplicate_warning)
+    } else {
+      ElMessage.success('作业提交成功')
+    }
+
+    visible.value = false
+    emit('submitted', result)
+    await loadStatus()
+  } catch (err) {
+    if (isRetryableError(err)) {
+      // 网络中断：保留已选文件与表单，给出可点重试的提示
+      retryHint.value =
+        err instanceof ApiError && err.code === 'aborted'
+          ? '提交已中断，文件仍在，可直接重试。'
+          : '网络中断，文件没有上传成功。已选文件都还在，网络恢复后请点「重试」。'
+      ElMessage.warning(retryHint.value)
+    } else {
+      ElMessage.error(err instanceof Error ? err.message : '提交失败')
+    }
+  } finally {
+    uploading.value = false
+  }
+}
+
 /** 本设备已提交时的提醒文案 */
 const deviceHint = computed(() => {
   const device = status.value?.device
@@ -360,7 +570,11 @@ function fileKey(file: File): string {
 /** el-upload 的变更回调：保留完整文件列表并刷新预览 */
 async function onFilesChange(files: UploadFile[], list: UploadUserFile[]) {
   fileList.value = list
-  if (files.length > 10) ElMessage.warning('一次最多提交 10 个文件')
+  // 超限在这里只做提醒，真正拦截在提交前的统一校验里，
+  // 这样学生可以先把文件都选好再逐个删掉多余的那几个。
+  if (files.length > limits.value.max_files) {
+    ElMessage.warning(`一次最多提交 ${limits.value.max_files} 个文件`)
+  }
   await rebuildPreviews()
 }
 
@@ -396,6 +610,7 @@ watch(
     note.value = ''
     fileList.value = []
     progress.value = 0
+    retryHint.value = ''
     resetSpeed()
     // 名单与提交状态并行加载：两者互不依赖，串行会多等一个往返
     await Promise.all([loadStatus(), loadRoster()])
@@ -410,77 +625,14 @@ async function loadStatus() {
       classId: props.classId ?? null,
       deviceId: deviceId.value,
     })
+    // 服务端没给 limits（旧版本后端）时按保守上限走，并明确告知学生
+    if (!status.value.limits) ElMessage.warning('未能读取服务器限制，已按保守上限校验')
   } catch {
     // 状态查询失败不阻断提交，重复检测仍在服务端执行
     status.value = null
+    ElMessage.warning('未能读取服务器限制，已按保守上限校验')
   } finally {
     statusLoading.value = false
-  }
-}
-
-/** 单个文件大小上限（与服务端 storage.max_file_bytes 默认值一致） */
-const MAX_FILE_BYTES = 20 * 1024 * 1024 * 1024
-
-async function submit() {
-  const name = studentName.value.trim()
-  if (!name) {
-    ElMessage.warning('请填写提交人姓名')
-    return
-  }
-  if (props.lessonId === null) {
-    ElMessage.warning('未选择课时，无法提交')
-    return
-  }
-  if (selectedFiles.value.length === 0) {
-    ElMessage.warning('请至少选择一个文件')
-    return
-  }
-  if (selectedFiles.value.length > 10) {
-    ElMessage.warning('一次最多提交 10 个文件')
-    return
-  }
-  const oversized = selectedFiles.value.find((file) => file.size > MAX_FILE_BYTES)
-  if (oversized) {
-    ElMessage.warning(`文件「${oversized.name}」超出大小上限`)
-    return
-  }
-
-  uploading.value = true
-  progress.value = 0
-  resetSpeed()
-  try {
-    const result = await api.submitHomework(
-      {
-        studentName: name,
-        studentNo: studentNo.value.trim() || undefined,
-        lessonId: props.lessonId,
-        classId: props.classId ?? null,
-        note: note.value.trim(),
-        deviceId: deviceId.value,
-        files: selectedFiles.value,
-      },
-      (progressInfo) => {
-        progress.value = progressInfo.percent
-        updateSpeed(progressInfo)
-      },
-    )
-
-    localStorage.setItem(NAME_KEY, name)
-    if (studentNo.value.trim()) localStorage.setItem(NO_KEY, studentNo.value.trim())
-
-    if (result.duplicate_warning) {
-      ElMessage.warning(result.duplicate_warning)
-    } else {
-      ElMessage.success('作业提交成功')
-    }
-
-    visible.value = false
-    emit('submitted', result)
-    await loadStatus()
-  } catch (err) {
-    ElMessage.error(err instanceof Error ? err.message : '提交失败')
-  } finally {
-    uploading.value = false
   }
 }
 
@@ -532,6 +684,18 @@ function kindLabel(kind: LocalPreivew['kind']): string {
         <span v-if="classHint" class="submit-form__class-hint">{{ classHint }}</span>
       </p>
 
+      <!-- 未选课时：直接说明原因，而不是让学生点提交后才看到提示 -->
+      <el-alert
+        v-if="lessonMissing"
+        type="info"
+        :closable="false"
+        show-icon
+        class="submit-form__alert"
+      >
+        <template #title>还没有选择课时</template>
+        请先在右侧课时列表中选择一节，再回来提交作业。
+      </el-alert>
+
       <el-form label-width="76px" label-position="left">
         <!--
           有班级名单时优先让学生从名单里选自己：
@@ -572,6 +736,7 @@ function kindLabel(kind: LocalPreivew['kind']): string {
             show-word-limit
             :disabled="uploading"
           />
+          <div v-if="nameHint" class="submit-form__field-hint">{{ nameHint }}</div>
         </el-form-item>
 
         <el-form-item v-if="hasRoster" label="学号">
@@ -595,7 +760,12 @@ function kindLabel(kind: LocalPreivew['kind']): string {
             <el-button :disabled="uploading">选择文件</el-button>
             <template #tip>
               <div class="submit-form__tip">
-                可一次选择多个文件，支持视频、图片、文档、压缩包等；单文件最大 20 GiB。
+                可一次选择多个文件，支持视频、图片、文档、压缩包等；最多
+                {{ limits.max_files }} 个，单个最大 {{ formatBytes(limits.max_file_bytes) }}，合计不超过
+                {{ formatBytes(limits.max_total_bytes) }}。
+                <span v-if="!limitsFromServer" class="submit-form__tip-warn">
+                  （未能读取服务器限制，已按保守上限校验）
+                </span>
               </div>
             </template>
           </el-upload>
@@ -715,6 +885,27 @@ function kindLabel(kind: LocalPreivew['kind']): string {
         </el-form-item>
       </el-form>
 
+      <!-- 网络中断后的重试提示：文件与表单都还在，直接点重试即可 -->
+      <el-alert
+        v-if="retryHint"
+        type="error"
+        :closable="false"
+        show-icon
+        class="submit-form__retry"
+      >
+        <template #title>本次没有提交成功</template>
+        {{ retryHint }}
+        <el-button
+          type="primary"
+          size="small"
+          :loading="uploading"
+          class="submit-form__retry-btn"
+          @click="submit"
+        >
+          重试
+        </el-button>
+      </el-alert>
+
       <p class="submit-form__privacy">
         提交时系统会记录来源 IP、设备标识与提交时间，仅用于教师核对作业归属。
       </p>
@@ -722,7 +913,13 @@ function kindLabel(kind: LocalPreivew['kind']): string {
 
     <template #footer>
       <el-button :disabled="uploading" @click="close">取消</el-button>
-      <el-button type="primary" :loading="uploading" @click="submit">
+      <el-button
+        type="primary"
+        :loading="uploading"
+        :disabled="lessonMissing"
+        :title="lessonMissing ? '请先在右侧选择一个课时' : ''"
+        @click="submit"
+      >
         {{ uploading ? '正在提交…' : '确认提交' }}
       </el-button>
     </template>
@@ -778,6 +975,27 @@ function kindLabel(kind: LocalPreivew['kind']): string {
   color: var(--text-sub);
   line-height: 1.6;
   margin-top: 4px;
+}
+
+.submit-form__tip-warn {
+  color: #b26a00;
+}
+
+/* 字幕提示与字段级错误提示 */
+.submit-form__field-hint {
+  width: 100%;
+  font-size: 12px;
+  color: var(--el-color-danger);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+.submit-form__retry {
+  margin-top: 4px;
+}
+
+.submit-form__retry-btn {
+  margin-left: 10px;
 }
 
 /* 本地预览 */

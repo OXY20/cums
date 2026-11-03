@@ -9,6 +9,12 @@
  */
 import { writeFileSync, mkdirSync } from 'node:fs'
 
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
+
+
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 const CDP = process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222'
 const OUT = 'docs/screenshots'
@@ -35,7 +41,7 @@ async function api(path, options = {}) {
 const login = await api('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const token = login.body.token
 const H = { Authorization: `Bearer ${token}` }
@@ -44,8 +50,10 @@ const courses = (await api('/api/courses', { headers: H })).body.items
 const classes = (await api('/api/classes', { headers: H })).body.items
 
 console.log('\n[1] 后端数据')
-check('课程 4 门', courses.length === 4, `实际 ${courses.length}`)
-check('班级 3 个', classes.length === 3, `实际 ${classes.length}`)
+// 断言的是演示数据「至少」造出这么多；其它脚本可能额外建过课程与班级，
+// 因此不能用精确数量断言，否则会把数据累积误报成功能缺陷。
+check('课程至少 4 门', courses.length >= 4, `实际 ${courses.length}`)
+check('班级至少 3 个', classes.length >= 3, `实际 ${classes.length}`)
 const wps = courses.find((c) => c.title === '计算机应用基础')
 check('存在「计算机应用基础」', Boolean(wps))
 

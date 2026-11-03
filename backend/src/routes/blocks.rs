@@ -7,7 +7,7 @@ use crate::error::{AppError, AppResult};
 use crate::models::{
     CreateBlockRequest, LessonBlockRow, ListResponse, ReorderBlocksRequest, UpdateBlockRequest,
 };
-use crate::routes::AuthUser;
+use crate::routes::{ensure_lesson_published, AuthUser, MaybeAuthUser};
 use crate::state::AppState;
 use axum::extract::{Path, State};
 use axum::routing::{get, put};
@@ -23,17 +23,16 @@ pub fn routes() -> Router<AppState> {
             "/api/lessons/{lesson_id}/blocks/reorder",
             put(reorder_blocks),
         )
-        .route(
-            "/api/blocks/{id}",
-            put(update_block).delete(delete_block),
-        )
+        .route("/api/blocks/{id}", put(update_block).delete(delete_block))
 }
 
 /// 列出某课时的全部正文块，媒体块附带资源信息。
 async fn list_blocks(
     State(state): State<AppState>,
+    viewer: MaybeAuthUser,
     Path(lesson_id): Path<i64>,
 ) -> AppResult<Json<ListResponse<LessonBlockRow>>> {
+    ensure_lesson_published(&state, lesson_id, &viewer).await?;
     let rows = fetch_blocks(&state, lesson_id).await?;
     Ok(Json(ListResponse::new(rows)))
 }

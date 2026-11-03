@@ -21,10 +21,11 @@ const resources = ref<Resource[]>([])
 
 onMounted(async () => {
   try {
-    resources.value = (await api.resources()).items
-  } catch {
-    // 未登录时资源列表不可用，保留空列表
+    // 学生端未登录，走公开接口：只返回已发布课程关联的资源。
+    resources.value = (await api.studentResources()).items
+  } catch (err) {
     resources.value = []
+    ElMessage.error(err instanceof Error ? err.message : '资源加载失败')
   }
 })
 

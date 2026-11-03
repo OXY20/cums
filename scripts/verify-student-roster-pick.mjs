@@ -1,4 +1,5 @@
 /**
+
  * 验证学生端「从班级名单选择自己」的完整链路。
  *
  * 这条链路是把前面几个功能串起来的关键：
@@ -6,6 +7,11 @@
  *
  * 用法：node scripts/verify-student-roster-pick.mjs [baseUrl] [cdpEndpoint]
  */
+
+// 管理员凭据：安装向导创建后账号名与口令由使用者决定，
+// 因此允许通过环境变量覆盖，默认保持与旧版一致。
+const ADMIN_USER = process.env.ADMIN_USER ?? 'admin'
+const ADMIN_PASS = process.env.ADMIN_PASS ?? 'admin'
 const BASE = process.argv[2] ?? 'http://127.0.0.1:8080'
 const CDP = process.argv[3] ?? process.env.CDP_ENDPOINT ?? 'http://127.0.0.1:9222'
 
@@ -39,7 +45,7 @@ async function j(path, options = {}) {
 const login = await j('/api/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'admin' }),
+  body: JSON.stringify({ username: ADMIN_USER, password: ADMIN_PASS }),
 })
 const token = login.body.token
 const H = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
@@ -282,6 +288,13 @@ try {
   check('已选择文件', (await evaluate(`document.querySelectorAll('.local-preview__tab').length`)) === 1)
 
   await clickByText('.el-dialog__footer button', '确认提交')
+  // 提交前有二次确认，需要再点一次才真正上传
+  await waitFor(
+    `document.querySelector('.el-message-box') !== null`,
+    '提交确认框',
+    10000,
+  )
+  await clickByText('.el-message-box__btns button', '确认提交')
   await waitFor(
     `Array.from(document.querySelectorAll('.el-dialog__title')).some((t) => t.innerText.includes('作业已提交'))`,
     '提交成功',
